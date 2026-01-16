@@ -1,0 +1,142 @@
+{
+  "name": "react-din",
+  "version": "0.1.0",
+  "description": "A React-first declarative WebAudio library for building audio graphs",
+  "author": "Valentin Dubois - veacks.net",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./core": {
+      "import": {
+        "types": "./dist/core/index.d.ts",
+        "default": "./dist/core/index.js"
+      },
+      "require": {
+        "types": "./dist/core/index.d.cts",
+        "default": "./dist/core/index.cjs"
+      }
+    },
+    "./nodes": {
+      "import": {
+        "types": "./dist/nodes/index.d.ts",
+        "default": "./dist/nodes/index.js"
+      },
+      "require": {
+        "types": "./dist/nodes/index.d.cts",
+        "default": "./dist/nodes/index.cjs"
+      }
+    },
+    "./transport": {
+      "import": {
+        "types": "./dist/transport/index.d.ts",
+        "default": "./dist/transport/index.js"
+      },
+      "require": {
+        "types": "./dist/transport/index.d.cts",
+        "default": "./dist/transport/index.cjs"
+      }
+    },
+    "./sequencer": {
+      "import": {
+        "types": "./dist/sequencer/index.d.ts",
+        "default": "./dist/sequencer/index.js"
+      },
+      "require": {
+        "types": "./dist/sequencer/index.d.cts",
+        "default": "./dist/sequencer/index.cjs"
+      }
+    },
+    "./analyzers": {
+      "import": {
+        "types": "./dist/analyzers/index.d.ts",
+        "default": "./dist/analyzers/index.js"
+      },
+      "require": {
+        "types": "./dist/analyzers/index.d.cts",
+        "default": "./dist/analyzers/index.cjs"
+      }
+    },
+    "./sources": {
+      "import": {
+        "types": "./dist/sources/index.d.ts",
+        "default": "./dist/sources/index.js"
+      },
+      "require": {
+        "types": "./dist/sources/index.d.cts",
+        "default": "./dist/sources/index.cjs"
+      }
+    },
+    "./effects": {
+      "import": {
+        "types": "./dist/effects/index.d.ts",
+        "default": "./dist/effects/index.js"
+      },
+      "require": {
+        "types": "./dist/effects/index.d.cts",
+        "default": "./dist/effects/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "eslint src --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "prettier": "^3.2.5"
+  },
+  "keywords": [
+    "react",
+    "webaudio",
+    "audio",
+    "declarative",
+    "dsp",
+    "music",
+    "sequencer",
+    "synthesizer"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/react-din.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/react-din/issues"
+  },
+  "homepage": "https://github.com/yourusername/react-din#readme"
+}
