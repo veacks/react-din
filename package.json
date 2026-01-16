@@ -133,10 +133,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/react-din.git"
+    "url": "https://github.com/veacks/react-din.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/react-din/issues"
+    "url": "https://github.com/veacks/react-din/issues"
   },
-  "homepage": "https://github.com/yourusername/react-din#readme"
+  "homepage": "https://github.com/veacks/react-din#readme"
 }

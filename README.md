@@ -4,6 +4,10 @@ A React-first declarative WebAudio library for building audio graphs.
 
 Build complex audio graphs using React's declarative paradigm. Audio nodes are represented as React components that automatically connect based on their parent-child relationships.
 
+> [!WARNING]  
+> This is a work in progress. The API is not stable and may change in the future.
+> It as been published to reserve npm package name `react-din`.
+
 ## Features
 
 - 🎛️ **Declarative Audio Graph** - Build audio graphs using JSX components
