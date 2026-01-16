@@ -22,6 +22,7 @@ const DEFAULT_CONFIG: TransportConfig = {
     stepsPerBeat: 4,
     swing: 0,
     swingSubdivision: 2,
+    mode: 'raf',
 };
 
 /**
@@ -95,6 +96,7 @@ export const TransportProvider: FC<TransportProviderProps> = ({
         stepsPerBeat,
         swing,
         swingSubdivision,
+        mode: 'raf',
     });
 
     const schedulerRef = useRef<number | null>(null);
@@ -173,9 +175,95 @@ export const TransportProvider: FC<TransportProviderProps> = ({
         setConfigState((prev) => ({ ...prev, ...updates }));
     }, []);
 
-    // Scheduler loop
+    // Toggle play/stop
+    const toggle = useCallback(() => {
+        if (isPlaying) {
+            stop();
+        } else {
+            play();
+        }
+    }, [isPlaying, play, stop]);
+
+    // Reset position without stopping
+    const reset = useCallback(() => {
+        setPosition(DEFAULT_POSITION);
+        if (context) {
+            nextStepTimeRef.current = context.currentTime;
+        }
+    }, [context]);
+
+    // Manual update for 'manual' mode
+    const update = useCallback((now?: number) => {
+        if (config.mode !== 'manual' || !context || !isPlaying) return;
+
+        const currentTime = now ?? context.currentTime;
+        const stepsPerBar = config.stepsPerBeat * config.beatsPerBar;
+        const stepsPerPhrase = stepsPerBar * config.barsPerPhrase;
+        const lookAhead = 0.1;
+
+        while (nextStepTimeRef.current < currentTime + lookAhead) {
+            const stepTime = nextStepTimeRef.current;
+            const totalSteps = position.totalSteps;
+
+            const currentPhrase = Math.floor(totalSteps / stepsPerPhrase);
+            const stepsInPhrase = totalSteps % stepsPerPhrase;
+            const currentBar = Math.floor(stepsInPhrase / stepsPerBar);
+            const stepsInBar = stepsInPhrase % stepsPerBar;
+            const currentBeat = Math.floor(stepsInBar / config.stepsPerBeat);
+            const currentStep = stepsInBar % config.stepsPerBeat;
+
+            onStep?.(currentStep, stepTime);
+            if (currentStep === 0) {
+                onBeat?.(currentBeat, stepTime);
+                if (currentBeat === 0) {
+                    onBar?.(currentBar, stepTime);
+                    if (currentBar === 0) {
+                        onPhrase?.(currentPhrase, stepTime);
+                    }
+                }
+            }
+
+            setPosition({
+                step: currentStep,
+                beat: currentBeat,
+                bar: currentBar,
+                phrase: currentPhrase,
+                totalSteps: totalSteps + 1,
+                totalTime: (totalSteps + 1) * stepDuration,
+            });
+
+            let swingOffset = 0;
+            if (config.swing && config.swingSubdivision) {
+                const isSwungStep = (totalSteps + 1) % config.swingSubdivision === 1;
+                if (isSwungStep) {
+                    swingOffset = stepDuration * (config.swing ?? 0) * 0.5;
+                }
+            }
+
+            nextStepTimeRef.current += stepDuration + swingOffset;
+        }
+    }, [config, context, isPlaying, position.totalSteps, stepDuration, onStep, onBeat, onBar, onPhrase]);
+
+    // Individual setters
+    const setBpm = useCallback((newBpm: number) => {
+        setConfigState((prev) => ({ ...prev, bpm: Math.max(20, Math.min(300, newBpm)) }));
+    }, []);
+
+    const setTimeSignature = useCallback((beatsPerBar: number, beatUnit = 4) => {
+        setConfigState((prev) => ({ ...prev, beatsPerBar, beatUnit }));
+    }, []);
+
+    const setStepsPerBeat = useCallback((steps: number) => {
+        setConfigState((prev) => ({ ...prev, stepsPerBeat: steps }));
+    }, []);
+
+    const setPhraseBars = useCallback((bars: number) => {
+        setConfigState((prev) => ({ ...prev, barsPerPhrase: bars }));
+    }, []);
+
+    // Scheduler loop (only for 'raf' mode)
     useEffect(() => {
-        if (!isPlaying || !context) return;
+        if (!isPlaying || !context || config.mode === 'manual') return;
 
         const stepsPerBar = config.stepsPerBeat * config.beatsPerBar;
         const stepsPerPhrase = stepsPerBar * config.barsPerPhrase;
@@ -260,6 +348,13 @@ export const TransportProvider: FC<TransportProviderProps> = ({
         seek,
         setTempo,
         setConfig,
+        toggle,
+        reset,
+        update,
+        setBpm,
+        setTimeSignature,
+        setStepsPerBeat,
+        setPhraseBars,
     };
 
     return (

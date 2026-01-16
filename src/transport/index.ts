@@ -15,4 +15,4 @@ export { TransportProvider, TransportContext } from './TransportContext';
 
 // Hooks
 export { useTransport } from './useTransport';
-export { useBeat } from './useBeat';
+export { useBeat, useStep, useBar, usePhrase } from './useBeat';

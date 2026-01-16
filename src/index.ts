@@ -68,6 +68,9 @@ export {
     // Hooks
     useTransport,
     useBeat,
+    useStep,
+    useBar,
+    usePhrase,
 } from './transport';
 
 export type {
@@ -112,6 +115,9 @@ export {
     useAnalyzer,
     useFFT,
     useMeter,
+    useWaveform,
+    useRMS,
+    usePeak,
 } from './analyzers';
 
 export type {
@@ -129,6 +135,7 @@ export type {
 export {
     Sampler,
     Noise,
+    NoiseBurst,
     MediaStream,
     ConstantSource,
 } from './sources';
@@ -138,9 +145,11 @@ export type {
     SamplerProps,
     NoiseProps,
     NoiseType,
+    NoiseBurstProps,
     MediaStreamProps,
     ConstantSourceProps,
 } from './sources';
+
 
 // -----------------------------------------------------------------------------
 // Effects (Extension)

@@ -63,3 +63,60 @@ export function useBeat(subdivision: 'step' | 'beat' | 'bar' = 'beat'): TimePosi
 
     return position;
 }
+
+/**
+ * Hook that returns the current step.
+ * Updates every step (16th note).
+ *
+ * @returns Current step number (0-indexed within beat)
+ *
+ * @example
+ * ```tsx
+ * function StepIndicator() {
+ *   const step = useStep();
+ *   return <div>Step: {step}</div>;
+ * }
+ * ```
+ */
+export function useStep(): number {
+    const transport = useTransport();
+    return transport.step;
+}
+
+/**
+ * Hook that returns the current bar.
+ * Updates every bar.
+ *
+ * @returns Current bar number (0-indexed within phrase)
+ *
+ * @example
+ * ```tsx
+ * function BarIndicator() {
+ *   const bar = useBar();
+ *   return <div>Bar: {bar + 1}</div>;
+ * }
+ * ```
+ */
+export function useBar(): number {
+    const transport = useTransport();
+    return transport.bar;
+}
+
+/**
+ * Hook that returns the current phrase.
+ * Updates every phrase.
+ *
+ * @returns Current phrase number (0-indexed)
+ *
+ * @example
+ * ```tsx
+ * function PhraseIndicator() {
+ *   const phrase = usePhrase();
+ *   return <div>Phrase: {phrase + 1}</div>;
+ * }
+ * ```
+ */
+export function usePhrase(): number {
+    const transport = useTransport();
+    return transport.phrase;
+}

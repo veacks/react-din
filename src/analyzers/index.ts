@@ -19,3 +19,5 @@ export { Analyzer } from './Analyzer';
 export { useAnalyzer } from './useAnalyzer';
 export { useFFT } from './useFFT';
 export { useMeter } from './useMeter';
+export { useWaveform } from './useWaveform';
+export { useRMS, usePeak } from './useLevels';

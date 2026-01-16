@@ -93,6 +93,14 @@ export interface TransportConfig {
      * @default 2
      */
     swingSubdivision?: number;
+
+    /**
+     * Transport mode.
+     * 'raf' = uses internal requestAnimationFrame loop
+     * 'manual' = requires calling update() from external loop
+     * @default 'raf'
+     */
+    mode?: 'raf' | 'manual';
 }
 
 // =============================================================================
@@ -165,6 +173,43 @@ export interface TransportState extends TimePosition {
      * @param config - Partial configuration to merge
      */
     setConfig: (config: Partial<TransportConfig>) => void;
+
+    /**
+     * Toggle between play and stop.
+     */
+    toggle: () => void;
+
+    /**
+     * Reset position to start without stopping.
+     */
+    reset: () => void;
+
+    /**
+     * Manual update for 'manual' mode.
+     * Call from external loop (e.g., useFrame from r3f).
+     * @param now - Optional current time in seconds
+     */
+    update: (now?: number) => void;
+
+    /**
+     * Set BPM directly.
+     */
+    setBpm: (bpm: number) => void;
+
+    /**
+     * Set time signature.
+     */
+    setTimeSignature: (beatsPerBar: number, beatUnit?: number) => void;
+
+    /**
+     * Set steps per beat.
+     */
+    setStepsPerBeat: (steps: number) => void;
+
+    /**
+     * Set phrase length.
+     */
+    setPhraseBars: (bars: number) => void;
 }
 
 // =============================================================================
