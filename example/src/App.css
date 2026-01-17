@@ -649,3 +649,182 @@ button.secondary:hover:not(:disabled) {
 .acid-grid {
     margin-top: 1rem;
 }
+
+/* ========================================================================
+   New Sequencer Styles (Pagination & XY Pad)
+   ======================================================================== */
+
+.sequencer-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+/* Acid Section Layout */
+.acid-controls-wrapper {
+    display: flex;
+    gap: 1.5rem;
+    align-items: stretch;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.acid-controls {
+    flex: 1;
+    min-width: 300px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    align-items: flex-end;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+}
+
+.arp-container {
+    width: 140px;
+    flex-shrink: 0;
+}
+
+/* XY Pad */
+.xy-pad {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 100px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    touch-action: none;
+    cursor: crosshair;
+    overflow: hidden;
+    transition: all 0.2s;
+}
+
+.xy-pad.active {
+    border-color: #64B5F6;
+    box-shadow: 0 0 20px rgba(100, 181, 246, 0.2);
+}
+
+.xy-cursor {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    background: #64B5F6;
+    border: 2px solid white;
+    border-radius: 50%;
+    transform: translate(-50%, 50%);
+    pointer-events: none;
+    box-shadow: 0 0 10px #64B5F6;
+}
+
+.xy-label {
+    position: absolute;
+    bottom: 6px;
+    right: 6px;
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.3);
+    font-weight: 700;
+    pointer-events: none;
+    letter-spacing: 0.5px;
+}
+
+/* Pagination Bar */
+.pagination-bar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    margin-top: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.pagination-label {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.5);
+    font-weight: 700;
+}
+
+.pagination-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.page-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 700;
+    transition: all 0.1s;
+}
+
+.page-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.page-btn.active {
+    background: #E040FB;
+    color: white;
+    border-color: #E040FB;
+    box-shadow: 0 0 10px rgba(224, 64, 251, 0.4);
+}
+
+.page-btn.playing {
+    border-bottom: 3px solid #64B5F6;
+}
+
+.page-btn.active.playing {
+    border-bottom: 3px solid white;
+}
+
+.pagination-info {
+    margin-left: auto;
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.4);
+    font-family: 'Fira Code', monospace;
+}
+
+/* Status Section adjustments */
+.status-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.top-controls {
+    width: 100%;
+    justify-content: space-between;
+}
+
+/* Bass Specific */
+.bass-step-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.step-btn.bass {
+    border-color: #2196F3;
+}
+
+.step-btn.bass.on {
+    background: #2196F3;
+    box-shadow: 0 0 10px #2196F3;
+}
+
+@media (max-width: 900px) {
+    .instrument-grid {
+        grid-template-columns: 1fr;
+    }
+}
