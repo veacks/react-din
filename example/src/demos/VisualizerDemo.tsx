@@ -7,8 +7,10 @@ import { MeshBasicNodeMaterial, WebGPURenderer, SpriteNodeMaterial } from 'three
 import {
     time,
     uv,
+    vec3,
     vec4,
     float,
+    mix,
     mx_noise_vec3,
     uniform,
     storage,
@@ -61,6 +63,7 @@ const DebugOverlay = ({ setAudioLevel }: { setAudioLevel: (v: number) => void })
 
 // --- Particle System ---
 const ParticleSystem = ({ isRendererReady }: { isRendererReady: boolean }) => {
+    const { gl, scene } = useThree();
     const count = 20000;
     const { frequencyData } = useAnalyzer({ fftSize: 2048 }); // Higher FFT size for better resolution
 
@@ -113,16 +116,17 @@ const ParticleSystem = ({ isRendererReady }: { isRendererReady: boolean }) => {
         // Screen-space UV for soft circle (Billboarded)
         // SpriteNodeMaterial uses standard UVs 0..1
         const dist = uv().sub(0.5).length();
+        // Softer edge: power 3.0 instead of 2.0
         const alpha = float(0.5).sub(dist).mul(2.0).clamp(0, 1);
-        const circle = alpha.pow(2.0);
+        const circle = alpha.pow(3.0);
 
-        m.colorNode = vec4(1, 1, 1, circle);
+        m.colorNode = vec4(0.9, 0.95, 1.0, circle); // Slight blue tint to white
 
         // Position: Access buffer via instanceIndex
         m.positionNode = posBuf.element(instanceIndex);
 
         // Dynamic Size
-        m.scaleNode = float(0.1).add(uAudio.mul(0.5));
+        m.scaleNode = float(0.05).add(uAudio.mul(0.3));
 
         m.transparent = true;
         m.depthWrite = false;
@@ -136,6 +140,30 @@ const ParticleSystem = ({ isRendererReady }: { isRendererReady: boolean }) => {
 
         return { computeNode: compute, material: m, geometry: geo };
     }, []);
+
+    // Background Node (Smoke Effect)
+    useEffect(() => {
+        // Color Palette (High Contrast Grayscale)
+        const color1 = vec3(0.0, 0.0, 0.0);   // Pure Black
+        const color2 = vec3(1., 1., 1.);   // Bright Grey
+
+        // Noise pattern
+        // We use uv() which in background context maps to screen
+        const noiseScale = float(10.1);
+        const timeScale = float(.1);
+
+        const n = mx_noise_vec3(uv().mul(noiseScale).add(vec3(uTime.mul(timeScale), 0, uTime.mul(timeScale))));
+
+        // Enhance contrast of the noise pattern itself
+        let factor = n.r.add(1.0).mul(0.5);
+        factor = factor.pow(1.5).clamp(0, 1);
+
+        const bg = mix(color1, color2, factor);
+
+        scene.backgroundNode = bg;
+
+        return () => { scene.backgroundNode = null; };
+    }, [scene]);
 
     useFrame((state, delta) => {
         if (!isRendererReady) return;
@@ -238,7 +266,7 @@ export const VisualizerDemo = () => {
                         return renderer as unknown as THREE.WebGLRenderer;
                     }}
                 >
-                    <color attach="background" args={['#000000']} />
+                    <color attach="background" args={['#999999']} />
                     <PerspectiveCamera makeDefault position={[0, 0, 10]} />
                     <DebugOverlay setAudioLevel={setDebugAudioLevel} />
                     <Suspense fallback={null}>
