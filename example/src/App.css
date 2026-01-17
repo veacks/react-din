@@ -463,3 +463,189 @@ button.secondary:hover:not(:disabled) {
 .event-item:last-child {
     border-bottom: none;
 }
+
+/* ========================================================================
+   Sequencer Demo Styles
+   ======================================================================== */
+
+.sequencer-demo h2 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Sequencer Grid */
+.sequencer-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.sequencer-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    transition: opacity 0.2s;
+}
+
+.sequencer-row.muted {
+    opacity: 0.4;
+}
+
+.row-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 100px;
+}
+
+.row-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-family: 'Fira Code', monospace;
+}
+
+.mute-btn {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.mute-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.mute-btn.active {
+    background: #EF5350;
+    border-color: #EF5350;
+    color: white;
+}
+
+/* Step Buttons */
+.step-buttons {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.step-btn {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    transition: all 0.1s ease-out;
+    position: relative;
+}
+
+.step-btn:hover {
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.step-btn.beat-start {
+    border-left: 3px solid rgba(255, 255, 255, 0.3);
+}
+
+.step-btn.on {
+    background: var(--step-color, #64B5F6);
+    border-color: var(--step-color, #64B5F6);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--step-color, #64B5F6) 50%, transparent);
+}
+
+.step-btn.current {
+    transform: scale(1.1);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+    border-color: white;
+}
+
+.step-btn.on.current {
+    transform: scale(1.15);
+    box-shadow: 0 0 25px var(--step-color, #64B5F6);
+}
+
+/* Acid Step specific */
+.acid-step-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.step-btn.acid.accent {
+    border-width: 3px;
+    border-color: #FF5722;
+}
+
+.step-btn.acid.on.accent {
+    box-shadow: 0 0 15px #FF5722, 0 0 5px var(--step-color, #00FF88);
+}
+
+.note-indicator {
+    font-size: 0.625rem;
+    font-family: 'Fira Code', monospace;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* Acid Row */
+.acid-row {
+    background: linear-gradient(135deg, rgba(0, 255, 136, 0.05), rgba(0, 200, 100, 0.02));
+    border: 1px solid rgba(0, 255, 136, 0.2);
+}
+
+.acid-row .step-btn.on {
+    background: linear-gradient(135deg, #00FF88, #00CC66);
+}
+
+/* Acid Controls */
+.acid-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    align-items: flex-end;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.acid-controls .control-group {
+    flex: 1;
+    min-width: 120px;
+}
+
+.acid-controls input[type="range"] {
+    width: 100%;
+}
+
+.acid-controls button {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
+.acid-label {
+    color: #00FF88;
+}
+
+.acid-mute-btn {
+    margin-left: auto;
+}
+
+.acid-grid {
+    margin-top: 1rem;
+}

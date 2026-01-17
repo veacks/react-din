@@ -2,6 +2,7 @@ import { Route, Switch, Link, useLocation } from 'wouter';
 import { CoreDemo } from './demos/CoreDemo';
 import { NodesDemo } from './demos/NodesDemo';
 import { TransportDemo } from './demos/TransportDemo';
+import { SequencerDemo } from './demos/SequencerDemo';
 import './App.css';
 
 const demos = [
@@ -9,8 +10,8 @@ const demos = [
   { path: '/core', label: 'Core', component: CoreDemo },
   { path: '/nodes', label: 'Nodes', component: NodesDemo },
   { path: '/transport', label: 'Transport', component: TransportDemo },
+  { path: '/sequencer', label: 'Sequencer', component: SequencerDemo },
   // Future demos:
-  // { path: '/sequencer', label: 'Sequencer', component: SequencerDemo },
   // { path: '/analyzers', label: 'Analyzers', component: AnalyzersDemo },
 ];
 
@@ -32,10 +33,10 @@ function Home() {
           <h3>Transport</h3>
           <p>BPM, time signatures, playback control</p>
         </Link>
-        <div className="demo-link disabled">
+        <Link href="/sequencer" className="demo-link">
           <h3>Sequencer</h3>
-          <p>Coming soon...</p>
-        </div>
+          <p>TR-909 drums & TB-303 acid synth</p>
+        </Link>
         <div className="demo-link disabled">
           <h3>Analyzers</h3>
           <p>Coming soon...</p>
@@ -62,6 +63,7 @@ function App() {
           <Route path="/core" component={CoreDemo} />
           <Route path="/nodes" component={NodesDemo} />
           <Route path="/transport" component={TransportDemo} />
+          <Route path="/sequencer" component={SequencerDemo} />
           <Route>
             <div className="not-found">
               <h2>404 - Not Found</h2>
