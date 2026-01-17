@@ -22,39 +22,44 @@ import { PerspectiveCamera } from '@react-three/drei';
 
 // --- Organic Sound Components ---
 
-const AlienTexture = ({ active }: { active: boolean }) => {
-    const { context } = useAudio();
+const AlienTexture = ({ active, mouseX }: { active: boolean; mouseX: number }) => {
     const [modFreq, setModFreq] = useState(10);
+    const [detune, setDetune] = useState(0);
 
-    // Randomly modulate the modulator frequency
+    // Randomly modulate frequencies for evolving texture
     useEffect(() => {
         if (!active) return;
         const interval = setInterval(() => {
-            setModFreq(Math.random() * 50 + 5); // 5Hz to 55Hz
-        }, 200 + Math.random() * 500);
+            setModFreq(Math.random() * 80 + 10); // 10Hz to 90Hz
+            setDetune(Math.random() * 200 - 100); // -100 to +100 cents
+        }, 150 + Math.random() * 400);
         return () => clearInterval(interval);
     }, [active]);
 
-    // Simple FM: Carrier (Sine) + Modulator (Sawtooth)
-    // react-din doesn't support direct FM routing via props easily in this version,
-    // so we'll layer two complex tones to simulate it, or just use a bubbly random filter.
-    // Let's use a bubbly filter approach which is easier with current components.
+    // Mouse X controls pitch shift
+    const pitchShift = mouseX * 300;
 
     return (
-        <Gain gain={active ? 0.1 : 0}>
-            {/* Carrier-like tone with rapid filter modulation */}
-            <Filter frequency={modFreq * 20 + 200} type="bandpass" Q={10}>
-                <Osc frequency={200} type="sawtooth" />
+        <Gain gain={active ? 0.12 : 0}>
+            {/* Bubbly FM-like texture */}
+            <Filter frequency={modFreq * 25 + 300 + pitchShift} type="bandpass" Q={12}>
+                <Osc frequency={220 + pitchShift} type="sawtooth" detune={detune} />
             </Filter>
-            {/* High pitched chatter */}
-            <Filter frequency={modFreq * 50 + 1000} type="highpass" Q={5}>
-                <Osc frequency={Math.random() * 1000 + 500} type="square" detune={Math.random() * 100} />
+            {/* High pitched alien chatter */}
+            <Filter frequency={modFreq * 60 + 800} type="highpass" Q={8}>
+                <Osc frequency={600 + modFreq * 5} type="square" detune={detune * 2} />
             </Filter>
+            {/* Sub harmonic wobble */}
+            <Gain gain={0.3}>
+                <Filter frequency={150 + Math.abs(pitchShift)} type="lowpass" Q={3}>
+                    <Osc frequency={55 + mouseX * 20} type="sine" />
+                </Filter>
+            </Gain>
         </Gain>
     );
 };
 
-const Crackle = ({ active }: { active: boolean }) => {
+const Crackle = ({ active, intensity }: { active: boolean; intensity: number }) => {
     const { context } = useAudio();
     const nextClickTime = useRef(0);
 
@@ -64,70 +69,111 @@ const Crackle = ({ active }: { active: boolean }) => {
         const scheduleClick = () => {
             const time = context.currentTime;
             if (time >= nextClickTime.current) {
-                // Create burst
+                // Create burst with varying character based on intensity
                 const osc = context.createOscillator();
                 const gain = context.createGain();
                 const filter = context.createBiquadFilter();
 
-                osc.type = Math.random() > 0.5 ? 'sawtooth' : 'square';
-                osc.frequency.value = Math.random() * 50 + 20; // Low frequency clicks
+                // More varied waveforms
+                const waveforms: OscillatorType[] = ['sawtooth', 'square', 'triangle'];
+                osc.type = waveforms[Math.floor(Math.random() * 3)];
+                osc.frequency.value = Math.random() * 100 + 15 + intensity * 50;
 
-                filter.type = 'highpass';
-                filter.frequency.value = 8000; // High frequency crackle
+                filter.type = Math.random() > 0.5 ? 'highpass' : 'bandpass';
+                filter.frequency.value = 5000 + intensity * 5000 + Math.random() * 3000;
+                filter.Q.value = 2 + Math.random() * 5;
 
-                gain.gain.setValueAtTime(0.05, time);
-                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+                const volume = 0.03 + intensity * 0.05;
+                gain.gain.setValueAtTime(volume, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.03 + Math.random() * 0.04);
 
                 osc.connect(filter);
                 filter.connect(gain);
                 gain.connect(context.destination);
 
                 osc.start(time);
-                osc.stop(time + 0.05);
+                osc.stop(time + 0.08);
 
-                nextClickTime.current = time + Math.random() * 0.5 + 0.1; // Random interval 0.1s - 0.6s
+                // Faster crackles when intensity is high
+                nextClickTime.current = time + Math.random() * (0.4 - intensity * 0.3) + 0.05;
             }
             requestAnimationFrame(scheduleClick);
         };
 
         const handle = requestAnimationFrame(scheduleClick);
         return () => cancelAnimationFrame(handle);
-    }, [active, context]);
+    }, [active, context, intensity]);
 
-    return null; // Purely imperative audio for clicks
+    return null;
 };
 
 // --- Sound Component ---
 const SoundScape = ({ mouseX, mouseY, isActive }: { mouseX: number, mouseY: number, isActive: boolean }) => {
-    const cutoff = 200 + (Math.abs(mouseX) * 2000);
-    const pitch = 50 + (mouseY * 50);
-    const reactiveGain = isActive ? Math.min(Math.abs(mouseX) + Math.abs(mouseY), 0.5) : 0;
+    // Mouse controls more parameters
+    const cutoff = 150 + (Math.abs(mouseX) * 2500) + (mouseY * 500);
+    const resonance = 3 + Math.abs(mouseX) * 12;
+    const pitch = 55 + (mouseY * 60);
+    const detune = mouseX * 30;
+    const reactiveGain = isActive ? Math.min(Math.abs(mouseX) + Math.abs(mouseY), 0.6) : 0;
+    const intensity = Math.abs(mouseX) + Math.abs(mouseY) * 0.5; // For crackle
+
+    // LFO-like effect using state
+    const [lfoPhase, setLfoPhase] = useState(0);
+    useEffect(() => {
+        if (!isActive) return;
+        const interval = setInterval(() => {
+            setLfoPhase(p => (p + 0.1) % (Math.PI * 2));
+        }, 50);
+        return () => clearInterval(interval);
+    }, [isActive]);
+
+    const lfoValue = Math.sin(lfoPhase) * 200; // ±200Hz modulation
+    const lfoValue2 = Math.cos(lfoPhase * 0.7) * 100; // Different rate for second LFO
 
     return (
         <>
-            {/* Deep Drone */}
-            <Gain gain={0.3}>
-                <Filter frequency={cutoff} type="lowpass" Q={5}>
-                    <Osc frequency={60} type="sawtooth" autoStart />
+            {/* Deep Drone with LFO */}
+            <Gain gain={0.25}>
+                <Filter frequency={cutoff + lfoValue} type="lowpass" Q={resonance}>
+                    <Osc frequency={pitch} type="sawtooth" autoStart detune={detune} />
                 </Filter>
             </Gain>
-            <Gain gain={0.1}>
-                {/* Reverb-like texture using slow detuned oscillators */}
-                <Osc frequency={110 + pitch} type="sine" autoStart detune={5} />
-                <Osc frequency={110 + pitch} type="sine" autoStart detune={-5} />
+
+            {/* Harmonic layers with detuned chorus effect */}
+            <Gain gain={0.08}>
+                <Osc frequency={pitch * 2} type="sine" autoStart detune={7 + lfoValue2 * 0.1} />
+                <Osc frequency={pitch * 2} type="sine" autoStart detune={-7 - lfoValue2 * 0.1} />
+                <Osc frequency={pitch * 3} type="triangle" autoStart detune={12} />
             </Gain>
+
+            {/* Reactive mid-range with bandpass sweep */}
             <Gain gain={reactiveGain}>
-                <Filter frequency={cutoff * 2} type="bandpass" Q={2}>
-                    <Osc frequency={200 + (mouseX * 100)} type="triangle" autoStart />
+                <Filter frequency={cutoff + lfoValue * 2} type="bandpass" Q={4 + Math.abs(mouseY) * 6}>
+                    <Osc frequency={220 + (mouseX * 150)} type="triangle" autoStart detune={lfoValue2 * 0.5} />
+                </Filter>
+            </Gain>
+
+            {/* Sparkly high-end reactive layer */}
+            <Gain gain={reactiveGain * 0.4}>
+                <Filter frequency={2000 + mouseX * 3000 + lfoValue * 3} type="highpass" Q={2}>
+                    <Osc frequency={440 + mouseY * 200} type="square" autoStart detune={lfoValue2} />
+                </Filter>
+            </Gain>
+
+            {/* Sub bass pulse */}
+            <Gain gain={isActive ? 0.15 : 0}>
+                <Filter frequency={100 + Math.abs(lfoValue) * 0.3} type="lowpass" Q={2}>
+                    <Osc frequency={35 + mouseY * 15} type="sine" autoStart />
                 </Filter>
             </Gain>
 
             {/* New Organic Layers */}
-            <AlienTexture active={isActive} />
-            <Crackle active={isActive} />
+            <AlienTexture active={isActive} mouseX={mouseX} />
+            <Crackle active={isActive} intensity={intensity} />
         </>
     );
 };
+
 
 // --- Debug Component ---
 const DebugOverlay = ({ setAudioLevel }: { setAudioLevel: (v: number) => void }) => {

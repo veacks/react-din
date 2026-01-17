@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, type FC } from 'react';
+import { useState, useCallback, useRef, type FC } from 'react';
 import {
     AudioProvider,
     useAudio,
@@ -7,6 +7,10 @@ import {
     Gain,
     Filter,
     NoiseBurst,
+    Synth,
+    MonoSynth,
+    DrumSynth,
+    noteToFreq,
 } from 'react-din';
 
 /**
@@ -45,12 +49,12 @@ interface DrumPattern {
 
 interface BassPattern {
     steps: Pattern;
-    notes: number[];
+    notes: string[];  // Note strings like 'C2', 'D2', etc.
 }
 
 interface AcidPattern {
     steps: Pattern;
-    notes: number[];
+    notes: string[];  // Note strings like 'C3', 'G3', etc.
     accents: Pattern;
     slides: Pattern;
 }
@@ -105,14 +109,15 @@ const BASS_BASE: Pattern = [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0];
 const BASS_VAR4: Pattern = [1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0];
 const BASS_VAR8: Pattern = [1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1];
 
-const BASS_NOTES_BASE = [36, 36, 36, 38, 36, 36, 41, 36, 36, 36, 38, 36, 36, 43, 41, 38];
-const BASS_NOTES_VAR4 = [36, 36, 43, 38, 36, 41, 38, 36, 43, 41, 38, 36, 41, 36, 38, 41];
-const BASS_NOTES_VAR8 = [36, 41, 36, 43, 41, 36, 38, 43, 36, 41, 43, 38, 36, 41, 38, 36];
+// Bass notes using note strings - Funkier bassline with octave jumps
+const BASS_NOTES_BASE = ['C2', 'C3', 'C2', 'Eb2', 'C2', 'G2', 'F2', 'C3', 'C2', 'Eb2', 'D2', 'C3', 'C2', 'G2', 'F2', 'Eb2'];
+const BASS_NOTES_VAR4 = ['C2', 'G2', 'C3', 'Eb2', 'C2', 'F2', 'D2', 'C3', 'G2', 'Eb2', 'C2', 'G2', 'F2', 'C3', 'Eb2', 'D2'];
+const BASS_NOTES_VAR8 = ['C2', 'C3', 'G2', 'C3', 'F2', 'C3', 'Eb2', 'G2', 'C2', 'C3', 'G2', 'Eb2', 'C3', 'F2', 'G2', 'C3'];
 
-function createBassNotes(): number[] {
+function createBassNotes(): string[] {
     const notePatterns = [BASS_NOTES_BASE, BASS_NOTES_BASE, BASS_NOTES_BASE, BASS_NOTES_VAR4,
         BASS_NOTES_BASE, BASS_NOTES_BASE, BASS_NOTES_BASE, BASS_NOTES_VAR8];
-    const result: number[] = [];
+    const result: string[] = [];
     for (let page = 0; page < TOTAL_PAGES; page++) {
         result.push(...notePatterns[page]);
     }
@@ -129,22 +134,23 @@ const ACID_BASE: Pattern = [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1];
 const ACID_VAR4: Pattern = [1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0];
 const ACID_VAR8: Pattern = [1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1];
 
-const ACID_NOTES_BASE = [60, 60, 72, 67, 60, 63, 60, 67, 72, 60, 63, 60, 67, 72, 60, 67];
-const ACID_NOTES_VAR4 = [60, 72, 60, 67, 72, 60, 63, 67, 60, 72, 67, 60, 63, 72, 67, 60];
-const ACID_NOTES_VAR8 = [60, 60, 72, 60, 72, 60, 72, 60, 67, 72, 67, 72, 67, 72, 84, 72];
+// Acid notes - Wilder melodic range for more fun
+const ACID_NOTES_BASE = ['C3', 'G3', 'C4', 'Eb4', 'C4', 'G4', 'C5', 'Bb4', 'G4', 'Eb4', 'C4', 'G3', 'C4', 'Eb4', 'G4', 'C5'];
+const ACID_NOTES_VAR4 = ['C4', 'Eb4', 'G4', 'Bb4', 'C5', 'Bb4', 'G4', 'Eb4', 'C4', 'Eb4', 'G4', 'C5', 'Eb5', 'C5', 'G4', 'Eb4'];
+const ACID_NOTES_VAR8 = ['C3', 'C4', 'C5', 'C4', 'G4', 'C5', 'Eb5', 'C5', 'G4', 'Bb4', 'G4', 'Eb4', 'G4', 'C5', 'Eb5', 'G5'];
 
-const ACCENT_BASE: Pattern = [1, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1];
-const ACCENT_VAR4: Pattern = [1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0];
-const ACCENT_VAR8: Pattern = [1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1];
+const ACCENT_BASE: Pattern = [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1];
+const ACCENT_VAR4: Pattern = [1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0];
+const ACCENT_VAR8: Pattern = [1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1];
 
 const SLIDE_BASE: Pattern = [0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0];
 const SLIDE_VAR4: Pattern = [0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1];
 const SLIDE_VAR8: Pattern = [0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1];
 
-function createAcidNotes(): number[] {
+function createAcidNotes(): string[] {
     const notePatterns = [ACID_NOTES_BASE, ACID_NOTES_BASE, ACID_NOTES_BASE, ACID_NOTES_VAR4,
         ACID_NOTES_BASE, ACID_NOTES_BASE, ACID_NOTES_BASE, ACID_NOTES_VAR8];
-    const result: number[] = [];
+    const result: string[] = [];
     for (let page = 0; page < TOTAL_PAGES; page++) {
         result.push(...notePatterns[page]);
     }
@@ -158,9 +164,9 @@ const DEFAULT_ACID_PATTERN: AcidPattern = {
     slides: createPattern([SLIDE_BASE, SLIDE_BASE, SLIDE_BASE, SLIDE_VAR4, SLIDE_BASE, SLIDE_BASE, SLIDE_BASE, SLIDE_VAR8]),
 };
 
-// MIDI note to frequency
-function midiToFreq(note: number): number {
-    return 440 * Math.pow(2, (note - 69) / 12);
+// Helper to convert note (string or number) to frequency
+function toFreq(note: number | string): number {
+    return typeof note === 'number' ? 440 * Math.pow(2, (note - 69) / 12) : noteToFreq(note);
 }
 
 // ============================================================================
@@ -305,7 +311,7 @@ function SequencerDemoContent() {
 
         // X controls note (C2 to C5 = MIDI 36 to 84)
         const midiNote = 36 + Math.floor(x * 48);
-        const freq = midiToFreq(midiNote);
+        const freq = toFreq(midiNote);
         arpOscRef.current.frequency.setTargetAtTime(freq, context.currentTime, 0.02);
 
         // Y controls filter cutoff (100Hz to 8000Hz)
@@ -496,16 +502,28 @@ function SequencerDemoContent() {
                     <Track id="perc" pattern={drumPattern.perc} mute={drumMutes.perc}><Percussion /></Track>
 
                     <Track id="bass" pattern={bassPattern.steps} mute={bassMute}>
-                        <SubBass notes={bassPattern.notes} />
+                        <Synth
+                            notes={bassPattern.notes}
+                            oscillator={{ type: 'triangle', detune: 5 }}
+                            envelope={{ attack: 0.005, decay: 0.15, sustain: 0.6, release: 0.08 }}
+                            filter={{ type: 'lowpass', frequency: 350, Q: 2, envelope: 200 }}
+                            volume={0.7}
+                        />
                     </Track>
 
                     <Track id="acid" pattern={acidPattern.steps} mute={acidMute}>
-                        <AcidSynth
+                        <MonoSynth
                             notes={acidPattern.notes}
                             accents={acidPattern.accents}
-                            cutoff={cutoff}
-                            resonance={resonance}
-                            envAmount={envAmount}
+                            oscillator={{ type: 'sawtooth', detune: 8 }}
+                            envelope={{ attack: 0.001, decay: 0.08, sustain: 0.4, release: 0.05 }}
+                            filter={{
+                                type: 'lowpass',
+                                frequency: cutoff,
+                                Q: resonance * 1.5,
+                                envelope: envAmount * 1.5
+                            }}
+                            volume={0.55}
                         />
                     </Track>
                 </Sequencer>
@@ -661,7 +679,7 @@ const AcidRow: FC<AcidRowProps> = ({
                             aria-label={`Acid step ${i + 1} ${value ? 'on' : 'off'} ${pattern.accents[i] ? 'accented' : ''}`}
                         />
                         {value === 1 && (
-                            <span className="note-indicator">{pattern.notes[i] % 12}</span>
+                            <span className="note-indicator">{pattern.notes[i].replace(/[0-9]/g, '')}</span>
                         )}
                     </div>
                 ))}
@@ -712,7 +730,7 @@ const BassRow: FC<BassRowProps> = ({
                             aria-label={`Bass step ${i + 1} ${value ? 'on' : 'off'}`}
                         />
                         {value === 1 && (
-                            <span className="note-indicator">{pattern.notes[i] % 12}</span>
+                            <span className="note-indicator">{pattern.notes[i].replace(/[0-9]/g, '')}</span>
                         )}
                     </div>
                 ))}
@@ -722,446 +740,93 @@ const BassRow: FC<BassRowProps> = ({
 };
 
 // ============================================================================
-// TR-909 Style Drum Synth Components - Acid House Edition
+// TR-909 Style Drum Synth Components - Using DrumSynth
 // ============================================================================
 
 /**
- * Kick909 - Punchy 909-style kick with sub-bass for that acid house thump
+ * Kick909 - Punchy 909-style kick with extra thump
  */
-const Kick909: FC = () => {
-    const { context } = useAudio();
-    const { subscribe } = useTriggerContextSafe();
-
-    useEffect(() => {
-        if (!context || !subscribe) return;
-
-        const unsub = subscribe((event) => {
-            const now = event.time;
-            const velocity = event.velocity;
-
-            // Main body oscillator - starts high, sweeps down fast
-            const oscBody = context.createOscillator();
-            oscBody.type = 'sine';
-            oscBody.frequency.setValueAtTime(180, now);
-            oscBody.frequency.exponentialRampToValueAtTime(45, now + 0.08);
-
-            // Sub oscillator for extra low-end punch
-            const oscSub = context.createOscillator();
-            oscSub.type = 'sine';
-            oscSub.frequency.setValueAtTime(55, now);
-
-            // Click transient oscillator
-            const oscClick = context.createOscillator();
-            oscClick.type = 'triangle';
-            oscClick.frequency.setValueAtTime(4000, now);
-            oscClick.frequency.exponentialRampToValueAtTime(100, now + 0.01);
-
-            // Body gain envelope - punchy attack, medium decay
-            const gainBody = context.createGain();
-            gainBody.gain.setValueAtTime(0, now);
-            gainBody.gain.linearRampToValueAtTime(0.9 * velocity, now + 0.002);
-            gainBody.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
-
-            // Sub gain envelope - slightly slower attack for rumble
-            const gainSub = context.createGain();
-            gainSub.gain.setValueAtTime(0, now);
-            gainSub.gain.linearRampToValueAtTime(0.6 * velocity, now + 0.01);
-            gainSub.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-
-            // Click gain - very short
-            const gainClick = context.createGain();
-            gainClick.gain.setValueAtTime(0.3 * velocity, now);
-            gainClick.gain.exponentialRampToValueAtTime(0.01, now + 0.02);
-
-            // Master gain node
-            const master = context.createGain();
-            master.gain.setValueAtTime(0.8, now);
-
-            // Soft saturation with waveshaper
-            const waveshaper = context.createWaveShaper();
-            const curve = new Float32Array(256);
-            for (let i = 0; i < 256; i++) {
-                const x = (i / 128) - 1;
-                curve[i] = Math.tanh(x * 2);
-            }
-            waveshaper.curve = curve;
-
-            // Connect
-            oscBody.connect(gainBody);
-            oscSub.connect(gainSub);
-            oscClick.connect(gainClick);
-            gainBody.connect(waveshaper);
-            gainSub.connect(waveshaper);
-            gainClick.connect(waveshaper);
-            waveshaper.connect(master);
-            master.connect(context.destination);
-
-            // Play
-            oscBody.start(now);
-            oscSub.start(now);
-            oscClick.start(now);
-            oscBody.stop(now + 0.4);
-            oscSub.stop(now + 0.4);
-            oscClick.stop(now + 0.05);
-        });
-
-        return unsub;
-    }, [context, subscribe]);
-
-    return null;
-};
+const Kick909: FC = () => (
+    <DrumSynth
+        oscillators={[
+            // Main body - aggressive pitch sweep
+            { type: 'sine', frequency: 220, pitchDecay: 40, pitchDecayTime: 0.06, gain: 1.0, duration: 0.3 },
+            // Sub oscillator for massive low-end
+            { type: 'sine', frequency: 50, gain: 0.8, duration: 0.35 },
+            // Click transient - snappy attack
+            { type: 'triangle', frequency: 5000, pitchDecay: 80, pitchDecayTime: 0.008, gain: 0.4, duration: 0.015 },
+        ]}
+        envelope={{ attack: 0.001, decay: 0.3, sustain: 0, release: 0.08 }}
+        volume={0.85}
+        saturation
+        saturationAmount={2.5}
+    />
+);
 
 /**
- * ClosedHiHat - Tight, crispy closed hi-hat
+ * ClosedHiHat - Crispy and bright
  */
-const ClosedHiHat: FC = () => {
-    return (
-        <Gain gain={0.18}>
-            <Filter type="highpass" frequency={9000} Q={0.8}>
-                <Filter type="bandpass" frequency={12000} Q={2}>
-                    <NoiseBurst type="white" duration={0.05} attack={0.001} release={0.02} />
-                </Filter>
+const ClosedHiHat: FC = () => (
+    <Gain gain={0.22}>
+        <Filter type="highpass" frequency={8000} Q={1}>
+            <Filter type="bandpass" frequency={14000} Q={2.5}>
+                <NoiseBurst type="white" duration={0.04} attack={0.0005} release={0.015} />
             </Filter>
-        </Gain>
-    );
-};
+        </Filter>
+    </Gain>
+);
 
 /**
- * OpenHiHat - Longer, sizzling open hi-hat
+ * OpenHiHat - Long sizzle with shimmer
  */
-const OpenHiHat: FC = () => {
-    return (
-        <Gain gain={0.15}>
-            <Filter type="highpass" frequency={7000} Q={0.7}>
-                <Filter type="bandpass" frequency={10000} Q={1.5}>
-                    <NoiseBurst type="white" duration={0.25} attack={0.001} release={0.2} />
-                </Filter>
+const OpenHiHat: FC = () => (
+    <Gain gain={0.18}>
+        <Filter type="highpass" frequency={6000} Q={0.8}>
+            <Filter type="bandpass" frequency={11000} Q={1.8}>
+                <NoiseBurst type="white" duration={0.3} attack={0.0005} release={0.25} />
             </Filter>
-        </Gain>
-    );
-};
+        </Filter>
+    </Gain>
+);
 
 /**
- * Clap909 - Classic 909 clap with layered transients
+ * Clap909 - Fat clap with more body
  */
-const Clap909: FC = () => {
-    const { context } = useAudio();
-    const { subscribe } = useTriggerContextSafe();
-
-    useEffect(() => {
-        if (!context || !subscribe) return;
-
-        const unsub = subscribe((event) => {
-            const now = event.time;
-            const velocity = event.velocity;
-
-            // Create multiple short noise bursts for 909 clap character
-            const createBurst = (startTime: number, duration: number, gain: number) => {
-                const bufferSize = context.sampleRate * duration;
-                const buffer = context.createBuffer(1, bufferSize, context.sampleRate);
-                const data = buffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) {
-                    data[i] = (Math.random() * 2 - 1);
-                }
-
-                const source = context.createBufferSource();
-                source.buffer = buffer;
-
-                const filter = context.createBiquadFilter();
-                filter.type = 'bandpass';
-                filter.frequency.setValueAtTime(1200, startTime);
-                filter.Q.setValueAtTime(2, startTime);
-
-                const gainNode = context.createGain();
-                gainNode.gain.setValueAtTime(0, startTime);
-                gainNode.gain.linearRampToValueAtTime(gain * velocity, startTime + 0.001);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
-
-                source.connect(filter);
-                filter.connect(gainNode);
-                gainNode.connect(context.destination);
-
-                source.start(startTime);
-                source.stop(startTime + duration);
-            };
-
-            // Layer multiple bursts for that 909 clap flutter
-            createBurst(now, 0.02, 0.15);
-            createBurst(now + 0.015, 0.02, 0.12);
-            createBurst(now + 0.03, 0.12, 0.25);
-        });
-
-        return unsub;
-    }, [context, subscribe]);
-
-    return null;
-};
+const Clap909: FC = () => (
+    <DrumSynth
+        oscillators={[
+            // Add a bit of tone for body
+            { type: 'sine', frequency: 200, pitchDecay: 100, pitchDecayTime: 0.01, gain: 0.15, duration: 0.03 },
+        ]}
+        noise={[
+            // Multiple bursts for that classic 909 flutter
+            { type: 'white', filterType: 'bandpass', filterFrequency: 1400, filterQ: 3, gain: 0.2, duration: 0.015 },
+            { type: 'white', filterType: 'bandpass', filterFrequency: 1200, filterQ: 2.5, gain: 0.15, duration: 0.02 },
+            { type: 'white', filterType: 'bandpass', filterFrequency: 1100, filterQ: 2, gain: 0.3, duration: 0.15 },
+        ]}
+        envelope={{ attack: 0.0005, decay: 0.15, sustain: 0, release: 0.04 }}
+        volume={0.55}
+        saturation
+        saturationAmount={1.5}
+    />
+);
 
 /**
- * Percussion - Funky rimshot/tom hybrid for groove
+ * Percussion - Funky conga/rimshot hybrid
  */
-const Percussion: FC = () => {
-    const { context } = useAudio();
-    const { subscribe } = useTriggerContextSafe();
-
-    useEffect(() => {
-        if (!context || !subscribe) return;
-
-        const unsub = subscribe((event) => {
-            const now = event.time;
-            const velocity = event.velocity;
-
-            // Tone body
-            const osc = context.createOscillator();
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(500, now);
-            osc.frequency.exponentialRampToValueAtTime(180, now + 0.05);
-
-            // Noise layer for attack
-            const bufferSize = context.sampleRate * 0.03;
-            const buffer = context.createBuffer(1, bufferSize, context.sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-                data[i] = (Math.random() * 2 - 1);
-            }
-            const noise = context.createBufferSource();
-            noise.buffer = buffer;
-
-            const noiseFilter = context.createBiquadFilter();
-            noiseFilter.type = 'highpass';
-            noiseFilter.frequency.setValueAtTime(2000, now);
-
-            const noiseGain = context.createGain();
-            noiseGain.gain.setValueAtTime(0.3 * velocity, now);
-            noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.02);
-
-            // Tone gain
-            const toneGain = context.createGain();
-            toneGain.gain.setValueAtTime(0, now);
-            toneGain.gain.linearRampToValueAtTime(0.35 * velocity, now + 0.002);
-            toneGain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-
-            // Connect
-            osc.connect(toneGain);
-            toneGain.connect(context.destination);
-            noise.connect(noiseFilter);
-            noiseFilter.connect(noiseGain);
-            noiseGain.connect(context.destination);
-
-            // Play
-            osc.start(now);
-            noise.start(now);
-            osc.stop(now + 0.15);
-            noise.stop(now + 0.03);
-        });
-
-        return unsub;
-    }, [context, subscribe]);
-
-    return null;
-};
-
-// ============================================================================
-// Sub Bass Synth Component - Deep low-end for that acid house rumble
-// ============================================================================
-
-interface SubBassProps {
-    notes: number[];
-}
-
-const SubBass: FC<SubBassProps> = ({ notes }) => {
-    const { context } = useAudio();
-    const { subscribe } = useTriggerContextSafe();
-
-    const notesRef = useRef(notes);
-    notesRef.current = notes;
-
-    useEffect(() => {
-        if (!context || !subscribe) return;
-
-        const unsub = subscribe((event) => {
-            const now = event.time;
-            const step = event.step;
-            const velocity = event.velocity;
-            const duration = event.duration;
-
-            const note = notesRef.current[step % notesRef.current.length];
-            const freq = midiToFreq(note);
-
-            // Main sine oscillator for pure sub-bass
-            const oscSine = context.createOscillator();
-            oscSine.type = 'sine';
-            oscSine.frequency.setValueAtTime(freq, now);
-
-            // Triangle oscillator for slight harmonic content
-            const oscTri = context.createOscillator();
-            oscTri.type = 'triangle';
-            oscTri.frequency.setValueAtTime(freq, now);
-
-            // Low-pass filter to keep it clean
-            const filter = context.createBiquadFilter();
-            filter.type = 'lowpass';
-            filter.frequency.setValueAtTime(200, now);
-            filter.Q.setValueAtTime(1, now);
-
-            // Amp envelope - punchy attack, sustained
-            const gainSine = context.createGain();
-            gainSine.gain.setValueAtTime(0, now);
-            gainSine.gain.linearRampToValueAtTime(0.5 * velocity, now + 0.01);
-            gainSine.gain.setValueAtTime(0.45 * velocity, now + duration * 0.6);
-            gainSine.gain.exponentialRampToValueAtTime(0.01, now + duration * 0.95);
-
-            const gainTri = context.createGain();
-            gainTri.gain.setValueAtTime(0, now);
-            gainTri.gain.linearRampToValueAtTime(0.15 * velocity, now + 0.01);
-            gainTri.gain.setValueAtTime(0.12 * velocity, now + duration * 0.6);
-            gainTri.gain.exponentialRampToValueAtTime(0.01, now + duration * 0.95);
-
-            // Light saturation
-            const waveshaper = context.createWaveShaper();
-            const curve = new Float32Array(256);
-            for (let i = 0; i < 256; i++) {
-                const x = (i / 128) - 1;
-                curve[i] = Math.tanh(x * 1.5);
-            }
-            waveshaper.curve = curve;
-
-            // Master gain
-            const master = context.createGain();
-            master.gain.setValueAtTime(0.8, now);
-
-            // Connect
-            oscSine.connect(gainSine);
-            oscTri.connect(gainTri);
-            gainSine.connect(filter);
-            gainTri.connect(filter);
-            filter.connect(waveshaper);
-            waveshaper.connect(master);
-            master.connect(context.destination);
-
-            // Play
-            oscSine.start(now);
-            oscTri.start(now);
-            oscSine.stop(now + duration);
-            oscTri.stop(now + duration);
-        });
-
-        return unsub;
-    }, [context, subscribe]);
-
-    return null;
-};
-
-// ============================================================================
-// TB-303 Acid Synth Component - Enhanced for maximum squelch
-// ============================================================================
-
-interface AcidSynthProps {
-    notes: number[];
-    accents: Pattern;
-    cutoff: number;
-    resonance: number;
-    envAmount: number;
-}
-
-const AcidSynth: FC<AcidSynthProps> = ({ notes, accents, cutoff, resonance, envAmount }) => {
-    const { context } = useAudio();
-    const { subscribe } = useTriggerContextSafe();
-
-    const paramsRef = useRef({ notes, accents, cutoff, resonance, envAmount });
-    paramsRef.current = { notes, accents, cutoff, resonance, envAmount };
-
-    useEffect(() => {
-        if (!context || !subscribe) return;
-
-        const unsub = subscribe((event) => {
-            const { notes, accents, cutoff, resonance, envAmount } = paramsRef.current;
-            const now = event.time;
-            const step = event.step;
-            const velocity = event.velocity;
-            const duration = event.duration;
-
-            const note = notes[step % notes.length];
-            const freq = midiToFreq(note);
-            const isAccent = accents[step % accents.length] === 1;
-
-            // Main sawtooth oscillator
-            const osc = context.createOscillator();
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(freq, now);
-
-            // Square sub-oscillator for thickness
-            const oscSub = context.createOscillator();
-            oscSub.type = 'square';
-            oscSub.frequency.setValueAtTime(freq, now);
-
-            // Resonant low-pass filter - the heart of the 303 sound
-            const filter = context.createBiquadFilter();
-            filter.type = 'lowpass';
-            filter.Q.setValueAtTime(resonance, now);
-
-            // Filter envelope - aggressive for accents
-            const peakCutoff = cutoff + (isAccent ? envAmount * 2 : envAmount);
-            filter.frequency.setValueAtTime(peakCutoff, now);
-            filter.frequency.exponentialRampToValueAtTime(cutoff, now + 0.12);
-
-            // Gain envelopes
-            const gainSaw = context.createGain();
-            const ampLevel = isAccent ? 0.35 * velocity : 0.22 * velocity;
-            gainSaw.gain.setValueAtTime(0, now);
-            gainSaw.gain.linearRampToValueAtTime(ampLevel, now + 0.003);
-            gainSaw.gain.setValueAtTime(ampLevel * 0.9, now + duration * 0.7);
-            gainSaw.gain.exponentialRampToValueAtTime(0.01, now + duration * 0.95);
-
-            const gainSub = context.createGain();
-            gainSub.gain.setValueAtTime(0, now);
-            gainSub.gain.linearRampToValueAtTime(ampLevel * 0.3, now + 0.003);
-            gainSub.gain.exponentialRampToValueAtTime(0.01, now + duration * 0.9);
-
-            // Soft saturation for that analog warmth
-            const waveshaper = context.createWaveShaper();
-            const curve = new Float32Array(256);
-            for (let i = 0; i < 256; i++) {
-                const x = (i / 128) - 1;
-                curve[i] = Math.tanh(x * 2.5);
-            }
-            waveshaper.curve = curve;
-
-            const master = context.createGain();
-            master.gain.setValueAtTime(0.7, now);
-
-            // Connect
-            osc.connect(gainSaw);
-            oscSub.connect(gainSub);
-            gainSaw.connect(filter);
-            gainSub.connect(filter);
-            filter.connect(waveshaper);
-            waveshaper.connect(master);
-            master.connect(context.destination);
-
-            // Play
-            osc.start(now);
-            oscSub.start(now);
-            osc.stop(now + duration);
-            oscSub.stop(now + duration);
-        });
-
-        return unsub;
-    }, [context, subscribe]);
-
-    return null;
-};
-
-// ============================================================================
-// Trigger Context Hook (Safe version)
-// ============================================================================
-
-import { useTriggerContext } from 'react-din';
-
-function useTriggerContextSafe() {
-    try {
-        return useTriggerContext();
-    } catch {
-        return { subscribe: null, currentTrigger: null, trackId: null };
-    }
-}
+const Percussion: FC = () => (
+    <DrumSynth
+        oscillators={[
+            // Tone body - more resonant
+            { type: 'triangle', frequency: 600, pitchDecay: 150, pitchDecayTime: 0.04, gain: 0.45, duration: 0.12 },
+            // Add harmonic layer
+            { type: 'sine', frequency: 1200, pitchDecay: 300, pitchDecayTime: 0.02, gain: 0.2, duration: 0.06 },
+        ]}
+        noise={[
+            // Brighter attack
+            { type: 'white', filterType: 'highpass', filterFrequency: 3000, filterQ: 1.5, gain: 0.35, duration: 0.025 },
+        ]}
+        envelope={{ attack: 0.001, decay: 0.12, sustain: 0, release: 0.04 }}
+        volume={0.55}
+    />
+);

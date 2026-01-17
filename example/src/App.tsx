@@ -4,17 +4,8 @@ import { NodesDemo } from './demos/NodesDemo';
 import { TransportDemo } from './demos/TransportDemo';
 import { SequencerDemo } from './demos/SequencerDemo';
 import { VisualizerDemo } from './demos/VisualizerDemo';
+import { NotesDemo } from './demos/NotesDemo';
 import './App.css';
-
-const demos = [
-  { path: '/', label: 'Home', component: Home },
-  { path: '/core', label: 'Core', component: CoreDemo },
-  { path: '/nodes', label: 'Nodes', component: NodesDemo },
-  { path: '/transport', label: 'Transport', component: TransportDemo },
-  { path: '/sequencer', label: 'Sequencer', component: SequencerDemo },
-  // Future demos:
-  // { path: '/analyzers', label: 'Analyzers', component: AnalyzersDemo },
-];
 
 function Home() {
   return (
@@ -37,6 +28,10 @@ function Home() {
         <Link href="/sequencer" className="demo-link">
           <h3>Sequencer</h3>
           <p>TR-909 drums & TB-303 acid synth</p>
+        </Link>
+        <Link href="/notes" className="demo-link">
+          <h3>Notes</h3>
+          <p>Piano keyboard & note conversion</p>
         </Link>
         <Link href="/visualizer" className="demo-link">
           <h3>Visualizer</h3>
@@ -65,6 +60,7 @@ function App() {
           <Route path="/nodes" component={NodesDemo} />
           <Route path="/transport" component={TransportDemo} />
           <Route path="/sequencer" component={SequencerDemo} />
+          <Route path="/notes" component={NotesDemo} />
           <Route path="/visualizer" component={VisualizerDemo} />
           <Route>
             <div className="not-found">

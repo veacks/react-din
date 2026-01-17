@@ -147,6 +147,72 @@ function EffectsChain() {
 }
 ```
 
+### Notes & Frequencies
+
+Use note strings (English or French) instead of raw MIDI numbers:
+
+```tsx
+import { noteToMidi, midiToNote, noteToFreq, parseNote } from 'react-din';
+
+// English note names
+noteToMidi('C4');      // 60
+noteToMidi('A4');      // 69
+noteToFreq('A4');      // 440
+
+// French (solfege) names
+noteToMidi('Do4');     // 60
+noteToMidi('Sol#2');   // 44
+noteToFreq('La4');     // 440
+
+// MIDI to note
+midiToNote(60);        // "C4"
+midiToNote(61, true);  // "Db4" (prefer flats)
+
+// Parse any note format
+parseNote('Eb4');      // { note: 'D#', octave: 4, midi: 63, frequency: 311.13 }
+```
+
+### Synths
+
+Built-in synthesizer components inspired by Tone.js:
+
+```tsx
+import { Synth, MonoSynth, FMSynth, AMSynth, NoiseSynth, Envelope } from 'react-din';
+
+// Basic synth with ADSR envelope
+<Track id="lead" pattern={pattern}>
+  <Synth
+    notes={['C4', 'E4', 'G4', 'C5']}
+    oscillator={{ type: 'sawtooth' }}
+    envelope={{ attack: 0.01, decay: 0.2, sustain: 0.7, release: 0.3 }}
+    filter={{ type: 'lowpass', frequency: 2000, Q: 2 }}
+  />
+</Track>
+
+// TB-303 style acid synth with filter envelope
+<Track id="acid" pattern={pattern}>
+  <MonoSynth
+    notes={['C3', 'C3', 'G3', 'C4']}
+    accents={[1, 0, 0, 1]}
+    oscillator={{ type: 'sawtooth' }}
+    filter={{ frequency: 600, Q: 15, envelope: 3000 }}
+  />
+</Track>
+
+// FM synthesis
+<FMSynth
+  notes={notes}
+  modulationRatio={2}
+  modulationIndex={3}
+  envelope={{ attack: 0.01, decay: 0.3, sustain: 0.4, release: 0.5 }}
+/>
+
+// Standalone envelope wrapper
+<Envelope attack={0.01} decay={0.2} sustain={0.7} release={0.5}>
+  <Osc type="sawtooth" frequency={440} autoStart />
+</Envelope>
+```
+
 ### 3D Spatial Audio
 
 Use the Panner component for 3D positional audio:

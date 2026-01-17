@@ -183,3 +183,61 @@ export {
     isSSR,
     getAudioContext,
 } from './utils';
+
+// -----------------------------------------------------------------------------
+// Notes
+// -----------------------------------------------------------------------------
+export {
+    parseNote,
+    noteToMidi,
+    midiToNote,
+    midiToFreq,
+    noteToFreq,
+    noteToFrench,
+    noteFromFrench,
+} from './notes';
+
+export type {
+    NoteName,
+    FrenchNoteName,
+    NoteString,
+    NoteInput,
+    ParsedNote,
+} from './notes';
+
+// -----------------------------------------------------------------------------
+// Synths
+// -----------------------------------------------------------------------------
+export {
+    Synth,
+    MonoSynth,
+    FMSynth,
+    AMSynth,
+    NoiseSynth,
+    DrumSynth,
+    Envelope,
+    useEnvelope,
+    DEFAULT_ENVELOPE,
+    DEFAULT_OSCILLATOR,
+    DEFAULT_FILTER,
+} from './synths';
+
+export type {
+    EnvelopeConfig,
+    OscillatorConfig,
+    OscillatorWaveType,
+    FilterConfig,
+    FilterTypeOption,
+    BaseSynthProps,
+    SynthProps,
+    MonoSynthProps,
+    FMSynthProps,
+    AMSynthProps,
+    NoiseSynthProps,
+    EnvelopeProps,
+    UseEnvelopeResult,
+    DrumSynthProps,
+    DrumOscillatorConfig,
+    DrumNoiseConfig,
+} from './synths';
+
