@@ -3,6 +3,7 @@ import { CoreDemo } from './demos/CoreDemo';
 import { NodesDemo } from './demos/NodesDemo';
 import { TransportDemo } from './demos/TransportDemo';
 import { SequencerDemo } from './demos/SequencerDemo';
+import { VisualizerDemo } from './demos/VisualizerDemo';
 import './App.css';
 
 const demos = [
@@ -37,10 +38,10 @@ function Home() {
           <h3>Sequencer</h3>
           <p>TR-909 drums & TB-303 acid synth</p>
         </Link>
-        <div className="demo-link disabled">
-          <h3>Analyzers</h3>
-          <p>Coming soon...</p>
-        </div>
+        <Link href="/visualizer" className="demo-link">
+          <h3>Visualizer</h3>
+          <p>R3F, TSL, Audio Reactive Ink</p>
+        </Link>
       </nav>
     </div>
   );
@@ -64,6 +65,7 @@ function App() {
           <Route path="/nodes" component={NodesDemo} />
           <Route path="/transport" component={TransportDemo} />
           <Route path="/sequencer" component={SequencerDemo} />
+          <Route path="/visualizer" component={VisualizerDemo} />
           <Route>
             <div className="not-found">
               <h2>404 - Not Found</h2>
