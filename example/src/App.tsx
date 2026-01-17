@@ -1,14 +1,15 @@
 import { Route, Switch, Link, useLocation } from 'wouter';
 import { CoreDemo } from './demos/CoreDemo';
 import { NodesDemo } from './demos/NodesDemo';
+import { TransportDemo } from './demos/TransportDemo';
 import './App.css';
 
 const demos = [
   { path: '/', label: 'Home', component: Home },
   { path: '/core', label: 'Core', component: CoreDemo },
   { path: '/nodes', label: 'Nodes', component: NodesDemo },
+  { path: '/transport', label: 'Transport', component: TransportDemo },
   // Future demos:
-  // { path: '/transport', label: 'Transport', component: TransportDemo },
   // { path: '/sequencer', label: 'Sequencer', component: SequencerDemo },
   // { path: '/analyzers', label: 'Analyzers', component: AnalyzersDemo },
 ];
@@ -27,10 +28,10 @@ function Home() {
           <h3>Nodes</h3>
           <p>Gain, Delay, StereoPanner, Compressor</p>
         </Link>
-        <div className="demo-link disabled">
+        <Link href="/transport" className="demo-link">
           <h3>Transport</h3>
-          <p>Coming soon...</p>
-        </div>
+          <p>BPM, time signatures, playback control</p>
+        </Link>
         <div className="demo-link disabled">
           <h3>Sequencer</h3>
           <p>Coming soon...</p>
@@ -60,6 +61,7 @@ function App() {
           <Route path="/" component={Home} />
           <Route path="/core" component={CoreDemo} />
           <Route path="/nodes" component={NodesDemo} />
+          <Route path="/transport" component={TransportDemo} />
           <Route>
             <div className="not-found">
               <h2>404 - Not Found</h2>

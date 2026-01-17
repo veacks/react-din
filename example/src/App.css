@@ -83,7 +83,7 @@ body {
     background-clip: text;
 }
 
-.home > p {
+.home>p {
     color: rgba(255, 255, 255, 0.6);
     font-size: 1.25rem;
     margin-bottom: 3rem;
@@ -142,7 +142,7 @@ body {
     color: #64B5F6;
 }
 
-.demo > p {
+.demo>p {
     color: rgba(255, 255, 255, 0.6);
     margin-bottom: 2rem;
 }
@@ -298,4 +298,168 @@ code {
 
 .not-found a {
     color: #64B5F6;
+}
+
+/* Button Variants */
+button.secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+button.secondary:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Node Description */
+.node-description {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+
+/* Info Grid */
+.info-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.info-label {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Position Display */
+.position-display {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.position-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    min-width: 80px;
+}
+
+.position-item.total {
+    background: linear-gradient(135deg, rgba(100, 181, 246, 0.2), rgba(224, 64, 251, 0.2));
+    border: 1px solid rgba(100, 181, 246, 0.3);
+}
+
+.position-label {
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 0.25rem;
+}
+
+.position-value {
+    font-size: 2rem;
+    font-weight: 700;
+    font-family: 'Fira Code', monospace;
+    color: #64B5F6;
+}
+
+.position-item.total .position-value {
+    font-size: 1.5rem;
+    background: linear-gradient(135deg, #64B5F6, #E040FB);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Metronome Display */
+.metronome-display {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.metronome-beat {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.1s ease-out;
+}
+
+.metronome-beat.downbeat {
+    border-color: rgba(224, 64, 251, 0.4);
+}
+
+.metronome-beat.active {
+    background: #64B5F6;
+    border-color: #64B5F6;
+    box-shadow: 0 0 20px rgba(100, 181, 246, 0.6);
+    transform: scale(1.1);
+}
+
+.metronome-beat.active.downbeat {
+    background: #E040FB;
+    border-color: #E040FB;
+    box-shadow: 0 0 20px rgba(224, 64, 251, 0.6);
+}
+
+/* Step Display */
+.step-display {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.step-indicator {
+    width: 20px;
+    height: 8px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.1);
+    transition: all 0.05s ease-out;
+}
+
+.step-indicator.active {
+    background: #64B5F6;
+    box-shadow: 0 0 8px rgba(100, 181, 246, 0.5);
+}
+
+/* Event Log */
+.event-log {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    padding: 1rem;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.875rem;
+}
+
+.event-empty {
+    color: rgba(255, 255, 255, 0.3);
+    text-align: center;
+    padding: 2rem;
+}
+
+.event-item {
+    padding: 0.25rem 0;
+    color: rgba(255, 255, 255, 0.8);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.event-item:last-child {
+    border-bottom: none;
 }
