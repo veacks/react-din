@@ -164,23 +164,45 @@ const ParticleSystem = ({ isRendererReady }: { isRendererReady: boolean }) => {
         const initialPositionArray = new Float32Array(count * 3);
 
         for (let i = 0; i < count; i++) {
-            // Circle / Ring Formation
+            // Circle / Ring Formation with Organic Ink Blot Thickness
             const radius = 4.0;
-            const spread = 0.2; // Thinner smoke ring (Expectation: ink-like line)
-            const angle = Math.random() * 2 * Math.PI;
+            const maxThickness = 1.5; // Thickness of the ink blobs
+            const minThickness = 0.05; // Thickness of the connecting lines
 
-            // Random radius within the ring thickness
-            const r = radius + (Math.random() - 0.5) * spread;
+            // Uniform angle distribution for continuous line
+            const angle = (i / count) * 2 * Math.PI;
+
+            // Generate wrapping noise using harmonics
+            // sin(N * angle) wraps perfectly if N is integer.
+            let noise = 0;
+            noise += Math.sin(angle * 3.0);       // Base shape (3 blobs)
+            noise += Math.sin(angle * 7.0) * 0.5; // Detail
+            noise += Math.sin(angle * 13.0) * 0.25; // Fine detail
+
+            // Normalize roughly to 0..1 (range is approx -1.75 to 1.75)
+            noise = (noise + 1.75) / 3.5;
+
+            // Sharpen the contrast: Power curve makes high values (blobs) spikes and low values flat
+            // Higher power = thinner connecting lines, more defined blobs
+            const inkWeight = Math.pow(noise, 4.0);
+
+            // Calculate spread based on ink weight
+            const spread = minThickness + inkWeight * (maxThickness - minThickness);
+
+            // Random radius within the variable thickness
+            // Use a bell curve bias for radius to make the "core" of the line denser
+            const rOffset = (Math.random() + Math.random() + Math.random() - 1.5) / 1.5; // approx gaussian -1..1
+            const r = radius + rOffset * spread;
 
             const x = r * Math.cos(angle);
             const y = r * Math.sin(angle);
-            const z = (Math.random() - 0.5) * 0.5; // Flatter depth
+            // Z spread also modulated by ink weight for volumetric blobs
+            const z = (Math.random() - 0.5) * (0.2 + inkWeight * 0.8);
 
             positionArray[i * 3] = x;
             positionArray[i * 3 + 1] = y;
             positionArray[i * 3 + 2] = z;
 
-            // Store initial position for "Home Return" force
             initialPositionArray[i * 3] = x;
             initialPositionArray[i * 3 + 1] = y;
             initialPositionArray[i * 3 + 2] = z;
@@ -196,16 +218,34 @@ const ParticleSystem = ({ isRendererReady }: { isRendererReady: boolean }) => {
             const v = velBuf.element(instanceIndex);
             const initialPos = initialPosBuf.element(instanceIndex);
 
-            const flow = mx_noise_vec3(p.mul(0.5).add(uTime.mul(0.1))).mul(0.05);
+            // Calmer, larger scale noise
+            // p.mul(0.15) -> Larger zones (less perturbations)
+            // uTime.mul(0.05) -> Slower evolution
+            // .mul(0.01) -> Weaker force amplitude
+            const flow = mx_noise_vec3(p.mul(0.15).add(uTime.mul(0.05))).mul(0.01);
+
             const diff = p.sub(uCursor);
             const dist = diff.length();
             const repel = diff.normalize().mul(float(1.0).div(dist.mul(dist).add(0.1))).mul(uAudio.add(0.2)).mul(0.15); // Stronger repel
 
             const newV = v.mul(0.95).add(flow).add(repel);
 
-            // Home Return Force: Pull back to initial ring position
+            // Rotation Logic
+            // Rotate initialPos around Z axis slowly (Anti-Clockwise)
+            const t = uTime.mul(0.05); // Rotation speed
+            const cosT = t.cos();
+            const sinT = t.sin();
+
+            // Rotated Target Position
+            const rotatedTarget = vec3(
+                initialPos.x.mul(cosT).sub(initialPos.y.mul(sinT)),
+                initialPos.x.mul(sinT).add(initialPos.y.mul(cosT)),
+                initialPos.z // Z stays same (ignoring depth rotation for now)
+            );
+
+            // Home Return Force: Pull back to ROTATED target
             // Stronger force (0.05) to maintain thin shape
-            const homeReturn = initialPos.sub(p).mul(0.05);
+            const homeReturn = rotatedTarget.sub(p).mul(0.05);
 
             v.assign(newV.add(homeReturn));
             p.assign(p.add(v));
@@ -220,7 +260,7 @@ const ParticleSystem = ({ isRendererReady }: { isRendererReady: boolean }) => {
         // SpriteNodeMaterial uses standard UVs 0..1
         const dist = uv().sub(0.5).length();
         // Softer edge: power 3.0 instead of 2.0
-        const alpha = float(0.5).sub(dist).mul(2.0).clamp(0, 1);
+        const alpha = float(0.5).sub(dist).mul(1.0).clamp(0, 1);
         const circle = alpha.pow(3.0);
 
         m.colorNode = vec4(0.9, 0.95, 1.0, circle); // Slight blue tint to white
@@ -229,7 +269,7 @@ const ParticleSystem = ({ isRendererReady }: { isRendererReady: boolean }) => {
         m.positionNode = posBuf.element(instanceIndex);
 
         // Dynamic Size
-        m.scaleNode = float(0.05).add(uAudio.mul(0.3));
+        m.scaleNode = float(0.05).add(uAudio.mul(0.8));
 
         m.transparent = true;
         m.depthWrite = false;
