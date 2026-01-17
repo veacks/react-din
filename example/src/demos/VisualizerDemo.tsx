@@ -20,6 +20,83 @@ import {
 } from 'three/tsl';
 import { PerspectiveCamera } from '@react-three/drei';
 
+// --- Organic Sound Components ---
+
+const AlienTexture = ({ active }: { active: boolean }) => {
+    const { context } = useAudio();
+    const [modFreq, setModFreq] = useState(10);
+
+    // Randomly modulate the modulator frequency
+    useEffect(() => {
+        if (!active) return;
+        const interval = setInterval(() => {
+            setModFreq(Math.random() * 50 + 5); // 5Hz to 55Hz
+        }, 200 + Math.random() * 500);
+        return () => clearInterval(interval);
+    }, [active]);
+
+    // Simple FM: Carrier (Sine) + Modulator (Sawtooth)
+    // react-din doesn't support direct FM routing via props easily in this version,
+    // so we'll layer two complex tones to simulate it, or just use a bubbly random filter.
+    // Let's use a bubbly filter approach which is easier with current components.
+
+    return (
+        <Gain gain={active ? 0.1 : 0}>
+            {/* Carrier-like tone with rapid filter modulation */}
+            <Filter frequency={modFreq * 20 + 200} type="bandpass" Q={10}>
+                <Osc frequency={200} type="sawtooth" />
+            </Filter>
+            {/* High pitched chatter */}
+            <Filter frequency={modFreq * 50 + 1000} type="highpass" Q={5}>
+                <Osc frequency={Math.random() * 1000 + 500} type="square" detune={Math.random() * 100} />
+            </Filter>
+        </Gain>
+    );
+};
+
+const Crackle = ({ active }: { active: boolean }) => {
+    const { context } = useAudio();
+    const nextClickTime = useRef(0);
+
+    useEffect(() => {
+        if (!active || !context) return;
+
+        const scheduleClick = () => {
+            const time = context.currentTime;
+            if (time >= nextClickTime.current) {
+                // Create burst
+                const osc = context.createOscillator();
+                const gain = context.createGain();
+                const filter = context.createBiquadFilter();
+
+                osc.type = Math.random() > 0.5 ? 'sawtooth' : 'square';
+                osc.frequency.value = Math.random() * 50 + 20; // Low frequency clicks
+
+                filter.type = 'highpass';
+                filter.frequency.value = 8000; // High frequency crackle
+
+                gain.gain.setValueAtTime(0.05, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(context.destination);
+
+                osc.start(time);
+                osc.stop(time + 0.05);
+
+                nextClickTime.current = time + Math.random() * 0.5 + 0.1; // Random interval 0.1s - 0.6s
+            }
+            requestAnimationFrame(scheduleClick);
+        };
+
+        const handle = requestAnimationFrame(scheduleClick);
+        return () => cancelAnimationFrame(handle);
+    }, [active, context]);
+
+    return null; // Purely imperative audio for clicks
+};
+
 // --- Sound Component ---
 const SoundScape = ({ mouseX, mouseY, isActive }: { mouseX: number, mouseY: number, isActive: boolean }) => {
     const cutoff = 200 + (Math.abs(mouseX) * 2000);
@@ -28,19 +105,26 @@ const SoundScape = ({ mouseX, mouseY, isActive }: { mouseX: number, mouseY: numb
 
     return (
         <>
+            {/* Deep Drone */}
             <Gain gain={0.3}>
                 <Filter frequency={cutoff} type="lowpass" Q={5}>
                     <Osc frequency={60} type="sawtooth" autoStart />
                 </Filter>
             </Gain>
             <Gain gain={0.1}>
-                <Osc frequency={110 + pitch} type="sine" autoStart />
+                {/* Reverb-like texture using slow detuned oscillators */}
+                <Osc frequency={110 + pitch} type="sine" autoStart detune={5} />
+                <Osc frequency={110 + pitch} type="sine" autoStart detune={-5} />
             </Gain>
             <Gain gain={reactiveGain}>
                 <Filter frequency={cutoff * 2} type="bandpass" Q={2}>
                     <Osc frequency={200 + (mouseX * 100)} type="triangle" autoStart />
                 </Filter>
             </Gain>
+
+            {/* New Organic Layers */}
+            <AlienTexture active={isActive} />
+            <Crackle active={isActive} />
         </>
     );
 };
@@ -77,34 +161,53 @@ const ParticleSystem = ({ isRendererReady }: { isRendererReady: boolean }) => {
         // 1. Buffers
         const positionArray = new Float32Array(count * 3);
         const velocityArray = new Float32Array(count * 3);
+        const initialPositionArray = new Float32Array(count * 3);
 
         for (let i = 0; i < count; i++) {
-            const r = 5 * Math.cbrt(Math.random());
-            const theta = Math.random() * 2 * Math.PI;
-            const phi = Math.acos(2 * Math.random() - 1);
+            // Circle / Ring Formation
+            const radius = 4.0;
+            const spread = 0.2; // Thinner smoke ring (Expectation: ink-like line)
+            const angle = Math.random() * 2 * Math.PI;
 
-            positionArray[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-            positionArray[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-            positionArray[i * 3 + 2] = r * Math.cos(phi);
+            // Random radius within the ring thickness
+            const r = radius + (Math.random() - 0.5) * spread;
+
+            const x = r * Math.cos(angle);
+            const y = r * Math.sin(angle);
+            const z = (Math.random() - 0.5) * 0.5; // Flatter depth
+
+            positionArray[i * 3] = x;
+            positionArray[i * 3 + 1] = y;
+            positionArray[i * 3 + 2] = z;
+
+            // Store initial position for "Home Return" force
+            initialPositionArray[i * 3] = x;
+            initialPositionArray[i * 3 + 1] = y;
+            initialPositionArray[i * 3 + 2] = z;
         }
 
         const posBuf = storage(new InstancedBufferAttribute(positionArray, 3), 'vec3', count);
         const velBuf = storage(new InstancedBufferAttribute(velocityArray, 3), 'vec3', count);
+        const initialPosBuf = storage(new InstancedBufferAttribute(initialPositionArray, 3), 'vec3', count);
 
         // 2. Compute
         const update = Fn(() => {
             const p = posBuf.element(instanceIndex);
             const v = velBuf.element(instanceIndex);
+            const initialPos = initialPosBuf.element(instanceIndex);
 
-            const flow = mx_noise_vec3(p.mul(0.5).add(uTime.mul(0.2))).mul(0.05);
+            const flow = mx_noise_vec3(p.mul(0.5).add(uTime.mul(0.1))).mul(0.05);
             const diff = p.sub(uCursor);
             const dist = diff.length();
-            const repel = diff.normalize().mul(float(1.0).div(dist.mul(dist).add(0.1))).mul(uAudio.add(0.2)).mul(0.05);
+            const repel = diff.normalize().mul(float(1.0).div(dist.mul(dist).add(0.1))).mul(uAudio.add(0.2)).mul(0.15); // Stronger repel
 
             const newV = v.mul(0.95).add(flow).add(repel);
-            const centerReturn = p.mul(-0.01);
 
-            v.assign(newV.add(centerReturn));
+            // Home Return Force: Pull back to initial ring position
+            // Stronger force (0.05) to maintain thin shape
+            const homeReturn = initialPos.sub(p).mul(0.05);
+
+            v.assign(newV.add(homeReturn));
             p.assign(p.add(v));
         });
 
@@ -144,18 +247,18 @@ const ParticleSystem = ({ isRendererReady }: { isRendererReady: boolean }) => {
     // Background Node (Smoke Effect)
     useEffect(() => {
         // Color Palette (High Contrast Grayscale)
-        const color1 = vec3(0.0, 0.0, 0.0);   // Pure Black
+        const color1 = vec3(0.3, 0.3, 0.3);   // Pure Black
         const color2 = vec3(1., 1., 1.);   // Bright Grey
 
         // Noise pattern
         // We use uv() which in background context maps to screen
-        const noiseScale = float(10.1);
+        const noiseScale = float(5.);
         const timeScale = float(.1);
 
-        const n = mx_noise_vec3(uv().mul(noiseScale).add(vec3(uTime.mul(timeScale), 0, uTime.mul(timeScale))));
+        const n = mx_noise_vec3(uv().mul(noiseScale).add(0, 0, uTime.mul(timeScale)));
 
         // Enhance contrast of the noise pattern itself
-        let factor = n.r.add(1.0).mul(0.5);
+        let factor = n.r.add(1.0).mul(0.3);
         factor = factor.pow(1.5).clamp(0, 1);
 
         const bg = mix(color1, color2, factor);
@@ -239,7 +342,7 @@ export const VisualizerDemo = () => {
                 <SoundScape mouseX={interaction.x} mouseY={interaction.y} isActive={interaction.active} />
 
                 <Canvas
-                    style={{ filter: 'invert(1)' }}
+                    style={{ filter: 'invert(1) drop-shadow(0 0 10px rgba(200,220,255,0.6)) brightness(1.2) contrast(1.2)' }}
                     gl={({ canvas }) => {
                         const renderer = new WebGPURenderer({
                             canvas,
