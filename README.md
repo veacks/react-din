@@ -1,6 +1,6 @@
 # react-din
 
-A React-first declarative WebAudio library for building audio graphs.
+A React-first declarative WebAudio library for building audio graphs, focused for interactive sound design.
 
 Build complex audio graphs using React's declarative paradigm. Audio nodes are represented as React components that automatically connect based on their parent-child relationships.
 
