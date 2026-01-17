@@ -39,6 +39,13 @@ export interface AudioProviderProps {
     manualUnlock?: boolean;
 
     /**
+     * Defer AudioContext creation until a user gesture is detected.
+     * Useful for browsers that require activation before context creation.
+     * @default false
+     */
+    createOnUserGesture?: boolean;
+
+    /**
      * Master gain level (0-1).
      * Controls the volume of the master bus.
      * @default 1
@@ -60,6 +67,12 @@ export interface AudioProviderProps {
      * Callback fired if AudioContext creation fails.
      */
     onError?: (error: Error) => void;
+
+    /**
+     * Enable debug logging for audio lifecycle and node connections.
+     * @default false
+     */
+    debug?: boolean;
 }
 
 // =============================================================================
@@ -93,6 +106,11 @@ export interface AudioContextState {
      * Many browsers require a user interaction before audio can play.
      */
     isUnlocked: boolean;
+
+    /**
+     * Whether debug logging is enabled.
+     */
+    debug: boolean;
 
     /**
      * Manually unlock/resume the AudioContext.

@@ -15,7 +15,7 @@ import type {
     AudioContextRef,
 } from './types';
 import { AudioOutProvider } from './AudioOutContext';
-import { setupUnlock } from './unlock';
+import { setupUnlock, setupGestureUnlock } from './unlock';
 
 /**
  * Internal context for the audio system.
@@ -42,6 +42,8 @@ export const AudioProvider: FC<AudioProviderProps> = ({
     children,
     contextOptions,
     manualUnlock = false,
+    createOnUserGesture = false,
+    debug = false,
     masterGain: initialMasterGain = 1,
     onStateChange,
     onUnlock,
@@ -51,12 +53,20 @@ export const AudioProvider: FC<AudioProviderProps> = ({
     const [context, setContext] = useState<AudioContextRef>(null);
     const [state, setState] = useState<AudioState>('suspended');
     const [isUnlocked, setIsUnlocked] = useState(false);
+    const unlockedRef = useRef(false);
+    const contextRef = useRef<AudioContextRef>(null);
     const masterBusRef = useRef<GainNode | null>(null);
-    const cleanupRef = useRef<(() => void) | null>(null);
+    const contextCleanupRef = useRef<(() => void) | null>(null);
+    const unlockCleanupRef = useRef<(() => void) | null>(null);
 
-    // Initialize AudioContext on mount (client only)
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
+    const log = useCallback((...args: unknown[]) => {
+        if (!debug) return;
+        console.info('[react-din]', ...args);
+    }, [debug]);
+
+    const createContext = useCallback((): AudioContextRef => {
+        if (typeof window === 'undefined') return null;
+        if (contextRef.current) return contextRef.current;
 
         try {
             const AudioContextClass =
@@ -71,53 +81,124 @@ export const AudioProvider: FC<AudioProviderProps> = ({
             masterBus.gain.value = initialMasterGain;
             masterBus.connect(ctx.destination);
 
-            setContext(ctx);
+            contextRef.current = ctx;
             masterBusRef.current = masterBus;
+            setContext(ctx);
             setState(ctx.state as AudioState);
+            log('AudioContext created', { state: ctx.state, sampleRate: ctx.sampleRate });
 
-            // Listen for state changes
+            unlockedRef.current = ctx.state === 'running';
+            setIsUnlocked(unlockedRef.current);
+            if (unlockedRef.current && !manualUnlock) {
+                onUnlock?.();
+                log('AudioContext already running');
+            }
+
             const handleStateChange = () => {
                 const newState = ctx.state as AudioState;
                 setState(newState);
                 onStateChange?.(newState);
+                log('AudioContext state change', newState);
 
-                if (newState === 'running' && !isUnlocked) {
+                if (newState === 'running' && !unlockedRef.current) {
+                    unlockedRef.current = true;
                     setIsUnlocked(true);
                     onUnlock?.();
+                    log('AudioContext unlocked');
                 }
             };
 
             ctx.addEventListener('statechange', handleStateChange);
 
-            // Setup automatic unlock if not manual
-            if (!manualUnlock) {
-                cleanupRef.current = setupUnlock(ctx, () => {
-                    setIsUnlocked(true);
-                    onUnlock?.();
-                });
-            }
-
-            return () => {
+            contextCleanupRef.current = () => {
                 ctx.removeEventListener('statechange', handleStateChange);
-                cleanupRef.current?.();
                 ctx.close();
             };
+
+            return ctx;
         } catch (error) {
+            log('AudioContext creation failed', error);
             onError?.(error as Error);
+            return null;
         }
-    }, [contextOptions, manualUnlock, initialMasterGain, onStateChange, onUnlock, onError, isUnlocked]);
+    }, [contextOptions, initialMasterGain, log, manualUnlock, onError, onStateChange, onUnlock]);
 
     // Unlock function
     const unlock = useCallback(async () => {
-        if (!context) return;
-        if (context.state === 'running') {
-            setIsUnlocked(true);
+        const ctx = contextRef.current ?? createContext();
+        if (!ctx) {
+            log('AudioContext unavailable, unlock skipped');
             return;
         }
-        await context.resume();
+
+        log('AudioContext unlock requested', { state: ctx.state });
+
+        if (ctx.state === 'running') {
+            if (!unlockedRef.current) {
+                unlockedRef.current = true;
+                setIsUnlocked(true);
+                onUnlock?.();
+                log('AudioContext already running');
+            }
+            return;
+        }
+
+        try {
+            await ctx.resume();
+        } catch (error) {
+            log('AudioContext resume failed', error);
+            onError?.(error as Error);
+            return;
+        }
+
+        unlockedRef.current = true;
         setIsUnlocked(true);
         onUnlock?.();
-    }, [context, onUnlock]);
+        log('AudioContext unlocked');
+    }, [createContext, log, onError, onUnlock]);
+
+    // Initialize AudioContext and unlock handling
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        unlockCleanupRef.current?.();
+        unlockCleanupRef.current = null;
+
+        if (createOnUserGesture) {
+            if (!manualUnlock) {
+                log('Waiting for user gesture to create AudioContext');
+                unlockCleanupRef.current = setupGestureUnlock(() => {
+                    log('User gesture detected');
+                    void unlock();
+                });
+            }
+            return;
+        }
+
+        const ctx = createContext();
+        if (!ctx) return;
+
+        if (!manualUnlock) {
+            unlockCleanupRef.current = setupUnlock(ctx, () => {
+                if (unlockedRef.current) return;
+                unlockedRef.current = true;
+                setIsUnlocked(true);
+                onUnlock?.();
+                log('AudioContext unlocked');
+            });
+        }
+    }, [createContext, createOnUserGesture, log, manualUnlock, onUnlock, unlock]);
+
+    useEffect(() => {
+        return () => {
+            unlockCleanupRef.current?.();
+            unlockCleanupRef.current = null;
+            contextCleanupRef.current?.();
+            contextCleanupRef.current = null;
+            contextRef.current = null;
+            masterBusRef.current = null;
+        };
+    }, []);
 
     // Master gain control
     const setMasterGain = useCallback((gain: number) => {
@@ -132,6 +213,7 @@ export const AudioProvider: FC<AudioProviderProps> = ({
         state,
         masterBus: masterBusRef.current,
         isUnlocked,
+        debug,
         unlock,
         setMasterGain,
         sampleRate: context?.sampleRate ?? 44100,

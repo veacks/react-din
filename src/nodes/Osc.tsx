@@ -29,7 +29,7 @@ export const Osc: FC<OscProps> = ({
     periodicWave,
     id,
 }) => {
-    const startedRef = useRef(false);
+    const startedNodeRef = useRef<OscillatorNode | null>(null);
 
     const { nodeRef, context } = useAudioNode<OscillatorNode>({
         createNode: (ctx) => ctx.createOscillator(),
@@ -65,14 +65,16 @@ export const Osc: FC<OscProps> = ({
 
     // Auto-start
     useEffect(() => {
-        if (nodeRef.current && autoStart && !startedRef.current) {
-            try {
-                nodeRef.current.start();
-                startedRef.current = true;
-            } catch {
-                // Already started
-            }
+        const node = nodeRef.current;
+        if (!node || !autoStart) return;
+        if (startedNodeRef.current === node) return;
+
+        try {
+            node.start();
+        } catch {
+            // Already started
         }
+        startedNodeRef.current = node;
     }, [autoStart, nodeRef.current]);
 
     return (

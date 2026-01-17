@@ -72,6 +72,47 @@ export function setupUnlock(
 }
 
 /**
+ * Sets up a user gesture listener and runs a callback once on first gesture.
+ *
+ * This is useful when the AudioContext must be created or resumed
+ * inside a user-initiated event.
+ *
+ * @param onGesture - Callback fired on first user gesture
+ * @returns Cleanup function to remove event listeners
+ *
+ * @internal
+ */
+export function setupGestureUnlock(onGesture: () => void): () => void {
+    if (typeof window === 'undefined') {
+        return () => { };
+    }
+
+    let handled = false;
+
+    const handleUnlock = () => {
+        if (handled) return;
+        handled = true;
+        onGesture();
+        cleanup();
+    };
+
+    const cleanup = () => {
+        UNLOCK_EVENTS.forEach((event) => {
+            document.removeEventListener(event, handleUnlock, { capture: true });
+        });
+    };
+
+    UNLOCK_EVENTS.forEach((event) => {
+        document.addEventListener(event, handleUnlock, {
+            capture: true,
+            passive: true,
+        });
+    });
+
+    return cleanup;
+}
+
+/**
  * Check if the AudioContext is in a suspended state and needs unlocking.
  *
  * @param context - The AudioContext to check

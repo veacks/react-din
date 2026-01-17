@@ -5,6 +5,9 @@
   "author": "Valentin Dubois - veacks.net",
   "license": "MIT",
   "type": "module",
+  "workspaces": [
+    "example"
+  ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -102,7 +105,8 @@
     "lint": "eslint src --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "example:dev": "npm -w example run dev"
   },
   "peerDependencies": {
     "react": ">=18.0.0",

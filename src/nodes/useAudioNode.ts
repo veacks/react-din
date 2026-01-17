@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAudio } from '../core/AudioProvider';
 import { useAudioOut } from '../core/AudioOutContext';
 
@@ -78,10 +78,21 @@ export function useAudioNode<T extends AudioNode>({
     bypass = false,
     deps = [],
 }: UseAudioNodeOptions<T>): UseAudioNodeResult<T> {
-    const { context, isUnlocked } = useAudio();
+    const { context, isUnlocked, debug } = useAudio();
     const { outputNode } = useAudioOut();
     const nodeRef = useRef<T | null>(null);
     const bypassConnectionRef = useRef<AudioNode | null>(null);
+
+    const log = (...args: unknown[]) => {
+        if (!debug) return;
+        console.info('[react-din]', ...args);
+    };
+
+    const getNodeName = (node: AudioNode | null) =>
+        node?.constructor?.name ?? 'AudioNode';
+
+    // Track node version to trigger reconnection when node is recreated
+    const [nodeVersion, setNodeVersion] = useState(0);
 
     // Create node
     useEffect(() => {
@@ -89,8 +100,11 @@ export function useAudioNode<T extends AudioNode>({
 
         const node = createNode(context);
         nodeRef.current = node;
+        log('Node created', getNodeName(node));
+        setNodeVersion((v: number) => v + 1); // Trigger reconnection
 
         return () => {
+            log('Node disposed', getNodeName(node));
             node.disconnect();
             nodeRef.current = null;
         };
@@ -102,25 +116,31 @@ export function useAudioNode<T extends AudioNode>({
         const node = nodeRef.current;
         if (!node || !outputNode) return;
 
+        const nodeName = getNodeName(node);
+        const outputName = getNodeName(outputNode);
+
         if (bypass) {
             // In bypass mode, we don't connect through this node
             // Children will connect directly to our parent
             bypassConnectionRef.current = outputNode;
+            log('Node bypass', nodeName, '->', outputName);
         } else {
             node.connect(outputNode);
             bypassConnectionRef.current = null;
+            log('Node connected', nodeName, '->', outputName);
         }
 
         return () => {
             if (!bypass) {
                 try {
                     node.disconnect(outputNode);
+                    log('Node disconnected', nodeName, '->', outputName);
                 } catch {
                     // Node may already be disconnected
                 }
             }
         };
-    }, [outputNode, bypass]);
+    }, [outputNode, bypass, nodeVersion]);
 
     return {
         nodeRef,
