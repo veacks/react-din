@@ -19,9 +19,16 @@ const DelayNode = memo(({ id, data, selected }: NodeProps) => {
 
     return (
         <div className={`audio-node delay-node ${selected ? 'selected' : ''}`}>
-            <div className="node-header">
-                <span className="node-icon">⏱️</span>
-                <span className="node-title">Delay</span>
+            <div className="node-header" style={{ justifyContent: 'space-between', position: 'relative' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Handle type="target" position={Position.Left} id="in" className="handle handle-in handle-audio" style={{ left: '-10px' }} />
+                    <span className="node-icon">⏱️</span>
+                    <span className="node-title">Delay</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span className="handle-label-static" style={{ fontSize: '9px', color: '#888', marginRight: '8px', textTransform: 'uppercase' }}>Out</span>
+                    <Handle type="source" position={Position.Right} id="out" className="handle handle-out handle-audio" style={{ right: '-10px' }} />
+                </div>
             </div>
             <div className="node-content">
                 <div className="node-control">
@@ -51,11 +58,6 @@ const DelayNode = memo(({ id, data, selected }: NodeProps) => {
                     <span className="value">{Math.round(delayData.feedback * 100)}%</span>
                 </div>
             </div>
-            <div className="handle-label handle-label-in" style={{ top: '40px' }}>Audio In</div>
-            <Handle type="target" position={Position.Left} id="in" className="handle handle-in handle-audio" style={{ top: '40px' }} />
-
-            <div className="handle-label handle-label-out">Audio Out</div>
-            <Handle type="source" position={Position.Right} id="out" className="handle handle-out handle-audio" />
         </div>
     );
 });

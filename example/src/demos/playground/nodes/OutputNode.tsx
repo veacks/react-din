@@ -32,9 +32,12 @@ const OutputNode = memo(({ id, data, selected }: NodeProps) => {
 
     return (
         <div className={`audio-node output-node ${selected ? 'selected' : ''} ${outputData.playing ? 'playing' : ''}`}>
-            <div className="node-header">
-                <span className="node-icon">🔊</span>
-                <span className="node-title">Output</span>
+            <div className="node-header" style={{ justifyContent: 'space-between', position: 'relative' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Handle type="target" position={Position.Left} id="in" className="handle handle-in handle-audio" style={{ left: '-10px' }} />
+                    <span className="node-icon">🔊</span>
+                    <span className="node-title">Output</span>
+                </div>
             </div>
             <div className="node-content">
                 <button
@@ -57,8 +60,6 @@ const OutputNode = memo(({ id, data, selected }: NodeProps) => {
                     <span className="value">{Math.round(outputData.masterGain * 100)}%</span>
                 </div>
             </div>
-            <div className="handle-label handle-label-in" style={{ top: '40px' }}>Audio In</div>
-            <Handle type="target" position={Position.Left} id="in" className="handle handle-in handle-audio" style={{ top: '40px' }} />
         </div>
     );
 });

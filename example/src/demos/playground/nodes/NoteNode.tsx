@@ -56,9 +56,9 @@ const NoteNode = memo(({ id, data, selected }: NodeProps) => {
                 <button
                     className="lang-toggle"
                     onClick={handleLanguageToggle}
-                    title={`Switch to ${noteData.language === 'en' ? 'French' : 'English'} notes`}
+                    title={`Switch to ${noteData.language === 'en' ? 'Solmization (Do, Re, Mi)' : 'Alphabetical (A, B, C)'}`}
                 >
-                    {noteData.language === 'en' ? '🇬🇧' : '🇫🇷'}
+                    {noteData.language === 'en' ? 'DoReMi' : 'ABC'}
                 </button>
             </div>
             <div className="node-content">

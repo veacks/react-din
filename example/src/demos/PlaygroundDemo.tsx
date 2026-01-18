@@ -6,9 +6,12 @@ import {
     MiniMap,
     BackgroundVariant,
     type NodeTypes,
+    type Node,
+    type OnNodesChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import './playground/playground.css';
+import Inspector from './playground/Inspector';
 
 import { useAudioGraphStore, type AudioNodeData } from './playground/store';
 import {
@@ -142,6 +145,8 @@ export const PlaygroundDemo: FC = () => {
     const onConnect = useAudioGraphStore((s) => s.onConnect);
     const addNode = useAudioGraphStore((s) => s.addNode);
 
+    const setSelectedNode = useAudioGraphStore((s) => s.setSelectedNode);
+
     // Generate code from current graph
     const generatedCode = useMemo(() => generateCode(nodes, edges), [nodes, edges]);
 
@@ -170,12 +175,21 @@ export const PlaygroundDemo: FC = () => {
         event.dataTransfer.dropEffect = 'move';
     }, []);
 
+    // Handle selection
+    const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
+        setSelectedNode(node.id);
+    }, [setSelectedNode]);
+
+    const onPaneClick = useCallback(() => {
+        setSelectedNode(null);
+    }, [setSelectedNode]);
+
     return (
         <div className="playground-demo">
             <style>{`
                 .playground-demo {
                     display: grid;
-                    grid-template-columns: 240px 1fr;
+                    grid-template-columns: 200px 1fr 300px;
                     height: calc(100vh - 60px);
                     gap: 0;
                     background: #0a0a12;
@@ -189,6 +203,13 @@ export const PlaygroundDemo: FC = () => {
                     border-right: 1px solid #2a2a3a;
                     overflow: hidden;
                 }
+                
+                /* Right Inspector */
+                .inspector-panel {
+                    border-left: 1px solid #2a2a3a;
+                    background: #16161e;
+                    overflow: hidden;
+                }
 
                 .node-palette {
                     flex: 0 0 auto;
@@ -197,6 +218,21 @@ export const PlaygroundDemo: FC = () => {
                     overflow-y: auto;
                     max-height: 50%;
                 }
+                
+                /* ... keep existing styles ... */
+                
+                /* Code preview adjustment */
+                .code-preview {
+                   display: flex;
+                   flex-direction: column;
+                   flex: 1;
+                   min-height: 0;
+                }
+                
+                /* Existing styles... I'll assume they persist or need to be re-added if I'm replacing the whole layout.
+                   Wait, I am doing a partial replace of the logic + render. 
+                   Ideally I should just inject the Inspector. 
+                   But I need to change grid-template-columns. */
 
                 .palette-category {
                     margin-bottom: 16px;
@@ -355,6 +391,7 @@ export const PlaygroundDemo: FC = () => {
                 .reverb-node .node-header { background: #8844ff; }
                 .panner-node .node-header { background: #44cccc; }
                 .mixer-node .node-header { background: #ffaa44; }
+                .input-node .node-header { background: #555555; }
 
                 .node-icon { font-size: 12px; }
                 .node-title { flex: 1; }
@@ -454,6 +491,11 @@ export const PlaygroundDemo: FC = () => {
                 .handle:hover {
                     background: #4488ff !important;
                 }
+                
+                .handle-audio {
+                   background: #00ff41 !important;
+                   border-color: #00ff41 !important;
+                }
 
                 /* MiniMap */
                 .react-flow__minimap {
@@ -492,11 +534,13 @@ export const PlaygroundDemo: FC = () => {
                 onDragOver={onDragOver}
             >
                 <ReactFlow
-                    nodes={nodes}
+                    nodes={nodes as unknown as Node[]}
                     edges={edges}
-                    onNodesChange={onNodesChange}
+                    onNodesChange={onNodesChange as unknown as OnNodesChange}
                     onEdgesChange={onEdgesChange}
                     onConnect={onConnect}
+                    onNodeClick={onNodeClick}
+                    onPaneClick={onPaneClick}
                     nodeTypes={nodeTypes}
                     fitView
                     snapToGrid
@@ -526,6 +570,10 @@ export const PlaygroundDemo: FC = () => {
                         maskColor="rgba(0,0,0,0.8)"
                     />
                 </ReactFlow>
+            </div>
+
+            <div className="inspector-panel">
+                <Inspector />
             </div>
         </div>
     );

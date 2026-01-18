@@ -109,7 +109,7 @@ export class AudioEngine {
     /**
      * Build and start the audio graph from visual nodes
      */
-    start(nodes: Node[], edges: Edge[]): void {
+    start(nodes: Node<AudioNodeData>[], edges: Edge[]): void {
         if (this.isPlaying) return;
 
         const ctx = this.init();
@@ -145,6 +145,11 @@ export class AudioEngine {
                         const param = targetInstance.params.get(edge.targetHandle);
                         if (param) {
                             sourceNode.connect(param);
+
+                            // If connecting a Note node (absolute Hz) to frequency, zero out the base frequency
+                            if (sourceInstance.type === 'note' && edge.targetHandle === 'frequency') {
+                                param.value = 0;
+                            }
                         }
                     } else {
                         // Standard Audio to Audio connection
@@ -157,7 +162,7 @@ export class AudioEngine {
         });
 
         // Connect output node to destination
-        const outputNode = nodes.find((n) => (n.data as AudioNodeData).type === 'output');
+        const outputNode = nodes.find((n) => n.data.type === 'output');
         if (outputNode) {
             const outputInstance = this.audioNodes.get(outputNode.id);
             if (outputInstance) {
@@ -231,8 +236,8 @@ export class AudioEngine {
     /**
      * Create an AudioNode from a visual node
      */
-    private createAudioNode(ctx: AudioContext, node: Node): AudioNodeInstance | null {
-        const data = node.data as AudioNodeData;
+    private createAudioNode(ctx: AudioContext, node: Node<AudioNodeData>): AudioNodeInstance | null {
+        const data = node.data;
 
         switch (data.type) {
             case 'osc': {

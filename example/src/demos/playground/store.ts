@@ -79,14 +79,19 @@ export interface MixerNodeData {
 }
 
 export interface InputParam {
+    id: string; // Unique ID for keying
     name: string;
-    value: number;
+    type: 'float'; // Extensible for later
+    defaultValue: number;
+    value: number; // Current value
     min: number;
     max: number;
+    label?: string; // Optional display label
 }
 
 export interface InputNodeData {
     type: 'input';
+    transportEnabled: boolean;
     bpm: number;
     params: InputParam[];
     label: string;
@@ -101,7 +106,7 @@ export interface NoteNodeData {
     label: string;
 }
 
-export type AudioNodeData =
+export type AudioNodeData = (
     | OscNodeData
     | GainNodeData
     | FilterNodeData
@@ -112,19 +117,21 @@ export type AudioNodeData =
     | StereoPannerNodeData
     | MixerNodeData
     | InputNodeData
-    | NoteNodeData;
+    | NoteNodeData
+) & Record<string, unknown>;
 
 // ============================================================================
 // Store State
 // ============================================================================
 
 interface AudioGraphState {
-    nodes: Node[];
+    nodes: Node<AudioNodeData>[];
     edges: Edge[];
     audioContext: AudioContext | null;
+    selectedNodeId: string | null;
 
     // React Flow handlers
-    onNodesChange: OnNodesChange;
+    onNodesChange: OnNodesChange<Node<AudioNodeData>>;
     onEdgesChange: OnEdgesChange;
     onConnect: OnConnect;
 
@@ -133,6 +140,7 @@ interface AudioGraphState {
     updateNodeData: (nodeId: string, data: Partial<AudioNodeData>) => void;
     removeNode: (nodeId: string) => void;
     setPlaying: (playing: boolean) => void;
+    setSelectedNode: (nodeId: string | null) => void;
     initAudioContext: () => void;
 }
 
@@ -140,24 +148,24 @@ let nodeIdCounter = 0;
 const getNodeId = () => `node_${++nodeIdCounter}`;
 
 // Initial nodes - Horizontal layout
-const initialNodes: Node[] = [
+const initialNodes: Node<AudioNodeData>[] = [
     {
         id: 'osc_1',
         type: 'oscNode',
         position: { x: 50, y: 150 },
-        data: { type: 'osc', frequency: 440, waveform: 'sine', label: 'Oscillator' },
+        data: { type: 'osc', frequency: 440, detune: 0, waveform: 'sine', label: 'Oscillator' } as AudioNodeData,
     },
     {
         id: 'gain_1',
         type: 'gainNode',
         position: { x: 300, y: 150 },
-        data: { type: 'gain', gain: 0.5, label: 'Gain' },
+        data: { type: 'gain', gain: 0.5, label: 'Gain' } as AudioNodeData,
     },
     {
         id: 'output_1',
         type: 'outputNode',
         position: { x: 520, y: 150 },
-        data: { type: 'output', playing: false, masterGain: 0.5, label: 'Output' },
+        data: { type: 'output', playing: false, masterGain: 0.5, label: 'Output' } as AudioNodeData,
     },
 ];
 
@@ -170,6 +178,17 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
     nodes: initialNodes,
     edges: initialEdges,
     audioContext: null,
+    selectedNodeId: null,
+
+    setSelectedNode: (nodeId) => {
+        set({ selectedNodeId: nodeId });
+        set((state) => ({
+            nodes: state.nodes.map((n) => ({
+                ...n,
+                selected: n.id === nodeId,
+            })),
+        }));
+    },
 
     onNodesChange: (changes) => {
         set({
@@ -199,7 +218,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
 
     addNode: (type, position = { x: 300, y: 200 }) => {
         const id = getNodeId();
-        let newNode: Node;
+        let newNode: Node<AudioNodeData>;
 
         switch (type) {
             case 'osc':
@@ -207,7 +226,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'oscNode',
                     position,
-                    data: { type: 'osc', frequency: 440, detune: 0, waveform: 'sine', label: 'Oscillator' },
+                    data: { type: 'osc', frequency: 440, detune: 0, waveform: 'sine', label: 'Oscillator' } as AudioNodeData,
                 };
                 break;
             case 'gain':
@@ -215,7 +234,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'gainNode',
                     position,
-                    data: { type: 'gain', gain: 0.5, label: 'Gain' },
+                    data: { type: 'gain', gain: 0.5, label: 'Gain' } as AudioNodeData,
                 };
                 break;
             case 'filter':
@@ -231,7 +250,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                         q: 1,
                         gain: 0,
                         label: 'Filter'
-                    },
+                    } as AudioNodeData,
                 };
                 break;
             case 'output':
@@ -239,7 +258,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'outputNode',
                     position,
-                    data: { type: 'output', playing: false, masterGain: 0.5, label: 'Output' },
+                    data: { type: 'output', playing: false, masterGain: 0.5, label: 'Output' } as AudioNodeData,
                 };
                 break;
             case 'noise':
@@ -247,7 +266,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'noiseNode',
                     position,
-                    data: { type: 'noise', noiseType: 'white', label: 'Noise' },
+                    data: { type: 'noise', noiseType: 'white', label: 'Noise' } as AudioNodeData,
                 };
                 break;
             case 'delay':
@@ -255,7 +274,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'delayNode',
                     position,
-                    data: { type: 'delay', delayTime: 0.3, feedback: 0.4, label: 'Delay' },
+                    data: { type: 'delay', delayTime: 0.3, feedback: 0.4, label: 'Delay' } as AudioNodeData,
                 };
                 break;
             case 'reverb':
@@ -263,7 +282,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'reverbNode',
                     position,
-                    data: { type: 'reverb', decay: 2, mix: 0.5, label: 'Reverb' },
+                    data: { type: 'reverb', decay: 2, mix: 0.5, label: 'Reverb' } as AudioNodeData,
                 };
                 break;
             case 'panner':
@@ -271,7 +290,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'pannerNode',
                     position,
-                    data: { type: 'panner', pan: 0, label: 'Pan' },
+                    data: { type: 'panner', pan: 0, label: 'Pan' } as AudioNodeData,
                 };
                 break;
             case 'mixer':
@@ -279,7 +298,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'mixerNode',
                     position,
-                    data: { type: 'mixer', inputs: 3, label: 'Mixer' },
+                    data: { type: 'mixer', inputs: 3, label: 'Mixer' } as AudioNodeData,
                 };
                 break;
             case 'input':
@@ -287,7 +306,13 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'inputNode',
                     position,
-                    data: { type: 'input', bpm: 120, params: [], label: 'Input' },
+                    data: {
+                        type: 'input',
+                        transportEnabled: true,
+                        bpm: 120,
+                        params: [],
+                        label: 'Input'
+                    } as AudioNodeData,
                 };
                 break;
             case 'note':
@@ -302,7 +327,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                         frequency: 261.6,
                         language: 'en',
                         label: 'Note'
-                    },
+                    } as AudioNodeData,
                 };
                 break;
             default:
