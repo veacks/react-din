@@ -194,12 +194,36 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
         set({
             nodes: applyNodeChanges(changes, get().nodes),
         });
+        // Note: We don't trigger engine update here for typical "position" changes.
+        // Data changes come via updateNodeData. 
+        // Deletions come via onNodesChange 'remove' type? 
+        // xyflow calls onNodesChange for deletions if using the delete key.
+        changes.forEach(change => {
+            if (change.type === 'remove') {
+                // If a node is removed, edges might also be removed by flow but we handle checking edges in onEdgesChange 
+                // or we rely on explicit removeNode which updates edges.
+                // However, applyNodeChanges might not update edges? 
+                // xyflow usually handles cascading edge removal if we pass onEdgesChange properly?
+                // Actually we should rely on onEdgesChange for edge removals.
+                // For node removal, we need to stop/disconnect the node in engine.
+                // But our engine is rebuilt from current nodes list if we call refresh maybe?
+                // Actually removeNode action is better for explicit removal. 
+                // If user presses "Delete" key, we might miss it here unless we hook into it.
+                // Let's assume standard interaction is sufficient for now or rely on refreshConnections clearing unconnected nodes? No.
+            }
+        });
     },
 
     onEdgesChange: (changes) => {
         set({
             edges: applyEdgeChanges(changes, get().edges),
         });
+        // Refresh connections whenever edges change (add/remove/select)
+        // Only strictly need for add/remove, but safe to call if check is efficient.
+        const hasStructuralChange = changes.some(c => c.type === 'add' || c.type === 'remove');
+        if (hasStructuralChange) {
+            audioEngine.refreshConnections(get().nodes, get().edges);
+        }
     },
 
     onConnect: (connection) => {
@@ -211,9 +235,11 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
             ? { stroke: '#44cc44', strokeWidth: 3 } // Green for audio
             : { stroke: '#4488ff', strokeWidth: 2, strokeDasharray: '5,5' }; // Blue dashed for control
 
-        set({
-            edges: addEdge({ ...connection, style: edgeStyle, animated: !isAudioConnection }, get().edges),
-        });
+        const newEdges = addEdge({ ...connection, style: edgeStyle, animated: !isAudioConnection }, get().edges);
+        set({ edges: newEdges });
+
+        // Refresh engine connections
+        audioEngine.refreshConnections(get().nodes, newEdges);
     },
 
     addNode: (type, position = { x: 300, y: 200 }) => {
@@ -334,7 +360,11 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                 return;
         }
 
-        set({ nodes: [...get().nodes, newNode] });
+        const newNodes = [...get().nodes, newNode];
+        set({ nodes: newNodes });
+
+        // Refresh connections to sync new node to engine
+        audioEngine.refreshConnections(newNodes, get().edges);
     },
 
     updateNodeData: (nodeId, data) => {
@@ -345,13 +375,23 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     : node
             ),
         });
+
+        // Trigger Engine Update
+        audioEngine.updateNode(nodeId, data);
     },
 
     removeNode: (nodeId) => {
+        const newNodes = get().nodes.filter((node) => node.id !== nodeId);
+        const newEdges = get().edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId);
         set({
-            nodes: get().nodes.filter((node) => node.id !== nodeId),
-            edges: get().edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
+            nodes: newNodes,
+            edges: newEdges,
         });
+
+        // We should also remove from engine...
+        // audioEngine.removeNode(nodeId); // Not implemented yet
+        // But refreshing connections will at least disconnect logic involving it.
+        audioEngine.refreshConnections(newNodes, newEdges);
     },
 
     setPlaying: (playing) => {

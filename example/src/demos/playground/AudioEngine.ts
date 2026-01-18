@@ -361,6 +361,141 @@ export class AudioEngine {
     }
 
     /**
+     * Refresh connections and sync nodes (Hot-swapping & Dynamic Add/Remove)
+     */
+    refreshConnections(nodes: Node<AudioNodeData>[], edges: Edge[]): void {
+        if (!this.isPlaying || !this.audioContext) return;
+        const ctx = this.audioContext;
+
+        // 0. Sync Nodes: Create new ones, Remove deleted ones
+        const activeIds = new Set(nodes.map(n => n.id));
+
+        // Detect and remove deleted nodes
+        for (const [id, instance] of this.audioNodes.entries()) {
+            if (!activeIds.has(id)) {
+                try {
+                    // Stop sources
+                    if (instance.node instanceof OscillatorNode ||
+                        instance.node instanceof AudioBufferSourceNode ||
+                        instance.node instanceof ConstantSourceNode) {
+                        try { instance.node.stop(); } catch (e) { }
+                    }
+                    if (instance.outputs) {
+                        instance.outputs.forEach(output => {
+                            if (output instanceof ConstantSourceNode || output instanceof OscillatorNode) {
+                                try { output.stop(); } catch (e) { }
+                            }
+                        });
+                    }
+                    instance.node.disconnect();
+                    // Disconnect special internals
+                    if (instance.type === 'delay' && instance.feedbackGain) {
+                        instance.feedbackGain.disconnect();
+                    }
+                } catch (e) { }
+                this.audioNodes.delete(id);
+            }
+        }
+
+        // Detect and create new nodes
+        nodes.forEach(node => {
+            if (!this.audioNodes.has(node.id)) {
+                const instance = this.createAudioNode(ctx, node);
+                if (instance) {
+                    this.audioNodes.set(node.id, instance);
+
+                    // Start if it's a source
+                    if (instance.node instanceof OscillatorNode) {
+                        instance.node.start();
+                    } else if (instance.node instanceof AudioBufferSourceNode) {
+                        instance.node.loop = true;
+                        instance.node.start();
+                    } else if (instance.node instanceof ConstantSourceNode) {
+                        instance.node.start();
+                    }
+
+                    // Start outputs (params)
+                    if (instance.outputs) {
+                        instance.outputs.forEach(output => {
+                            if (output instanceof ConstantSourceNode || output instanceof OscillatorNode) {
+                                output.start();
+                            }
+                        });
+                    }
+                }
+            }
+        });
+
+        // 1. Disconnect all nodes to clear graph wiring (so we can re-wire freshly)
+        this.audioNodes.forEach((instance) => {
+            try {
+                instance.node.disconnect();
+                if (instance.type === 'delay' && instance.feedbackGain) {
+                    instance.feedbackGain.disconnect();
+                }
+                // Reverb/others usually don't need distinct internal disconnect if they are single nodes or encapsulated
+                // But Delay loop is external to the main "node" (variable feedbackGain)
+            } catch (e) { }
+        });
+
+        // 2. Re-establish internal paths
+        this.audioNodes.forEach((instance) => {
+            if (instance.type === 'delay' && instance.feedbackGain) {
+                instance.node.connect(instance.feedbackGain);
+                instance.feedbackGain.connect(instance.node as AudioNode);
+            }
+        });
+
+        // 3. Re-connect edges
+        edges.forEach((edge) => {
+            const sourceInstance = this.audioNodes.get(edge.source);
+            const targetInstance = this.audioNodes.get(edge.target);
+
+
+            if (sourceInstance && targetInstance) {
+                try {
+                    // Determine source node (handle output)
+                    let sourceNode: AudioNode = sourceInstance.node;
+                    if (sourceInstance.type === 'input' && edge.sourceHandle && sourceInstance.outputs) {
+                        const specificOutput = sourceInstance.outputs.get(edge.sourceHandle);
+                        if (specificOutput) {
+                            sourceNode = specificOutput;
+                        }
+                    }
+
+                    // Connect to target AudioParam or AudioNode
+                    if (targetInstance.params && edge.targetHandle && targetInstance.params.has(edge.targetHandle)) {
+                        // Connect to AudioParam (modulation)
+                        const param = targetInstance.params.get(edge.targetHandle);
+                        if (param) {
+                            sourceNode.connect(param);
+
+                            // If connecting a Note node (absolute Hz) to frequency, zero out the base frequency
+                            if (sourceInstance.type === 'note' && edge.targetHandle === 'frequency') {
+                                param.value = 0;
+                            }
+                        }
+                    } else {
+                        // Standard Audio to Audio connection
+                        sourceNode.connect(targetInstance.node);
+                    }
+                } catch (e) {
+                    console.warn('Failed to reconnect nodes:', e);
+                }
+            }
+        });
+
+        // 4. Re-connect output to destination
+        const outputNode = nodes.find((n) => n.data.type === 'output');
+        if (outputNode) {
+            const outputInstance = this.audioNodes.get(outputNode.id);
+            if (outputInstance) {
+                outputInstance.node.connect(this.audioContext.destination);
+            }
+        }
+    }
+
+    /**
      * Update a specific parameter in real-time
      */
     updateNode(nodeId: string, data: Partial<AudioNodeData>): void {
@@ -416,11 +551,6 @@ export class AudioEngine {
                     if (instance.outputs!.has(paramId)) {
                         const paramNode = instance.outputs!.get(paramId) as ConstantSourceNode;
                         paramNode.offset.setTargetAtTime(param.value, currentTime, 0.01);
-
-                        // Handle name changes if we stored logic that depended on it, but here we depend on index
-                    } else if (this.audioContext) {
-                        // New param added while playing? We might need to handle dynamic creation
-                        // For now this handles value updates of existing params
                     }
                 });
             }
@@ -437,6 +567,23 @@ export class AudioEngine {
             }
             if ('feedback' in data && typeof data.feedback === 'number' && instance.feedbackGain) {
                 instance.feedbackGain.gain.setTargetAtTime(data.feedback, currentTime, 0.01);
+            }
+        } else if (instance.type === 'reverb') {
+            const node = instance.node as GainNode; // We return wetGain as the node
+            if ('mix' in data && typeof data.mix === 'number') {
+                node.gain.setTargetAtTime(data.mix, currentTime, 0.01);
+            }
+            // NOTE: 'decay' cannot be updated in real-time easily as it requires re-generating the impulse buffer.
+            // We can accept this limitation or try to swap buffer (complex).
+        } else if (instance.type === 'panner') {
+            const node = instance.node as StereoPannerNode;
+            if ('pan' in data && typeof data.pan === 'number') {
+                node.pan.setTargetAtTime(data.pan, currentTime, 0.01);
+            }
+        } else if (instance.type === 'output') {
+            const node = instance.node as GainNode;
+            if ('masterGain' in data && typeof data.masterGain === 'number') {
+                node.gain.setTargetAtTime(data.masterGain, currentTime, 0.01);
             }
         }
     }
