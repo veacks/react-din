@@ -19,6 +19,8 @@ export type {
     OversampleType,
 } from './types';
 
+export type { ADSRProps, ADSRConfig } from './ADSR';
+
 // Components
 export { Gain } from './Gain';
 export { Filter } from './Filter';
@@ -29,6 +31,7 @@ export { Convolver } from './Convolver';
 export { Panner } from './Panner';
 export { StereoPanner } from './StereoPanner';
 export { WaveShaper } from './WaveShaper';
+export { ADSR, DEFAULT_ADSR } from './ADSR';
 
 // Hooks
 export { useAudioNode } from './useAudioNode';

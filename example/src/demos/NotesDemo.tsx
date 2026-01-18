@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect, type FC } from 'react';
+import { useState, useCallback, useEffect, useRef, type FC } from 'react';
 import {
     AudioProvider,
     Osc,
     Gain,
+    ADSR,
     noteToFreq,
     parseNote,
 } from 'react-din';
@@ -20,51 +21,249 @@ import {
 // Piano key configuration
 const WHITE_KEYS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 
-interface PianoKeyProps {
-    note: string;
-    isBlack: boolean;
-    isActive: boolean;
-    onPress: () => void;
-    onRelease: () => void;
+// ADSR configuration type
+interface ADSRParams {
+    attack: number;
+    decay: number;
+    sustain: number;
+    release: number;
 }
 
-const PianoKey: FC<PianoKeyProps> = ({ note, isBlack, isActive, onPress, onRelease }) => {
-    const handlePointerDown = useCallback((e: React.PointerEvent) => {
+// ADSR Curve Editor Component - Interactive envelope visualization
+interface ADSRCurveEditorProps {
+    adsr: ADSRParams;
+    onChange: (key: keyof ADSRParams, value: number) => void;
+}
+
+const ADSRCurveEditor: FC<ADSRCurveEditorProps> = ({ adsr, onChange }) => {
+    const [dragging, setDragging] = useState<'attack' | 'decay' | 'sustain' | 'release' | null>(null);
+    const svgRef = useCallback((node: SVGSVGElement | null) => {
+        if (node) {
+            node.style.touchAction = 'none';
+        }
+    }, []);
+
+    // Canvas dimensions
+    const width = 320;
+    const height = 140;
+    const padding = { top: 15, right: 15, bottom: 15, left: 15 };
+    const graphWidth = width - padding.left - padding.right;
+    const graphHeight = height - padding.top - padding.bottom;
+
+    // Time scaling: total time shown = attack + decay + sustainHold + release
+    const sustainHoldTime = 0.3; // Fixed visual hold time for sustain
+    const totalTime = Math.max(0.5, adsr.attack + adsr.decay + sustainHoldTime + adsr.release);
+
+    // Calculate point positions
+    const timeToX = (t: number) => padding.left + (t / totalTime) * graphWidth;
+    const levelToY = (level: number) => padding.top + (1 - level) * graphHeight;
+
+    // Key points on the envelope
+    const startX = timeToX(0);
+    const startY = levelToY(0);
+
+    const attackEndX = timeToX(adsr.attack);
+    const attackEndY = levelToY(1); // Peak at 100%
+
+    const decayEndX = timeToX(adsr.attack + adsr.decay);
+    const decayEndY = levelToY(adsr.sustain);
+
+    const sustainEndX = timeToX(adsr.attack + adsr.decay + sustainHoldTime);
+    const sustainEndY = levelToY(adsr.sustain);
+
+    const releaseEndX = timeToX(adsr.attack + adsr.decay + sustainHoldTime + adsr.release);
+    const releaseEndY = levelToY(0);
+
+    // Build the path
+    const pathD = `
+        M ${startX} ${startY}
+        L ${attackEndX} ${attackEndY}
+        L ${decayEndX} ${decayEndY}
+        L ${sustainEndX} ${sustainEndY}
+        L ${releaseEndX} ${releaseEndY}
+    `;
+
+    // Drag handling
+    const handleMouseDown = (point: 'attack' | 'decay' | 'sustain' | 'release') => (e: React.PointerEvent) => {
         e.preventDefault();
-        (e.target as HTMLElement).setPointerCapture(e.pointerId);
-        onPress();
-    }, [onPress]);
+        (e.target as SVGElement).setPointerCapture(e.pointerId);
+        setDragging(point);
+    };
 
-    const handlePointerUp = useCallback(() => {
-        onRelease();
-    }, [onRelease]);
+    const handleMouseMove = useCallback((e: React.PointerEvent) => {
+        if (!dragging) return;
 
-    return (
-        <button
-            className={`piano-key ${isBlack ? 'black' : 'white'} ${isActive ? 'active' : ''}`}
-            onPointerDown={handlePointerDown}
-            onPointerUp={handlePointerUp}
-            onPointerLeave={handlePointerUp}
-            aria-label={`Play note ${note}`}
-        >
-            <span className="key-label">{note}</span>
-        </button>
+        const svg = e.currentTarget as SVGSVGElement;
+        const rect = svg.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // Convert pixel position to time/level
+        const time = Math.max(0.001, ((x - padding.left) / graphWidth) * totalTime);
+        const level = Math.max(0, Math.min(1, 1 - (y - padding.top) / graphHeight));
+
+        switch (dragging) {
+            case 'attack':
+                // Attack point: X controls attack time
+                onChange('attack', Math.min(time, 1));
+                break;
+            case 'decay':
+                // Decay point: X controls decay time, Y controls sustain level
+                const decayTime = Math.max(0.01, time - adsr.attack);
+                onChange('decay', Math.min(decayTime, 2));
+                onChange('sustain', level);
+                break;
+            case 'sustain':
+                // Sustain point: only Y movement (sustain level)
+                onChange('sustain', level);
+                break;
+            case 'release':
+                // Release point: X controls release time
+                const releaseTime = Math.max(0.01, time - adsr.attack - adsr.decay - sustainHoldTime);
+                onChange('release', Math.min(releaseTime, 3));
+                break;
+        }
+    }, [dragging, adsr.attack, adsr.decay, graphWidth, graphHeight, padding.left, padding.top, totalTime, onChange]);
+
+    const handleMouseUp = useCallback(() => {
+        setDragging(null);
+    }, []);
+
+    // Control point component
+    const ControlPoint: FC<{
+        cx: number;
+        cy: number;
+        pointType: 'attack' | 'decay' | 'sustain' | 'release';
+    }> = ({ cx, cy, pointType }) => (
+        <g className="control-point">
+            {/* Outer glow */}
+            <circle
+                cx={cx}
+                cy={cy}
+                r={10}
+                fill="transparent"
+                className="point-hitbox"
+                onPointerDown={handleMouseDown(pointType)}
+                style={{ cursor: 'grab' }}
+            />
+            {/* Main circle */}
+            <circle
+                cx={cx}
+                cy={cy}
+                r={6}
+                fill={dragging === pointType ? '#00ffff' : '#1a1a2e'}
+                stroke="#00d4ff"
+                strokeWidth={2}
+                onPointerDown={handleMouseDown(pointType)}
+                style={{ cursor: 'grab' }}
+            />
+            {/* Inner highlight */}
+            <circle
+                cx={cx}
+                cy={cy}
+                r={3}
+                fill="#ffa500"
+                onPointerDown={handleMouseDown(pointType)}
+                style={{ cursor: 'grab' }}
+            />
+        </g>
     );
-};
-
-// Synth voice component - using react-din declarative components
-interface VoiceProps {
-    note: string;
-    waveform: OscillatorType;
-}
-
-const Voice: FC<VoiceProps> = ({ note, waveform }) => {
-    const frequency = noteToFreq(note);
 
     return (
-        <Gain gain={0.3}>
-            <Osc frequency={frequency} type={waveform} autoStart />
-        </Gain>
+        <div className="adsr-curve-editor">
+            <svg
+                ref={svgRef}
+                width={width}
+                height={height}
+                viewBox={`0 0 ${width} ${height}`}
+                onPointerMove={handleMouseMove}
+                onPointerUp={handleMouseUp}
+                onPointerLeave={handleMouseUp}
+            >
+                {/* Background */}
+                <rect x={0} y={0} width={width} height={height} fill="#0a0a14" rx={4} />
+
+                {/* Graph area border */}
+                <rect
+                    x={padding.left}
+                    y={padding.top}
+                    width={graphWidth}
+                    height={graphHeight}
+                    fill="transparent"
+                    stroke="#2a2a3a"
+                    strokeWidth={1}
+                />
+
+                {/* Horizontal grid lines */}
+                {[0.25, 0.5, 0.75].map((level, i) => (
+                    <line
+                        key={i}
+                        x1={padding.left}
+                        y1={levelToY(level)}
+                        x2={padding.left + graphWidth}
+                        y2={levelToY(level)}
+                        stroke="#1a1a2a"
+                        strokeDasharray="2,4"
+                    />
+                ))}
+
+                {/* Envelope path with glow effect */}
+                <path
+                    d={pathD}
+                    fill="none"
+                    stroke="#00d4ff"
+                    strokeWidth={3}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    filter="url(#glow)"
+                />
+                <path
+                    d={pathD}
+                    fill="none"
+                    stroke="#00ffff"
+                    strokeWidth={1.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+
+                {/* Glow filter */}
+                <defs>
+                    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+                        <feMerge>
+                            <feMergeNode in="coloredBlur" />
+                            <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                    </filter>
+                </defs>
+
+                {/* Control points */}
+                <ControlPoint cx={attackEndX} cy={attackEndY} pointType="attack" />
+                <ControlPoint cx={decayEndX} cy={decayEndY} pointType="decay" />
+                <ControlPoint cx={sustainEndX} cy={sustainEndY} pointType="sustain" />
+                <ControlPoint cx={releaseEndX} cy={releaseEndY} pointType="release" />
+            </svg>
+
+            {/* Value labels */}
+            <div className="adsr-values">
+                <div className="adsr-value">
+                    <span className="label">Attack</span>
+                    <span className="value">{(adsr.attack * 1000).toFixed(0)} ms</span>
+                </div>
+                <div className="adsr-value">
+                    <span className="label">Decay</span>
+                    <span className="value">{(adsr.decay * 1000).toFixed(0)} ms</span>
+                </div>
+                <div className="adsr-value">
+                    <span className="label">Sustain</span>
+                    <span className="value">{(adsr.sustain * 100).toFixed(0)}%</span>
+                </div>
+                <div className="adsr-value">
+                    <span className="label">Release</span>
+                    <span className="value">{(adsr.release * 1000).toFixed(0)} ms</span>
+                </div>
+            </div>
+        </div>
     );
 };
 
@@ -73,6 +272,8 @@ interface PianoProps {
     startOctave: number;
     octaves: number;
     waveform: OscillatorType;
+    adsr: ADSRParams;
+    gain: number;
 }
 
 // Calculate black key positions relative to white keys
@@ -84,19 +285,49 @@ const BLACK_KEY_OFFSETS: { [key: string]: number } = {
     'A#': 5.8,
 };
 
-const Piano: FC<PianoProps> = ({ startOctave, octaves, waveform }) => {
-    const [activeNotes, setActiveNotes] = useState<Set<string>>(new Set());
+// Monophonic Voice component - always mounted, frequency changes dynamically
+interface MonoVoiceProps {
+    note: string | null;
+    waveform: OscillatorType;
+    adsr: ADSRParams;
+    gain: number;
+    trigger: boolean;
+}
 
-    const handlePress = useCallback((note: string) => {
-        setActiveNotes(prev => new Set([...prev, note]));
+const MonoVoice: FC<MonoVoiceProps> = ({ note, waveform, adsr, gain, trigger }) => {
+    const frequency = note ? noteToFreq(note) : 440;
+
+    return (
+        <ADSR trigger={trigger} attack={adsr.attack} decay={adsr.decay} sustain={adsr.sustain} release={adsr.release}>
+            <Gain gain={gain}>
+                <Osc frequency={frequency} type={waveform} autoStart />
+            </Gain>
+        </ADSR>
+    );
+};
+
+const Piano: FC<PianoProps> = ({ startOctave, octaves, waveform, adsr, gain }) => {
+    // Monophonic state - single voice
+    const [currentNote, setCurrentNote] = useState<string | null>(null);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const isPointerDownRef = useRef(false);
+
+    const handlePointerDown = useCallback((note: string) => {
+        isPointerDownRef.current = true;
+        setCurrentNote(note);
+        setIsPlaying(true);
     }, []);
 
-    const handleRelease = useCallback((note: string) => {
-        setActiveNotes(prev => {
-            const next = new Set(prev);
-            next.delete(note);
-            return next;
-        });
+    const handlePointerUp = useCallback(() => {
+        isPointerDownRef.current = false;
+        setIsPlaying(false);
+    }, []);
+
+    const handlePointerEnter = useCallback((note: string) => {
+        // Only change note if pointer is currently down (glide behavior)
+        if (isPointerDownRef.current) {
+            setCurrentNote(note);
+        }
     }, []);
 
     // Generate white keys
@@ -130,29 +361,35 @@ const Piano: FC<PianoProps> = ({ startOctave, octaves, waveform }) => {
 
     return (
         <div className="piano-container">
-            <div className="piano-keyboard">
+            <div
+                className="piano-keyboard"
+                onPointerUp={handlePointerUp}
+                onPointerLeave={handlePointerUp}
+            >
                 {whiteKeys.map(({ note }) => (
-                    <PianoKey
+                    <button
                         key={note}
-                        note={note}
-                        isBlack={false}
-                        isActive={activeNotes.has(note)}
-                        onPress={() => handlePress(note)}
-                        onRelease={() => handleRelease(note)}
-                    />
+                        className={`piano-key white ${currentNote === note && isPlaying ? 'active' : ''}`}
+                        onPointerDown={(e) => {
+                            e.preventDefault();
+                            handlePointerDown(note);
+                        }}
+                        onPointerEnter={() => handlePointerEnter(note)}
+                        aria-label={`Play note ${note}`}
+                    >
+                        <span className="key-label">{note}</span>
+                    </button>
                 ))}
                 {blackKeys.map(({ note, leftOffset }) => (
                     <button
                         key={note}
-                        className={`piano-key black ${activeNotes.has(note) ? 'active' : ''}`}
+                        className={`piano-key black ${currentNote === note && isPlaying ? 'active' : ''}`}
                         style={{ left: `${leftOffset}px` }}
                         onPointerDown={(e) => {
                             e.preventDefault();
-                            (e.target as HTMLElement).setPointerCapture(e.pointerId);
-                            handlePress(note);
+                            handlePointerDown(note);
                         }}
-                        onPointerUp={() => handleRelease(note)}
-                        onPointerLeave={() => handleRelease(note)}
+                        onPointerEnter={() => handlePointerEnter(note)}
                         aria-label={`Play note ${note}`}
                     >
                         <span className="key-label">{note}</span>
@@ -160,10 +397,14 @@ const Piano: FC<PianoProps> = ({ startOctave, octaves, waveform }) => {
                 ))}
             </div>
 
-            {/* Render voices for active notes */}
-            {Array.from(activeNotes).map(note => (
-                <Voice key={note} note={note} waveform={waveform} />
-            ))}
+            {/* Single monophonic voice - always mounted */}
+            <MonoVoice
+                note={currentNote}
+                waveform={waveform}
+                adsr={adsr}
+                gain={gain}
+                trigger={isPlaying}
+            />
         </div>
     );
 };
@@ -238,17 +479,18 @@ const WaveformSelector: FC<WaveformSelectorProps> = ({ value, onChange }) => {
     return (
         <div className="waveform-selector">
             <h3>Waveform</h3>
-            <div className="waveform-buttons">
+            <select
+                value={value}
+                onChange={(e) => onChange(e.target.value as OscillatorType)}
+                className="control-select"
+                aria-label="Select waveform"
+            >
                 {waveforms.map(wf => (
-                    <button
-                        key={wf}
-                        className={`waveform-btn ${value === wf ? 'active' : ''}`}
-                        onClick={() => onChange(wf)}
-                    >
-                        {wf}
-                    </button>
+                    <option key={wf} value={wf}>
+                        {wf.charAt(0).toUpperCase() + wf.slice(1)}
+                    </option>
                 ))}
-            </div>
+            </select>
         </div>
     );
 };
@@ -257,6 +499,17 @@ const WaveformSelector: FC<WaveformSelectorProps> = ({ value, onChange }) => {
 export const NotesDemo: FC = () => {
     const [waveform, setWaveform] = useState<OscillatorType>('sine');
     const [startOctave, setStartOctave] = useState(3);
+    const [adsr, setAdsr] = useState<ADSRParams>({
+        attack: 0.01,
+        decay: 0.1,
+        sustain: 0.7,
+        release: 0.3,
+    });
+    const [gain, setGain] = useState(0.3);
+
+    const updateAdsr = useCallback((key: keyof ADSRParams, value: number) => {
+        setAdsr(prev => ({ ...prev, [key]: value }));
+    }, []);
 
     return (
         <AudioProvider>
@@ -288,50 +541,56 @@ export const NotesDemo: FC = () => {
                     }
 
                     .waveform-selector, .note-converter, .octave-selector {
-                        background: #f5f5f5;
+                        background: #1e1e2e;
                         padding: 15px;
                         border-radius: 8px;
                         flex: 1;
                         min-width: 200px;
+                        color: #e0e0e0;
                     }
 
                     .waveform-selector h3, .note-converter h3, .octave-selector h3 {
                         margin: 0 0 10px 0;
                         font-size: 14px;
                         text-transform: uppercase;
-                        color: #666;
+                        color: #a0a0a0;
                     }
 
-                    .waveform-buttons {
-                        display: flex;
-                        gap: 8px;
-                    }
-
-                    .waveform-btn {
-                        flex: 1;
-                        padding: 8px 12px;
-                        border: 2px solid #ddd;
-                        background: white;
+                    .control-select {
+                        width: 100%;
+                        padding: 12px 16px;
+                        border: 2px solid #3a3a4a;
                         border-radius: 6px;
+                        background: #2a2a3a;
+                        color: #fff;
+                        font-size: 16px;
                         cursor: pointer;
-                        font-size: 12px;
-                        text-transform: capitalize;
-                        transition: all 0.1s;
+                        appearance: none;
+                        -webkit-appearance: none;
+                        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+                        background-repeat: no-repeat;
+                        background-position: right 12px center;
                     }
 
-                    .waveform-btn.active {
-                        border-color: #0066ff;
-                        background: #0066ff;
-                        color: white;
+                    .control-select:focus {
+                        outline: none;
+                        border-color: #0088ff;
                     }
 
                     .converter-input input {
                         width: 100%;
                         padding: 10px;
-                        border: 2px solid #ddd;
+                        border: 2px solid #3a3a4a;
                         border-radius: 6px;
                         font-size: 16px;
                         font-family: monospace;
+                        background: #2a2a3a;
+                        color: #fff;
+                    }
+
+                    .converter-input input:focus {
+                        outline: none;
+                        border-color: #0088ff;
                     }
 
                     .converter-result {
@@ -348,7 +607,7 @@ export const NotesDemo: FC = () => {
 
                     .result-item .label {
                         font-size: 11px;
-                        color: #999;
+                        color: #888;
                         text-transform: uppercase;
                     }
 
@@ -356,6 +615,7 @@ export const NotesDemo: FC = () => {
                         font-size: 18px;
                         font-weight: bold;
                         font-family: monospace;
+                        color: #7dd3fc;
                     }
 
                     .examples {
@@ -365,9 +625,121 @@ export const NotesDemo: FC = () => {
                     }
 
                     .examples code {
-                        background: #e8e8e8;
-                        padding: 2px 5px;
+                        background: #2d2d44;
+                        color: #7dd3fc;
+                        padding: 2px 6px;
                         border-radius: 3px;
+                    }
+
+                    .adsr-controls, .gain-control {
+                        background: #1e1e2e;
+                        padding: 15px;
+                        border-radius: 8px;
+                        flex: 1;
+                        min-width: 200px;
+                        color: #e0e0e0;
+                    }
+
+                    .adsr-controls {
+                        flex: 2;
+                    }
+
+                    .adsr-controls h3, .gain-control h3 {
+                        margin: 0 0 12px 0;
+                        font-size: 14px;
+                        text-transform: uppercase;
+                        color: #a0a0a0;
+                    }
+
+                    .envelope-row {
+                        align-items: flex-start;
+                    }
+
+                    .adsr-curve-editor {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 12px;
+                    }
+
+                    .adsr-curve-editor svg {
+                        border-radius: 4px;
+                        border: 1px solid #2a2a3a;
+                    }
+
+                    .adsr-values {
+                        display: grid;
+                        grid-template-columns: repeat(4, 1fr);
+                        gap: 8px;
+                        text-align: center;
+                    }
+
+                    .adsr-value {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 2px;
+                    }
+
+                    .adsr-value .label {
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        color: #888;
+                    }
+
+                    .adsr-value .value {
+                        font-size: 14px;
+                        font-weight: 500;
+                        color: #00d4ff;
+                    }
+
+                    .gain-control {
+                        align-self: flex-start;
+                    }
+
+                    .slider-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                        gap: 12px;
+                    }
+
+                    .slider-grid label {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 6px;
+                    }
+
+                    .slider-grid label span {
+                        font-size: 12px;
+                        color: #888;
+                    }
+
+                    .slider-grid input[type="range"] {
+                        width: 100%;
+                        height: 8px;
+                        border-radius: 4px;
+                        background: #3a3a4a;
+                        outline: none;
+                        -webkit-appearance: none;
+                        appearance: none;
+                    }
+
+                    .slider-grid input[type="range"]::-webkit-slider-thumb {
+                        -webkit-appearance: none;
+                        appearance: none;
+                        width: 18px;
+                        height: 18px;
+                        border-radius: 50%;
+                        background: #0088ff;
+                        cursor: pointer;
+                        border: 2px solid #ffffff;
+                    }
+
+                    .slider-grid input[type="range"]::-moz-range-thumb {
+                        width: 18px;
+                        height: 18px;
+                        border-radius: 50%;
+                        background: #0088ff;
+                        cursor: pointer;
+                        border: 2px solid #ffffff;
                     }
 
                     .octave-buttons {
@@ -463,15 +835,21 @@ export const NotesDemo: FC = () => {
                     .key-info {
                         margin-top: 20px;
                         padding: 15px;
-                        background: #f0f8ff;
+                        background: #1a1a2e;
                         border-radius: 8px;
                         font-size: 14px;
+                        color: #e0e0e0;
+                    }
+
+                    .key-info strong {
+                        color: #fff;
                     }
 
                     .key-info code {
-                        background: #ddeeff;
-                        padding: 2px 5px;
-                        border-radius: 3px;
+                        background: #2d2d44;
+                        color: #7dd3fc;
+                        padding: 2px 6px;
+                        border-radius: 4px;
                         font-family: monospace;
                     }
                 `}</style>
@@ -484,23 +862,46 @@ export const NotesDemo: FC = () => {
 
                     <div className="octave-selector">
                         <h3>Start Octave</h3>
-                        <div className="octave-buttons">
+                        <select
+                            value={startOctave}
+                            onChange={(e) => setStartOctave(Number(e.target.value))}
+                            className="control-select"
+                            aria-label="Select start octave"
+                        >
                             {[1, 2, 3, 4, 5].map(oct => (
-                                <button
-                                    key={oct}
-                                    className={`octave-btn ${startOctave === oct ? 'active' : ''}`}
-                                    onClick={() => setStartOctave(oct)}
-                                >
-                                    {oct}
-                                </button>
+                                <option key={oct} value={oct}>Octave {oct}</option>
                             ))}
-                        </div>
+                        </select>
                     </div>
 
                     <NoteConverter />
                 </div>
 
-                <Piano startOctave={startOctave} octaves={2} waveform={waveform} />
+                <div className="controls-row envelope-row">
+                    <div className="adsr-controls">
+                        <h3>ADSR Envelope</h3>
+                        <ADSRCurveEditor adsr={adsr} onChange={updateAdsr} />
+                    </div>
+
+                    <div className="gain-control">
+                        <h3>Volume</h3>
+                        <div className="slider-grid">
+                            <label>
+                                <span>Gain: {(gain * 100).toFixed(0)}%</span>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.01"
+                                    value={gain}
+                                    onChange={(e) => setGain(Number(e.target.value))}
+                                />
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <Piano startOctave={startOctave} octaves={2} waveform={waveform} adsr={adsr} gain={gain} />
 
                 <div className="key-info">
                     <strong>How to use:</strong> Click or tap on piano keys to play notes.

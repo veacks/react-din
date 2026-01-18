@@ -39,6 +39,8 @@ export {
     Panner,
     StereoPanner,
     WaveShaper,
+    ADSR,
+    DEFAULT_ADSR,
     // Hooks
     useAudioNode,
 } from './nodes';
@@ -57,6 +59,8 @@ export type {
     StereoPannerProps,
     WaveShaperProps,
     OversampleType,
+    ADSRProps,
+    ADSRConfig,
 } from './nodes';
 
 // -----------------------------------------------------------------------------
