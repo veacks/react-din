@@ -1,0 +1,67 @@
+import { memo } from 'react';
+import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { useAudioGraphStore, type OutputNodeData } from '../store';
+import { audioEngine } from '../AudioEngine';
+
+const OutputNode = memo(({ id, data, selected }: NodeProps) => {
+    const outputData = data as OutputNodeData;
+    const updateNodeData = useAudioGraphStore((s) => s.updateNodeData);
+    const nodes = useAudioGraphStore((s) => s.nodes);
+    const edges = useAudioGraphStore((s) => s.edges);
+
+    const togglePlay = () => {
+        const newPlaying = !outputData.playing;
+        updateNodeData(id, { playing: newPlaying });
+
+        if (newPlaying) {
+            // Start audio with current graph
+            audioEngine.start(nodes, edges);
+        } else {
+            // Stop audio
+            audioEngine.stop();
+        }
+    };
+
+    const handleMasterGainChange = (value: number) => {
+        updateNodeData(id, { masterGain: value });
+        // Update audio in real-time if playing
+        if (outputData.playing) {
+            audioEngine.updateNode(id, { masterGain: value });
+        }
+    };
+
+    return (
+        <div className={`audio-node output-node ${selected ? 'selected' : ''} ${outputData.playing ? 'playing' : ''}`}>
+            <div className="node-header">
+                <span className="node-icon">🔊</span>
+                <span className="node-title">Output</span>
+            </div>
+            <div className="node-content">
+                <button
+                    className={`play-button ${outputData.playing ? 'stop' : 'play'}`}
+                    onClick={togglePlay}
+                >
+                    {outputData.playing ? '⏹ Stop' : '▶ Play'}
+                </button>
+                <div className="node-control">
+                    <label>Master</label>
+                    <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value={outputData.masterGain}
+                        onChange={(e) => handleMasterGainChange(Number(e.target.value))}
+                        title="Master volume control"
+                    />
+                    <span className="value">{Math.round(outputData.masterGain * 100)}%</span>
+                </div>
+            </div>
+            <div className="handle-label handle-label-in" style={{ top: '40px' }}>Audio In</div>
+            <Handle type="target" position={Position.Left} id="in" className="handle handle-in handle-audio" style={{ top: '40px' }} />
+        </div>
+    );
+});
+
+OutputNode.displayName = 'OutputNode';
+export default OutputNode;

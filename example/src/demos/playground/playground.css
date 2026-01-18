@@ -1,0 +1,302 @@
+/* Node-based Playground Styles */
+
+.react-flow__node {
+    border-radius: 8px;
+    background: #1a1a1a;
+    color: #eee;
+    border: 1px solid #333;
+    font-size: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    min-width: 150px;
+}
+
+.react-flow__node.selected {
+    border-color: #646cff;
+    box-shadow: 0 0 0 2px rgba(100, 108, 255, 0.5);
+}
+
+.audio-node {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #222;
+    border-radius: 8px;
+}
+
+.node-header {
+    padding: 8px 12px;
+    background: #333;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid #444;
+}
+
+.node-icon {
+    font-size: 14px;
+}
+
+.node-content {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.node-control {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.node-control label {
+    font-size: 10px;
+    text-transform: uppercase;
+    color: #888;
+    letter-spacing: 0.5px;
+}
+
+.node-control input[type="range"] {
+    width: 100%;
+    margin: 4px 0;
+}
+
+.node-control select {
+    background: #333;
+    color: #eee;
+    border: 1px solid #444;
+    padding: 4px;
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+.node-control .value {
+    font-size: 10px;
+    color: #aaa;
+    text-align: right;
+}
+
+/* Handle Styles */
+.react-flow__handle {
+    width: 10px;
+    /** slightly larger */
+    height: 10px;
+    border: 2px solid #222;
+    transition: all 0.2s;
+}
+
+/* Audio Handles (Green) */
+.handle-audio {
+    background: #44cc44 !important;
+    /* Green */
+}
+
+/* Parameter Handles (Blue) */
+.handle-param {
+    background: #4488ff !important;
+    /* Blue */
+}
+
+.handle-in {
+    border-radius: 50%;
+}
+
+.handle-out {
+    border-radius: 50%;
+}
+
+/* Handle Hover */
+.react-flow__handle:hover {
+    transform: scale(1.2);
+    border-color: #fff;
+}
+
+/* Labels for Audio Sockets */
+.handle-label {
+    position: absolute;
+    font-size: 9px;
+    color: #888;
+    pointer-events: none;
+    white-space: nowrap;
+    text-transform: uppercase;
+}
+
+.handle-label-in {
+    left: 12px;
+    top: -2px;
+}
+
+.handle-label-out {
+    right: 12px;
+    top: -2px;
+}
+
+/* Node Palette */
+.node-palette {
+    width: 200px;
+    background: #1a1a1a;
+    border-right: 1px solid #333;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+}
+
+.palette-category h4 {
+    margin: 0 0 8px 0;
+    font-size: 11px;
+    text-transform: uppercase;
+    color: #666;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #333;
+}
+
+.palette-nodes {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.palette-node {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #2a2a2a;
+    border-radius: 4px;
+    border-left: 3px solid transparent;
+    cursor: grab;
+    transition: background 0.2s;
+    user-select: none;
+}
+
+.palette-node:hover {
+    background: #333;
+}
+
+.palette-node .icon {
+    font-size: 16px;
+}
+
+/* Layout */
+.playground-container {
+    display: flex;
+    height: 100vh;
+    width: 100%;
+    background: #111;
+    color: #eee;
+}
+
+.flow-container {
+    flex: 1;
+    position: relative;
+}
+
+/* Connection Lines */
+.react-flow__edge-path {
+    stroke-width: 2px;
+}
+
+/* Audio Connections - Green Edge */
+/* We can't easily select audio vs param edges with pure CSS unless we add classes to edges in JS. 
+   But we requested green sockets. The edge color is usually determined by the source handle. 
+   If we can force edges to default to green, or use JS to color them. 
+   For now, we'll try to style them via the component or global override if possible, 
+   but specific edge coloring usually requires edge types or 'style' prop on edge object. */
+
+/* Custom Params in Input Node */
+.custom-param {
+    position: relative;
+    padding: 6px;
+    background: #2a2a2a;
+    border-radius: 4px;
+    margin-bottom: 4px;
+}
+
+.custom-param .param-name {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 11px;
+}
+
+.remove-param {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0 4px;
+}
+
+.remove-param:hover {
+    color: #f44;
+}
+
+.add-param {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.add-param input {
+    flex: 1;
+    background: #333;
+    border: 1px solid #444;
+    color: #eee;
+    padding: 4px;
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+.add-param button {
+    background: #444;
+    color: #eee;
+    border: none;
+    padding: 0 8px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.add-param button:hover {
+    background: #555;
+}
+
+/* Note Node */
+.note-display {
+    margin-top: 8px;
+    padding: 8px;
+    background: #111;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.note-display .note-name {
+    display: block;
+    font-size: 16px;
+    font-weight: bold;
+    color: #ffcc00;
+}
+
+.note-display .freq {
+    display: block;
+    font-size: 10px;
+    color: #888;
+}
+
+.lang-toggle {
+    margin-left: auto;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    opacity: 0.7;
+}
+
+.lang-toggle:hover {
+    opacity: 1;
+}

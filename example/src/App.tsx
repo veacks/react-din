@@ -5,6 +5,7 @@ import { TransportDemo } from './demos/TransportDemo';
 import { SequencerDemo } from './demos/SequencerDemo';
 import { VisualizerDemo } from './demos/VisualizerDemo';
 import { NotesDemo } from './demos/NotesDemo';
+import { PlaygroundDemo } from './demos/PlaygroundDemo';
 import './App.css';
 
 function Home() {
@@ -37,6 +38,10 @@ function Home() {
           <h3>Visualizer</h3>
           <p>R3F, TSL, Audio Reactive Ink</p>
         </Link>
+        <Link href="/playground" className="demo-link">
+          <h3>Playground</h3>
+          <p>Interactive code editor with Sandpack</p>
+        </Link>
       </nav>
     </div>
   );
@@ -62,6 +67,7 @@ function App() {
           <Route path="/sequencer" component={SequencerDemo} />
           <Route path="/notes" component={NotesDemo} />
           <Route path="/visualizer" component={VisualizerDemo} />
+          <Route path="/playground" component={PlaygroundDemo} />
           <Route>
             <div className="not-found">
               <h2>404 - Not Found</h2>

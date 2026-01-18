@@ -1,0 +1,98 @@
+import { memo } from 'react';
+import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { useAudioGraphStore, type FilterNodeData } from '../store';
+import { audioEngine } from '../AudioEngine';
+
+const filterTypes: BiquadFilterType[] = ['lowpass', 'highpass', 'bandpass', 'lowshelf', 'highshelf', 'peaking', 'notch', 'allpass'];
+
+const FilterNode = memo(({ id, data, selected }: NodeProps) => {
+    const filterData = data as FilterNodeData;
+    const updateNodeData = useAudioGraphStore((s) => s.updateNodeData);
+
+    const handleChange = (key: keyof FilterNodeData, value: number | string) => {
+        updateNodeData(id, { [key]: value });
+        audioEngine.updateNode(id, { [key]: value });
+    };
+
+    return (
+        <div className={`audio-node filter-node ${selected ? 'selected' : ''}`}>
+            <div className="node-header">
+                <span className="node-icon">◇</span>
+                <span className="node-title">Filter</span>
+            </div>
+            <div className="node-content">
+                <div className="node-control">
+                    <label>Type</label>
+                    <select
+                        value={filterData.filterType}
+                        onChange={(e) => handleChange('filterType', e.target.value)}
+                    >
+                        {filterTypes.map((t) => (
+                            <option key={t} value={t}>{t}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="node-control">
+                    <label>Freq</label>
+                    <input
+                        type="range"
+                        min="20"
+                        max="20000"
+                        step="10"
+                        value={filterData.frequency}
+                        onChange={(e) => handleChange('frequency', Number(e.target.value))}
+                    />
+                    <span className="value">{filterData.frequency} Hz</span>
+                    <Handle type="target" position={Position.Left} id="frequency" className="handle handle-in handle-param" style={{ top: 'auto', left: '-5px' }} />
+                </div>
+                <div className="node-control">
+                    <label>Q</label>
+                    <input
+                        type="range"
+                        min="0.1"
+                        max="20"
+                        step="0.1"
+                        value={filterData.q}
+                        onChange={(e) => handleChange('q', Number(e.target.value))}
+                    />
+                    <span className="value">{filterData.q}</span>
+                    <Handle type="target" position={Position.Left} id="q" className="handle handle-in handle-param" style={{ top: 'auto', left: '-5px' }} />
+                </div>
+                <div className="node-control">
+                    <label>Detune</label>
+                    <input
+                        type="range"
+                        min="-1200"
+                        max="1200"
+                        step="10"
+                        value={filterData.detune}
+                        onChange={(e) => handleChange('detune', Number(e.target.value))}
+                    />
+                    <span className="value">{filterData.detune} c</span>
+                    <Handle type="target" position={Position.Left} id="detune" className="handle handle-in handle-param" style={{ top: 'auto', left: '-5px' }} />
+                </div>
+                <div className="node-control">
+                    <label>Gain</label>
+                    <input
+                        type="range"
+                        min="-40"
+                        max="40"
+                        value={filterData.gain}
+                        onChange={(e) => handleChange('gain', Number(e.target.value))}
+                    />
+                    <span className="value">{filterData.gain} dB</span>
+                    <Handle type="target" position={Position.Left} id="gain" className="handle handle-in handle-param" style={{ top: 'auto', left: '-5px' }} />
+                </div>
+            </div>
+
+            <div className="handle-label handle-label-in" style={{ top: '40px' }}>Audio In</div>
+            <Handle type="target" position={Position.Left} id="in" className="handle handle-in handle-audio" style={{ top: '40px' }} />
+
+            <div className="handle-label handle-label-out">Audio Out</div>
+            <Handle type="source" position={Position.Right} id="out" className="handle handle-out handle-audio" />
+        </div>
+    );
+});
+
+FilterNode.displayName = 'FilterNode';
+export default FilterNode;

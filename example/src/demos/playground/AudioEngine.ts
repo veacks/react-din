@@ -1,0 +1,445 @@
+import type { Node, Edge } from '@xyflow/react';
+import type {
+    AudioNodeData,
+    OscNodeData,
+    GainNodeData,
+    FilterNodeData,
+    OutputNodeData,
+    NoiseNodeData,
+    DelayNodeData,
+    ReverbNodeData,
+    StereoPannerNodeData,
+    MixerNodeData,
+    InputNodeData,
+    NoteNodeData,
+} from './store';
+
+interface AudioNodeInstance {
+    node: AudioNode;
+    type: string;
+    feedbackGain?: GainNode; // For delay feedback
+    // Map handle ID (e.g., 'frequency') to AudioParam
+    params?: Map<string, AudioParam>;
+    // Map output handle ID to AudioNode (for InputNode multiple outputs)
+    outputs?: Map<string, AudioNode>;
+}
+
+/**
+ * Creates a noise buffer for white/pink/brown noise
+ */
+function createNoiseBuffer(ctx: AudioContext, type: 'white' | 'pink' | 'brown'): AudioBuffer {
+    const sampleRate = ctx.sampleRate;
+    const length = sampleRate * 2; // 2 seconds
+    const buffer = ctx.createBuffer(1, length, sampleRate);
+    const data = buffer.getChannelData(0);
+
+    if (type === 'white') {
+        for (let i = 0; i < length; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+    } else if (type === 'pink') {
+        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+        for (let i = 0; i < length; i++) {
+            const white = Math.random() * 2 - 1;
+            b0 = 0.99886 * b0 + white * 0.0555179;
+            b1 = 0.99332 * b1 + white * 0.0750759;
+            b2 = 0.96900 * b2 + white * 0.1538520;
+            b3 = 0.86650 * b3 + white * 0.3104856;
+            b4 = 0.55000 * b4 + white * 0.5329522;
+            b5 = -0.7616 * b5 - white * 0.0168980;
+            data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11;
+            b6 = white * 0.115926;
+        }
+    } else { // brown
+        let lastOut = 0;
+        for (let i = 0; i < length; i++) {
+            const white = Math.random() * 2 - 1;
+            data[i] = (lastOut + (0.02 * white)) / 1.02;
+            lastOut = data[i];
+            data[i] *= 3.5;
+        }
+    }
+
+    return buffer;
+}
+
+/**
+ * Creates a simple impulse response for reverb
+ */
+function createReverbImpulse(ctx: AudioContext, decay: number): AudioBuffer {
+    const sampleRate = ctx.sampleRate;
+    const length = sampleRate * decay;
+    const buffer = ctx.createBuffer(2, length, sampleRate);
+
+    for (let channel = 0; channel < 2; channel++) {
+        const data = buffer.getChannelData(channel);
+        for (let i = 0; i < length; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-3 * i / length);
+        }
+    }
+
+    return buffer;
+}
+
+/**
+ * Audio Engine - Manages the actual Web Audio API graph
+ */
+export class AudioEngine {
+    private audioContext: AudioContext | null = null;
+    private audioNodes: Map<string, AudioNodeInstance> = new Map();
+    private isPlaying = false;
+
+    constructor() {
+        this.audioContext = null;
+    }
+
+    /**
+     * Initialize the AudioContext (requires user gesture)
+     */
+    init(): AudioContext {
+        if (!this.audioContext) {
+            this.audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+        }
+        if (this.audioContext.state === 'suspended') {
+            this.audioContext.resume();
+        }
+        return this.audioContext;
+    }
+
+    /**
+     * Build and start the audio graph from visual nodes
+     */
+    start(nodes: Node[], edges: Edge[]): void {
+        if (this.isPlaying) return;
+
+        const ctx = this.init();
+        this.cleanup();
+
+        // Create audio nodes for each visual node
+        nodes.forEach((node) => {
+            const audioNode = this.createAudioNode(ctx, node);
+            if (audioNode) {
+                this.audioNodes.set(node.id, audioNode);
+            }
+        });
+
+        // Connect nodes based on edges
+        edges.forEach((edge) => {
+            const sourceInstance = this.audioNodes.get(edge.source);
+            const targetInstance = this.audioNodes.get(edge.target);
+
+            if (sourceInstance && targetInstance) {
+                try {
+                    // Determine source node (handle output)
+                    let sourceNode: AudioNode = sourceInstance.node;
+                    if (sourceInstance.type === 'input' && edge.sourceHandle && sourceInstance.outputs) {
+                        const specificOutput = sourceInstance.outputs.get(edge.sourceHandle);
+                        if (specificOutput) {
+                            sourceNode = specificOutput;
+                        }
+                    }
+
+                    // Connect to target AudioParam or AudioNode
+                    if (targetInstance.params && edge.targetHandle && targetInstance.params.has(edge.targetHandle)) {
+                        // Connect to AudioParam (modulation)
+                        const param = targetInstance.params.get(edge.targetHandle);
+                        if (param) {
+                            sourceNode.connect(param);
+                        }
+                    } else {
+                        // Standard Audio to Audio connection
+                        sourceNode.connect(targetInstance.node);
+                    }
+                } catch (e) {
+                    console.warn('Failed to connect nodes:', e);
+                }
+            }
+        });
+
+        // Connect output node to destination
+        const outputNode = nodes.find((n) => (n.data as AudioNodeData).type === 'output');
+        if (outputNode) {
+            const outputInstance = this.audioNodes.get(outputNode.id);
+            if (outputInstance) {
+                outputInstance.node.connect(ctx.destination);
+            }
+        }
+
+        // Start oscillators, noise sources, and constant sources
+        this.audioNodes.forEach((instance) => {
+            if (instance.node instanceof OscillatorNode) {
+                instance.node.start();
+            } else if (instance.node instanceof AudioBufferSourceNode) {
+                instance.node.loop = true;
+                instance.node.start();
+            } else if (instance.node instanceof ConstantSourceNode) {
+                instance.node.start();
+            }
+
+            // Start any additional outputs (like params in InputNode)
+            if (instance.outputs) {
+                instance.outputs.forEach(output => {
+                    if (output instanceof ConstantSourceNode) {
+                        output.start();
+                    } else if (output instanceof OscillatorNode) {
+                        output.start();
+                    }
+                });
+            }
+        });
+
+        this.isPlaying = true;
+    }
+
+    /**
+     * Stop all audio and cleanup
+     */
+    stop(): void {
+        this.cleanup();
+        this.isPlaying = false;
+    }
+
+    /**
+     * Cleanup all audio nodes
+     */
+    private cleanup(): void {
+        this.audioNodes.forEach((instance) => {
+            try {
+                if (instance.node instanceof OscillatorNode ||
+                    instance.node instanceof AudioBufferSourceNode ||
+                    instance.node instanceof ConstantSourceNode) {
+                    instance.node.stop();
+                }
+
+                // Stop params
+                if (instance.outputs) {
+                    instance.outputs.forEach(output => {
+                        if (output instanceof ConstantSourceNode || output instanceof OscillatorNode) {
+                            try { output.stop(); } catch (e) { }
+                        }
+                    });
+                }
+
+                instance.node.disconnect();
+            } catch (e) {
+                // Ignore errors during cleanup
+            }
+        });
+        this.audioNodes.clear();
+    }
+
+    /**
+     * Create an AudioNode from a visual node
+     */
+    private createAudioNode(ctx: AudioContext, node: Node): AudioNodeInstance | null {
+        const data = node.data as AudioNodeData;
+
+        switch (data.type) {
+            case 'osc': {
+                const oscData = data as OscNodeData;
+                const osc = ctx.createOscillator();
+                osc.type = oscData.waveform;
+                osc.frequency.value = oscData.frequency;
+
+                const params = new Map<string, AudioParam>();
+                params.set('frequency', osc.frequency);
+
+                return { node: osc, type: 'osc', params };
+            }
+            case 'gain': {
+                const gainData = data as GainNodeData;
+                const gain = ctx.createGain();
+                gain.gain.value = gainData.gain;
+
+                const params = new Map<string, AudioParam>();
+                params.set('gain', gain.gain);
+
+                return { node: gain, type: 'gain', params };
+            }
+            case 'filter': {
+                const filterData = data as FilterNodeData;
+                const filter = ctx.createBiquadFilter();
+                filter.type = filterData.filterType;
+                filter.frequency.value = filterData.frequency;
+                filter.Q.value = filterData.q;
+
+                const params = new Map<string, AudioParam>();
+                params.set('frequency', filter.frequency);
+                params.set('q', filter.Q);
+
+                return { node: filter, type: 'filter', params };
+            }
+            case 'output': {
+                const outputData = data as OutputNodeData;
+                const masterGain = ctx.createGain();
+                masterGain.gain.value = outputData.masterGain;
+                return { node: masterGain, type: 'output' };
+            }
+            case 'noise': {
+                const noiseData = data as NoiseNodeData;
+                const buffer = createNoiseBuffer(ctx, noiseData.noiseType);
+                const source = ctx.createBufferSource();
+                source.buffer = buffer;
+                return { node: source, type: 'noise' };
+            }
+            case 'delay': {
+                const delayData = data as DelayNodeData;
+                const delay = ctx.createDelay(5);
+                delay.delayTime.value = delayData.delayTime;
+
+                // Create feedback loop with gain
+                const feedbackGain = ctx.createGain();
+                feedbackGain.gain.value = delayData.feedback;
+                delay.connect(feedbackGain);
+                feedbackGain.connect(delay);
+
+                return { node: delay, type: 'delay', feedbackGain };
+            }
+            case 'reverb': {
+                const reverbData = data as ReverbNodeData;
+                const convolver = ctx.createConvolver();
+                convolver.buffer = createReverbImpulse(ctx, reverbData.decay);
+
+                // Simple wet/dry mix using gains
+                const wetGain = ctx.createGain();
+                wetGain.gain.value = reverbData.mix;
+                convolver.connect(wetGain);
+
+                return { node: wetGain, type: 'reverb' };
+            }
+            case 'panner': {
+                const pannerData = data as StereoPannerNodeData;
+                const panner = ctx.createStereoPanner();
+                panner.pan.value = pannerData.pan;
+                return { node: panner, type: 'panner' };
+            }
+            case 'mixer': {
+                // Mixer is just a gain node that sums inputs
+                const mixerGain = ctx.createGain();
+                mixerGain.gain.value = 1;
+                return { node: mixerGain, type: 'mixer' };
+            }
+            case 'input': {
+                const inputData = data as InputNodeData;
+                // Main dummy node to hold reference (InputNode doesn't process audio itself usually, but holds params)
+                const dummy = ctx.createGain();
+
+                const outputs = new Map<string, AudioNode>();
+
+                // Create BPM constant source (could be LFO or clock in future)
+                const bpmSource = ctx.createConstantSource();
+                bpmSource.offset.value = inputData.bpm;
+                outputs.set('bpm', bpmSource);
+
+                // Create custom params as ConstantSourceNodes
+                if (inputData.params) {
+                    inputData.params.forEach((param, index) => {
+                        const paramSource = ctx.createConstantSource();
+                        paramSource.offset.value = param.value;
+                        outputs.set(`param_${index}`, paramSource);
+                    });
+                }
+
+                return { node: dummy, type: 'input', outputs };
+            }
+            case 'note': {
+                const noteData = data as NoteNodeData;
+                // NoteNode basically outputs frequency signal
+                const freqSource = ctx.createConstantSource();
+                freqSource.offset.value = noteData.frequency;
+
+                return { node: freqSource, type: 'note' };
+            }
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Update a specific parameter in real-time
+     */
+    updateNode(nodeId: string, data: Partial<AudioNodeData>): void {
+        const instance = this.audioNodes.get(nodeId);
+        if (!instance || !this.audioContext) return;
+
+        const currentTime = this.audioContext.currentTime;
+
+        if (instance.type === 'osc') {
+            const node = instance.node as OscillatorNode;
+            if ('frequency' in data && typeof data.frequency === 'number') {
+                node.frequency.setTargetAtTime(data.frequency, currentTime, 0.01);
+            }
+            if ('detune' in data && typeof data.detune === 'number') {
+                node.detune.setTargetAtTime(data.detune, currentTime, 0.01);
+            }
+            if ('waveform' in data && typeof data.waveform === 'string') {
+                node.type = data.waveform as OscillatorType;
+            }
+        } else if (instance.type === 'gain') {
+            const node = instance.node as GainNode;
+            if ('gain' in data && typeof data.gain === 'number') {
+                node.gain.setTargetAtTime(data.gain, currentTime, 0.01);
+            }
+        } else if (instance.type === 'filter') {
+            const node = instance.node as BiquadFilterNode;
+            if ('frequency' in data && typeof data.frequency === 'number') {
+                node.frequency.setTargetAtTime(data.frequency, currentTime, 0.01);
+            }
+            if ('q' in data && typeof data.q === 'number') {
+                node.Q.setTargetAtTime(data.q, currentTime, 0.01);
+            }
+            if ('detune' in data && typeof data.detune === 'number') {
+                node.detune.setTargetAtTime(data.detune, currentTime, 0.01);
+            }
+            if ('gain' in data && typeof data.gain === 'number') {
+                node.gain.setTargetAtTime(data.gain, currentTime, 0.01);
+            }
+            if ('filterType' in data && typeof data.filterType === 'string') {
+                node.type = data.filterType as BiquadFilterType;
+            }
+        } else if (instance.type === 'input') {
+            const inputData = data as InputNodeData;
+            // Update BPM if changed
+            if ('bpm' in inputData && instance.outputs?.has('bpm')) {
+                const bpmNode = instance.outputs.get('bpm') as ConstantSourceNode;
+                bpmNode.offset.setTargetAtTime(inputData.bpm, currentTime, 0.01);
+            }
+            // Update params
+            if ('params' in inputData && instance.outputs) {
+                inputData.params.forEach((param, index) => {
+                    const paramId = `param_${index}`;
+                    if (instance.outputs!.has(paramId)) {
+                        const paramNode = instance.outputs!.get(paramId) as ConstantSourceNode;
+                        paramNode.offset.setTargetAtTime(param.value, currentTime, 0.01);
+
+                        // Handle name changes if we stored logic that depended on it, but here we depend on index
+                    } else if (this.audioContext) {
+                        // New param added while playing? We might need to handle dynamic creation
+                        // For now this handles value updates of existing params
+                    }
+                });
+            }
+        } else if (instance.type === 'note') {
+            const noteData = data as NoteNodeData;
+            const node = instance.node as ConstantSourceNode;
+            if ('frequency' in noteData) {
+                node.offset.setTargetAtTime(noteData.frequency, currentTime, 0.01);
+            }
+        } else if (instance.type === 'delay') {
+            const node = instance.node as DelayNode;
+            if ('delayTime' in data && typeof data.delayTime === 'number') {
+                node.delayTime.setTargetAtTime(data.delayTime, currentTime, 0.01);
+            }
+            if ('feedback' in data && typeof data.feedback === 'number' && instance.feedbackGain) {
+                instance.feedbackGain.gain.setTargetAtTime(data.feedback, currentTime, 0.01);
+            }
+        }
+    }
+
+    get playing(): boolean {
+        return this.isPlaying;
+    }
+}
+
+// Singleton instance
+export const audioEngine = new AudioEngine();
