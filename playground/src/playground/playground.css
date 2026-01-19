@@ -2,39 +2,76 @@
 
 .react-flow__node {
     border-radius: 8px;
-    background: #1a1a1a;
-    color: #eee;
-    border: 1px solid #333;
+    background: var(--node-bg);
+    color: var(--text);
+    border: 1px solid var(--node-border);
     font-size: 12px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--node-shadow);
     min-width: 150px;
 }
 
 .react-flow__node.selected {
-    border-color: #646cff;
-    box-shadow: 0 0 0 2px rgba(100, 108, 255, 0.5);
+    border-color: var(--accent);
+    box-shadow: var(--node-shadow-focus);
+}
+
+.react-flow {
+    background: var(--canvas-bg);
+}
+
+.react-flow__background {
+    background: var(--canvas-bg);
 }
 
 .audio-node {
     display: flex;
     flex-direction: column;
     /* overflow: hidden;  <-- Removed to allow handles (left: -10px) to be visible */
-    background: #222;
+    background: var(--node-bg);
+    border: 1px solid var(--node-border);
     border-radius: 8px;
+    box-shadow: var(--node-shadow);
+    font-family: inherit;
+}
+
+.audio-node.selected {
+    border-color: var(--accent);
+    box-shadow: var(--node-shadow-focus);
 }
 
 .node-header {
     padding: 8px 12px;
-    background: #333;
+    background: var(--node-header-bg);
     font-weight: bold;
     display: flex;
     align-items: center;
     gap: 8px;
-    border-bottom: 1px solid #444;
+    border-bottom: 1px solid var(--node-border);
+    color: var(--node-header-text);
+    cursor: grab;
 }
+
+.node-header:active {
+    cursor: grabbing;
+}
+
+.osc-node .node-header { background: #ff8844; color: #fff; }
+.gain-node .node-header { background: #44cc44; color: #fff; }
+.filter-node .node-header { background: #aa44ff; color: #fff; }
+.output-node .node-header { background: #ff4466; color: #fff; }
+.noise-node .node-header { background: #666666; color: #fff; }
+.delay-node .node-header { background: #4488ff; color: #fff; }
+.reverb-node .node-header { background: #8844ff; color: #fff; }
+.panner-node .node-header { background: #44cccc; color: #042222; }
+.mixer-node .node-header { background: #ffaa44; color: #2b1b00; }
+.input-node .node-header { background: #555555; color: #fff; }
 
 .node-icon {
     font-size: 14px;
+}
+
+.node-title {
+    flex: 1;
 }
 
 .node-content {
@@ -58,19 +95,33 @@
 .node-control label {
     font-size: 10px;
     text-transform: uppercase;
-    color: #888;
+    color: var(--text-muted);
     letter-spacing: 0.5px;
 }
 
 .node-control input[type="range"] {
     width: 100%;
     margin: 4px 0;
+    height: 3px;
+    border-radius: 999px;
+    background: var(--control-border);
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.node-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
 }
 
 .node-control select {
-    background: #333;
-    color: #eee;
-    border: 1px solid #444;
+    background: var(--control-bg);
+    color: var(--text);
+    border: 1px solid var(--control-border);
     padding: 4px;
     border-radius: 4px;
     font-size: 11px;
@@ -78,7 +129,7 @@
 
 .node-control .value {
     font-size: 10px;
-    color: #aaa;
+    color: var(--accent);
     text-align: right;
 }
 
@@ -86,9 +137,10 @@
 .react-flow__handle {
     width: 10px;
     height: 10px;
-    border: 2px solid #222;
+    border: 2px solid var(--node-bg);
     transition: all 0.2s;
     z-index: 10;
+    background: var(--control-border);
 }
 
 /* Audio Handles (Green) */
@@ -100,7 +152,7 @@
 
 /* Parameter Handles (Blue) */
 .handle-param {
-    background: #007bff !important;
+    background: var(--accent) !important;
     /* Bright Blue */
     left: -6px !important;
 }
@@ -116,14 +168,14 @@
 /* Handle Hover */
 .react-flow__handle:hover {
     transform: scale(1.2);
-    border-color: #fff;
+    border-color: var(--node-header-text);
 }
 
 /* Labels for Audio Sockets */
 .handle-label {
     position: absolute;
     font-size: 9px;
-    color: #888;
+    color: var(--text-subtle);
     pointer-events: none;
     white-space: nowrap;
     text-transform: uppercase;
@@ -139,11 +191,44 @@
     top: -2px;
 }
 
+.play-button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.play-button:hover {
+    transform: translateY(-1px);
+}
+
+.play-button.play {
+    background: var(--success);
+    color: #fff;
+}
+
+.play-button.stop {
+    background: var(--danger);
+    color: #fff;
+}
+
+.output-node.playing {
+    animation: output-pulse 1s ease-in-out infinite;
+}
+
+@keyframes output-pulse {
+    0%, 100% { box-shadow: var(--node-shadow); }
+    50% { box-shadow: 0 0 18px rgba(239, 68, 68, 0.35); }
+}
+
 /* Node Palette */
 .node-palette {
     width: 200px;
-    background: #1a1a1a;
-    border-right: 1px solid #333;
+    background: var(--panel-bg);
+    border-right: 1px solid var(--panel-border);
     padding: 16px;
     display: flex;
     flex-direction: column;
@@ -155,9 +240,9 @@
     margin: 0 0 8px 0;
     font-size: 11px;
     text-transform: uppercase;
-    color: #666;
+    color: var(--text-subtle);
     padding-bottom: 4px;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid var(--panel-border);
 }
 
 .palette-nodes {
@@ -171,7 +256,7 @@
     align-items: center;
     gap: 10px;
     padding: 8px 12px;
-    background: #2a2a2a;
+    background: var(--panel-muted);
     border-radius: 4px;
     border-left: 3px solid transparent;
     cursor: grab;
@@ -180,7 +265,7 @@
 }
 
 .palette-node:hover {
-    background: #333;
+    background: var(--panel-bg);
 }
 
 .palette-node .icon {
@@ -192,8 +277,8 @@
     display: flex;
     height: 100vh;
     width: 100%;
-    background: #111;
-    color: #eee;
+    background: var(--app-bg);
+    color: var(--text);
 }
 
 .flow-container {
@@ -203,7 +288,13 @@
 
 /* Connection Lines */
 .react-flow__edge-path {
+    stroke: var(--edge-color);
     stroke-width: 2px;
+    transition: stroke 0.2s ease;
+}
+
+.react-flow__edge-path:hover {
+    stroke: var(--accent);
 }
 
 /* Audio Connections - Green Edge */
@@ -217,7 +308,7 @@
 .custom-param {
     position: relative;
     padding: 6px;
-    background: #2a2a2a;
+    background: var(--panel-muted);
     border-radius: 4px;
     margin-bottom: 4px;
 }
@@ -234,14 +325,14 @@
     right: 2px;
     background: none;
     border: none;
-    color: #666;
+    color: var(--text-subtle);
     cursor: pointer;
     font-size: 12px;
     padding: 0 4px;
 }
 
 .remove-param:hover {
-    color: #f44;
+    color: var(--danger);
 }
 
 .add-param {
@@ -252,17 +343,17 @@
 
 .add-param input {
     flex: 1;
-    background: #333;
-    border: 1px solid #444;
-    color: #eee;
+    background: var(--control-bg);
+    border: 1px solid var(--control-border);
+    color: var(--text);
     padding: 4px;
     border-radius: 4px;
     font-size: 11px;
 }
 
 .add-param button {
-    background: #444;
-    color: #eee;
+    background: var(--panel-border);
+    color: var(--text);
     border: none;
     padding: 0 8px;
     border-radius: 4px;
@@ -270,14 +361,14 @@
 }
 
 .add-param button:hover {
-    background: #555;
+    background: var(--control-border);
 }
 
 /* Note Node */
 .note-display {
     margin-top: 8px;
     padding: 8px;
-    background: #111;
+    background: var(--panel-muted);
     border-radius: 4px;
     text-align: center;
 }
@@ -292,24 +383,24 @@
 .note-display .freq {
     display: block;
     font-size: 10px;
-    color: #888;
+    color: var(--text-subtle);
 }
 
 .lang-toggle {
     margin-left: auto;
-    background: #444;
-    border: none;
+    background: var(--panel-muted);
+    border: 1px solid var(--panel-border);
     border-radius: 4px;
     cursor: pointer;
     font-size: 10px;
     padding: 2px 6px;
-    color: #eee;
+    color: var(--text);
     opacity: 0.9;
     text-transform: uppercase;
 }
 
 .lang-toggle:hover {
-    background: #555;
+    background: var(--panel-border);
     opacity: 1;
 }
 
@@ -341,12 +432,12 @@
 
 .input-param-label {
     margin: 0;
-    color: #ccc;
+    color: var(--text-muted);
 }
 
 .text-no-outputs {
     font-style: italic;
-    color: #666;
+    color: var(--text-subtle);
     font-size: 10px;
 }
 
@@ -354,6 +445,29 @@
     position: relative;
     transform: none;
     right: -14px;
+}
+
+.react-flow__minimap {
+    background: var(--minimap-bg);
+    border-radius: 8px;
+}
+
+.react-flow__controls {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.react-flow__controls-button {
+    background: var(--controls-bg);
+    border-bottom: 1px solid var(--panel-border);
+}
+
+.react-flow__controls-button:hover {
+    background: var(--panel-muted);
+}
+
+.react-flow__controls-button svg {
+    fill: var(--text-muted);
 }
 
 
@@ -385,7 +499,7 @@
 .sequencer-pad {
     width: 100%;
     aspect-ratio: 1;
-    background: #444;
+    background: var(--control-border);
     border: none;
     padding: 0;
     margin: 0;
@@ -402,7 +516,7 @@
 /* ADSR Node Styles */
 .adsr-viz {
     margin-bottom: 10px;
-    background: #222;
+    background: var(--panel-muted);
     border-radius: 4px;
     padding: 5px;
     overflow: hidden;
@@ -422,7 +536,7 @@
 
 .control-group label {
     font-size: 10px;
-    color: #aaa;
+    color: var(--text-muted);
 }
 
 .audio-node.adsr-node .node-content {
@@ -433,22 +547,9 @@
     display: block;
 }
 
-.handle-label {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 10px;
-    color: #aaa;
-    pointer-events: none;
-}
-
-.handle-label-in {
-    left: 10px;
-}
-
 .adsr-handle {
-    fill: #fff;
-    stroke: #0088ff;
+    fill: var(--panel-bg);
+    stroke: var(--accent);
     stroke-width: 2px;
     pointer-events: all;
     transition: r 0.1s ease;
@@ -474,7 +575,7 @@
     width: 100%;
     height: 60px;
     position: relative;
-    background: #222;
+    background: var(--panel-muted);
     border-radius: 2px;
     overflow: hidden;
 }
@@ -546,13 +647,13 @@
 }
 
 .piano-key.white {
-    background: #eee;
-    color: #333;
+    background: var(--panel-bg);
+    color: var(--text);
 }
 
 .piano-key.black {
-    background: #333;
-    color: #888;
+    background: var(--panel-border);
+    color: var(--text-subtle);
 }
 
 .key-label {
@@ -575,7 +676,7 @@
 .piano-cell {
     width: 16px;
     height: 12px;
-    background: #2a2a2a;
+    background: var(--panel-muted);
     border: none;
     border-radius: 2px;
     cursor: pointer;
@@ -584,32 +685,32 @@
 }
 
 .piano-cell:hover {
-    background: #444;
+    background: var(--panel-border);
 }
 
 .piano-cell.active {
-    background: #44ccff;
+    background: var(--accent);
 }
 
 .piano-cell.current {
-    box-shadow: inset 0 0 0 1px #fff;
+    box-shadow: inset 0 0 0 1px var(--panel-bg);
 }
 
 .piano-cell.beat {
-    background: #333;
+    background: var(--control-border);
 }
 
 .piano-cell.beat:hover {
-    background: #555;
+    background: var(--panel-border);
 }
 
 .piano-cell.beat.active {
-    background: #44ccff;
+    background: var(--accent);
 }
 
 /* Piano Roll extended note styles */
 .piano-cell.note-cont {
-    background: #2299cc;
+    background: var(--accent);
     border-left: none;
     border-radius: 0;
 }
@@ -619,5 +720,5 @@
 }
 
 .piano-cell.selecting {
-    background: rgba(68, 204, 255, 0.5);
+    background: rgba(96, 165, 250, 0.35);
 }

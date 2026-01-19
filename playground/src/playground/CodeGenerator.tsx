@@ -33,84 +33,35 @@ export const CodeGenerator: React.FC = () => {
     };
 
     return (
-        <div className="code-generator">
-            <div className="code-header">
-                <h4>Code Generator</h4>
-                <div className="code-controls">
-                    <label title="Wrap in self-contained AudioContext logic">
+        <div className="flex h-full flex-col bg-[var(--panel-bg)] text-[var(--text)]">
+            <div className="flex items-center justify-between border-b border-[var(--panel-border)] bg-[var(--panel-muted)] px-4 py-3">
+                <h4 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)]">
+                    Code Generator
+                </h4>
+                <div className="flex items-center gap-3 text-[10px] text-[var(--text-muted)]">
+                    <label className="flex items-center gap-1" title="Wrap in self-contained AudioContext logic">
                         <input
                             type="checkbox"
                             checked={includeProvider}
                             onChange={(e) => setIncludeProvider(e.target.checked)}
+                            className="accent-[var(--accent)]"
                         />
                         Include Provider
                     </label>
-                    <button onClick={handleCopy} className="copy-btn">Copy</button>
+                    <button
+                        onClick={handleCopy}
+                        className="rounded border border-[var(--panel-border)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                    >
+                        Copy
+                    </button>
                 </div>
             </div>
             <textarea
-                className="code-output"
+                className="flex-1 resize-none bg-transparent p-4 font-mono text-[10px] text-[var(--text)] outline-none"
                 value={generatedCode}
                 readOnly
                 spellCheck={false}
             />
-            <style>{`
-                .code-generator {
-                    display: flex;
-                    flex-direction: column;
-                    height: 100%;
-                    background: #1e1e1e;
-                    color: #d4d4d4;
-                    font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
-                }
-                .code-header {
-                    padding: 8px 12px;
-                    background: #252526;
-                    border-bottom: 1px solid #333;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }
-                .code-header h4 {
-                    margin: 0;
-                    font-size: 11px;
-                    color: #fff;
-                    text-transform: uppercase;
-                }
-                .code-controls {
-                    display: flex;
-                    gap: 12px;
-                    align-items: center;
-                    font-size: 10px;
-                }
-                .code-controls label {
-                    display: flex;
-                    align-items: center;
-                    gap: 4px;
-                    cursor: pointer;
-                    user-select: none;
-                }
-                .copy-btn {
-                    background: #0e639c;
-                    color: white;
-                    border: none;
-                    padding: 2px 8px;
-                    border-radius: 2px;
-                    cursor: pointer;
-                }
-                .copy-btn:hover { background: #1177bb; }
-                .code-output {
-                    flex: 1;
-                    background: #1e1e1e;
-                    border: none;
-                    color: #d4d4d4;
-                    padding: 12px;
-                    font-size: 11px;
-                    line-height: 1.4;
-                    resize: none;
-                    outline: none;
-                }
-            `}</style>
         </div>
     );
 };

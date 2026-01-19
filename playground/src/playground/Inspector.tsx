@@ -58,320 +58,213 @@ const Inspector: React.FC = () => {
     }
 
     return (
-        <div className="inspector">
-            <div className="inspector-header">
-                <h3>{nodeData.label || selectedNode.type}</h3>
-                <span className="node-id">{selectedNode.id}</span>
+        <div className="flex h-full flex-col bg-[var(--panel-bg)] text-[11px] text-[var(--text)]">
+            <div className="border-b border-[var(--panel-border)] bg-[var(--panel-muted)] px-4 py-3">
+                <h3 className="text-[12px] font-semibold text-[var(--text)]">
+                    {nodeData.label || selectedNode.type}
+                </h3>
+                <span className="text-[9px] text-[var(--text-subtle)]">{selectedNode.id}</span>
             </div>
 
-            <div className="inspector-content">
+            <div className="flex-1 overflow-y-auto px-4 py-4">
                 {/* Input Node Specific Controls */}
                 {nodeData.type === 'input' && (
-                    <>
-                        <div className="inspector-section">
-                            <h4>Params</h4>
-                            <div className="param-list">
-                                {(nodeData as InputNodeData).params.map((param, index) => (
-                                    <div key={param.id} className="param-item">
-                                        <div className="param-header">
-                                            <span className="param-type-indicator"></span>
+                    <div className="mb-6">
+                        <h4 className="mb-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)]">
+                            Params
+                        </h4>
+                        <div className="flex flex-col gap-3">
+                            {(nodeData as InputNodeData).params.map((param, index) => (
+                                <div key={param.id} className="rounded-md border border-[var(--panel-border)] bg-[var(--panel-muted)] p-3">
+                                    <div className="mb-2 flex items-center gap-2">
+                                        <span className="h-2 w-2 rounded-full bg-[var(--success)]" />
+                                        <input
+                                            type="text"
+                                            className="flex-1 bg-transparent text-[11px] font-semibold text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:outline-none"
+                                            value={param.label || param.name}
+                                            onChange={(e) => handleUpdateParam(index, { label: e.target.value, name: e.target.value })}
+                                        />
+                                        <button
+                                            className="text-[12px] text-[var(--text-subtle)] transition hover:text-[var(--danger)]"
+                                            onClick={() => handleRemoveParam(index)}
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <label className="flex-1 text-[10px] text-[var(--text-muted)]">Default</label>
                                             <input
-                                                type="text"
-                                                className="param-label-input"
-                                                value={param.label || param.name}
-                                                onChange={(e) => handleUpdateParam(index, { label: e.target.value, name: e.target.value })}
+                                                type="number"
+                                                value={param.defaultValue}
+                                                onChange={(e) => handleUpdateParam(index, { defaultValue: Number(e.target.value), value: Number(e.target.value) })}
+                                                step="0.01"
+                                                className="h-7 w-16 rounded border border-[var(--panel-border)] bg-[var(--control-bg)] px-2 text-[10px] text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
                                             />
-                                            <button
-                                                className="remove-btn"
-                                                onClick={() => handleRemoveParam(index)}
-                                            >×</button>
                                         </div>
-                                        <div className="param-details">
-                                            <div className="control-row">
-                                                <label>Default</label>
-                                                <input
-                                                    type="number"
-                                                    value={param.defaultValue}
-                                                    onChange={(e) => handleUpdateParam(index, { defaultValue: Number(e.target.value), value: Number(e.target.value) })}
-                                                    step="0.01"
-                                                />
-                                            </div>
-                                            <div className="control-row">
-                                                <label>Min</label>
-                                                <input
-                                                    type="number"
-                                                    value={param.min}
-                                                    onChange={(e) => handleUpdateParam(index, { min: Number(e.target.value) })}
-                                                    step="0.01"
-                                                />
-                                            </div>
-                                            <div className="control-row">
-                                                <label>Max</label>
-                                                <input
-                                                    type="number"
-                                                    value={param.max}
-                                                    onChange={(e) => handleUpdateParam(index, { max: Number(e.target.value) })}
-                                                    step="0.01"
-                                                />
-                                            </div>
-                                            <div className="control-row">
-                                                <label>Current</label>
-                                                <input
-                                                    type="range"
-                                                    min={param.min}
-                                                    max={param.max}
-                                                    step="0.01"
-                                                    value={param.value}
-                                                    onChange={(e) => handleUpdateParam(index, { value: Number(e.target.value) })}
-                                                />
-                                                <span className="value-display">{param.value.toFixed(2)}</span>
-                                            </div>
+                                        <div className="flex items-center gap-2">
+                                            <label className="flex-1 text-[10px] text-[var(--text-muted)]">Min</label>
+                                            <input
+                                                type="number"
+                                                value={param.min}
+                                                onChange={(e) => handleUpdateParam(index, { min: Number(e.target.value) })}
+                                                step="0.01"
+                                                className="h-7 w-16 rounded border border-[var(--panel-border)] bg-[var(--control-bg)] px-2 text-[10px] text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <label className="flex-1 text-[10px] text-[var(--text-muted)]">Max</label>
+                                            <input
+                                                type="number"
+                                                value={param.max}
+                                                onChange={(e) => handleUpdateParam(index, { max: Number(e.target.value) })}
+                                                step="0.01"
+                                                className="h-7 w-16 rounded border border-[var(--panel-border)] bg-[var(--control-bg)] px-2 text-[10px] text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <label className="flex-1 text-[10px] text-[var(--text-muted)]">Current</label>
+                                            <input
+                                                type="range"
+                                                min={param.min}
+                                                max={param.max}
+                                                step="0.01"
+                                                value={param.value}
+                                                onChange={(e) => handleUpdateParam(index, { value: Number(e.target.value) })}
+                                                className="flex-[2] accent-[var(--accent)]"
+                                            />
+                                            <span className="w-8 text-right text-[10px] text-[var(--accent)]">{param.value.toFixed(2)}</span>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-
-                            <div className="add-param-row">
-                                <input
-                                    type="text"
-                                    placeholder="New param name..."
-                                    value={newParamName}
-                                    onChange={(e) => setNewParamName(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleAddParam()}
-                                />
-                                <button onClick={handleAddParam}>+</button>
-                            </div>
+                                </div>
+                            ))}
                         </div>
-                    </>
+
+                        <div className="mt-3 flex items-center gap-2">
+                            <input
+                                type="text"
+                                placeholder="New param name..."
+                                value={newParamName}
+                                onChange={(e) => setNewParamName(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleAddParam()}
+                                className="h-8 flex-1 rounded border border-[var(--panel-border)] bg-[var(--control-bg)] px-2 text-[11px] text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)] focus:outline-none"
+                            />
+                            <button
+                                onClick={handleAddParam}
+                                className="h-8 w-8 rounded border border-[var(--panel-border)] text-[11px] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                            >
+                                +
+                            </button>
+                        </div>
+                    </div>
                 )}
 
                 {/* Transport Node Specific Controls */}
                 {nodeData.type === 'transport' && (
-                    <div className="inspector-section">
-                        <h4>Transport Controls</h4>
-                        <div className="control-row">
-                            <label>Playing</label>
-                            <input
-                                type="checkbox"
-                                checked={(nodeData as any).playing}
-                                onChange={(e) => updateNodeData(selectedNodeId!, { playing: e.target.checked })}
-                            />
-                        </div>
-                        <div className="control-row">
-                            <label>BPM</label>
-                            <input
-                                type="number"
-                                value={(nodeData as any).bpm}
-                                onChange={(e) => updateNodeData(selectedNodeId!, { bpm: Number(e.target.value) })}
-                                min={40}
-                                max={240}
-                            />
-                        </div>
-                        <div className="control-row">
-                            <label>Beats / Bar</label>
-                            <input
-                                type="number"
-                                value={(nodeData as any).beatsPerBar ?? 4}
-                                onChange={(e) => updateNodeData(selectedNodeId!, { beatsPerBar: Number(e.target.value) })}
-                                min={1}
-                                max={16}
-                            />
-                        </div>
-                        <div className="control-row">
-                            <label>Beat Unit</label>
-                            <input
-                                type="number"
-                                value={(nodeData as any).beatUnit ?? 4}
-                                onChange={(e) => updateNodeData(selectedNodeId!, { beatUnit: Number(e.target.value) })}
-                                min={1}
-                                max={16}
-                            />
-                        </div>
-                        <div className="control-row">
-                            <label>Steps / Beat</label>
-                            <input
-                                type="number"
-                                value={(nodeData as any).stepsPerBeat ?? 4}
-                                onChange={(e) => updateNodeData(selectedNodeId!, { stepsPerBeat: Number(e.target.value) })}
-                                min={1}
-                                max={16}
-                            />
-                        </div>
-                        <div className="control-row">
-                            <label>Bars / Phrase</label>
-                            <input
-                                type="number"
-                                value={(nodeData as any).barsPerPhrase ?? 4}
-                                onChange={(e) => updateNodeData(selectedNodeId!, { barsPerPhrase: Number(e.target.value) })}
-                                min={1}
-                                max={16}
-                            />
-                        </div>
-                        <div className="control-row">
-                            <label>Swing</label>
-                            <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.01"
-                                value={(nodeData as any).swing ?? 0}
-                                onChange={(e) => updateNodeData(selectedNodeId!, { swing: Number(e.target.value) })}
-                            />
-                            <span className="value-display">{((nodeData as any).swing ?? 0).toFixed(2)}</span>
+                    <div className="mb-6">
+                        <h4 className="mb-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)]">
+                            Transport Controls
+                        </h4>
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                                <label className="flex-1 text-[10px] text-[var(--text-muted)]">Playing</label>
+                                <input
+                                    type="checkbox"
+                                    checked={(nodeData as any).playing}
+                                    onChange={(e) => updateNodeData(selectedNodeId!, { playing: e.target.checked })}
+                                    className="accent-[var(--accent)]"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <label className="flex-1 text-[10px] text-[var(--text-muted)]">BPM</label>
+                                <input
+                                    type="number"
+                                    value={(nodeData as any).bpm}
+                                    onChange={(e) => updateNodeData(selectedNodeId!, { bpm: Number(e.target.value) })}
+                                    min={40}
+                                    max={240}
+                                    className="h-7 w-16 rounded border border-[var(--panel-border)] bg-[var(--control-bg)] px-2 text-[10px] text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <label className="flex-1 text-[10px] text-[var(--text-muted)]">Beats / Bar</label>
+                                <input
+                                    type="number"
+                                    value={(nodeData as any).beatsPerBar ?? 4}
+                                    onChange={(e) => updateNodeData(selectedNodeId!, { beatsPerBar: Number(e.target.value) })}
+                                    min={1}
+                                    max={16}
+                                    className="h-7 w-16 rounded border border-[var(--panel-border)] bg-[var(--control-bg)] px-2 text-[10px] text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <label className="flex-1 text-[10px] text-[var(--text-muted)]">Beat Unit</label>
+                                <input
+                                    type="number"
+                                    value={(nodeData as any).beatUnit ?? 4}
+                                    onChange={(e) => updateNodeData(selectedNodeId!, { beatUnit: Number(e.target.value) })}
+                                    min={1}
+                                    max={16}
+                                    className="h-7 w-16 rounded border border-[var(--panel-border)] bg-[var(--control-bg)] px-2 text-[10px] text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <label className="flex-1 text-[10px] text-[var(--text-muted)]">Steps / Beat</label>
+                                <input
+                                    type="number"
+                                    value={(nodeData as any).stepsPerBeat ?? 4}
+                                    onChange={(e) => updateNodeData(selectedNodeId!, { stepsPerBeat: Number(e.target.value) })}
+                                    min={1}
+                                    max={16}
+                                    className="h-7 w-16 rounded border border-[var(--panel-border)] bg-[var(--control-bg)] px-2 text-[10px] text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <label className="flex-1 text-[10px] text-[var(--text-muted)]">Bars / Phrase</label>
+                                <input
+                                    type="number"
+                                    value={(nodeData as any).barsPerPhrase ?? 4}
+                                    onChange={(e) => updateNodeData(selectedNodeId!, { barsPerPhrase: Number(e.target.value) })}
+                                    min={1}
+                                    max={16}
+                                    className="h-7 w-16 rounded border border-[var(--panel-border)] bg-[var(--control-bg)] px-2 text-[10px] text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <label className="flex-1 text-[10px] text-[var(--text-muted)]">Swing</label>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.01"
+                                    value={(nodeData as any).swing ?? 0}
+                                    onChange={(e) => updateNodeData(selectedNodeId!, { swing: Number(e.target.value) })}
+                                    className="flex-[2] accent-[var(--accent)]"
+                                />
+                                <span className="w-8 text-right text-[10px] text-[var(--accent)]">{((nodeData as any).swing ?? 0).toFixed(2)}</span>
+                            </div>
                         </div>
                     </div>
                 )}
 
                 {/* Common Properties */}
-                <div className="inspector-section">
-                    <h4>Node Properties</h4>
+                <div className="mb-4">
+                    <h4 className="mb-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)]">
+                        Node Properties
+                    </h4>
                     {(nodeData as any).label !== undefined && (
-                        <div className="control-row">
-                            <label>Label</label>
+                        <div className="flex items-center gap-2">
+                            <label className="flex-1 text-[10px] text-[var(--text-muted)]">Label</label>
                             <input
                                 type="text"
                                 value={nodeData.label}
                                 onChange={(e) => updateNodeData(selectedNodeId!, { label: e.target.value })}
+                                className="h-8 flex-1 rounded border border-[var(--panel-border)] bg-[var(--control-bg)] px-2 text-[11px] text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
                             />
                         </div>
                     )}
                 </div>
             </div>
-
-            <style>{`
-                .inspector {
-                    height: 100%;
-                    background: #16161e;
-                    border-left: 1px solid #2a2a3a;
-                    display: flex;
-                    flex-direction: column;
-                    color: #ccc;
-                    font-size: 11px;
-                }
-                .inspector.empty {
-                    align-items: center;
-                    justify-content: center;
-                    color: #555;
-                }
-                .inspector-header {
-                    padding: 12px;
-                    background: #1a1a22;
-                    border-bottom: 1px solid #2a2a3a;
-                }
-                .inspector-header h3 {
-                    margin: 0;
-                    font-size: 12px;
-                    color: #fff;
-                }
-                .node-id {
-                    font-size: 9px;
-                    color: #555;
-                }
-                .inspector-content {
-                    flex: 1;
-                    overflow-y: auto;
-                    padding: 12px;
-                }
-                .inspector-section {
-                    margin-bottom: 20px;
-                }
-                .inspector-section h4 {
-                    margin: 0 0 10px 0;
-                    color: #888;
-                    text-transform: uppercase;
-                    font-size: 9px;
-                    letter-spacing: 0.5px;
-                }
-                .control-row {
-                    display: flex;
-                    align-items: center;
-                    margin-bottom: 8px;
-                    gap: 8px;
-                }
-                .control-row label {
-                    flex: 1;
-                    color: #aaa;
-                }
-                .control-row input {
-                    background: #222;
-                    border: 1px solid #333;
-                    color: #eee;
-                    padding: 4px;
-                    border-radius: 3px;
-                    width: 60px;
-                }
-                .control-row input[type="text"] {
-                    flex: 1.5;
-                }
-                .control-row input[type="range"] {
-                    flex: 2;
-                    width: auto;
-                }
-                .value-display {
-                    width: 30px;
-                    text-align: right;
-                    color: #4488ff;
-                }
-                .param-list {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 8px;
-                }
-                .param-item {
-                    background: #1e1e28;
-                    border: 1px solid #333;
-                    border-radius: 4px;
-                    padding: 8px;
-                }
-                .param-header {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    margin-bottom: 8px;
-                }
-                .param-type-indicator {
-                    width: 8px;
-                    height: 8px;
-                    border-radius: 50%;
-                    background: #44cc44; /* Green for float/geometry usually, but let's stick to our palette */
-                }
-                .param-label-input {
-                    background: transparent;
-                    border: none;
-                    color: #fff;
-                    font-weight: bold;
-                    flex: 1;
-                }
-                .remove-btn {
-                    background: none;
-                    border: none;
-                    color: #666;
-                    cursor: pointer;
-                }
-                .remove-btn:hover { color: #ff4444; }
-                .add-param-row {
-                    display: flex;
-                    gap: 6px;
-                    margin-top: 10px;
-                }
-                .add-param-row input {
-                    flex: 1;
-                    background: #222;
-                    border: 1px solid #333;
-                    color: #eee;
-                    padding: 4px;
-                    border-radius: 3px;
-                }
-                .add-param-row button {
-                    background: #333;
-                    border: 1px solid #444;
-                    color: #eee;
-                    border-radius: 3px;
-                    cursor: pointer;
-                    width: 24px;
-                }
-                .add-param-row button:hover { background: #444; }
-            `}</style>
         </div>
     );
 };

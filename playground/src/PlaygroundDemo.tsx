@@ -96,6 +96,13 @@ const nodeCategories = [
     },
 ];
 
+const getInitialTheme = (): 'light' | 'dark' => {
+    if (typeof window === 'undefined') return 'dark';
+    const stored = window.localStorage.getItem('playground-theme');
+    if (stored === 'light' || stored === 'dark') return stored;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+};
+
 const NodePalette: FC = () => {
     const addNode = useAudioGraphStore((s) => s.addNode);
 
@@ -105,22 +112,24 @@ const NodePalette: FC = () => {
     }, []);
 
     return (
-        <div className="node-palette">
+        <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 py-4">
             {nodeCategories.map((category) => (
-                <div key={category.name} className="palette-category">
-                    <h4>{category.name}</h4>
-                    <div className="palette-nodes">
+                <div key={category.name} className="space-y-2">
+                    <h4 className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--text-subtle)]">
+                        {category.name}
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2">
                         {category.nodes.map((node) => (
                             <div
                                 key={node.type}
-                                className="palette-node"
-                                style={{ borderLeftColor: node.color }}
+                                className="group flex cursor-grab items-center gap-2 rounded-md border border-transparent bg-[var(--panel-muted)] px-2 py-2 text-[11px] font-medium text-[var(--text)] transition hover:border-[var(--panel-border)] hover:bg-[var(--panel-bg)] active:cursor-grabbing"
+                                style={{ borderLeftWidth: 3, borderLeftColor: node.color }}
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, node.type)}
                                 onClick={() => addNode(node.type as AudioNodeData['type'])}
                             >
-                                <span className="icon">{node.icon}</span>
-                                <span>{node.label}</span>
+                                <span className="text-sm">{node.icon}</span>
+                                <span className="truncate">{node.label}</span>
                             </div>
                         ))}
                     </div>
@@ -149,6 +158,9 @@ export const PlaygroundDemo: FC = () => {
     const isHydrated = useAudioGraphStore((s) => s.isHydrated);
     const setHydrated = useAudioGraphStore((s) => s.setHydrated);
 
+    const [theme, setTheme] = useState<'light' | 'dark'>(() => getInitialTheme());
+    const isDark = theme === 'dark';
+
     const activeGraph = graphs.find((graph) => graph.id === activeGraphId) ?? graphs[0];
     const activeGraphName = activeGraph?.name ?? 'Untitled Graph';
     const componentName = toPascalCase(activeGraphName);
@@ -159,6 +171,12 @@ export const PlaygroundDemo: FC = () => {
     useEffect(() => {
         setNameDraft(activeGraphName);
     }, [activeGraphName, activeGraphId]);
+
+    useEffect(() => {
+        const root = document.documentElement;
+        root.classList.toggle('dark', isDark);
+        window.localStorage.setItem('playground-theme', theme);
+    }, [isDark, theme]);
 
     useEffect(() => {
         let cancelled = false;
@@ -331,583 +349,158 @@ export const PlaygroundDemo: FC = () => {
         setSelectedNode(null);
     }, [setSelectedNode]);
 
+    const tabBase =
+        'rounded-full border px-3 py-1 text-[11px] font-medium transition';
+    const templateButtonBase =
+        'flex w-full items-center gap-2 rounded-md border border-[var(--panel-border)] bg-[var(--panel-muted)] px-3 py-2 text-left text-[11px] font-medium text-[var(--text)] transition hover:border-[var(--accent)] hover:bg-[var(--panel-bg)]';
+
     return (
-        <div className="playground-demo">
-            <style>{`
-                .playground-demo {
-                    display: grid;
-                    grid-template-columns: 200px 1fr 300px;
-                    height: 100vh;
-                    gap: 0;
-                    background: #0a0a12;
-                }
-
-                /* Left sidebar */
-                .sidebar {
-                    display: flex;
-                    flex-direction: column;
-                    background: #12121a;
-                    border-right: 1px solid #2a2a3a;
-                    overflow: hidden;
-                }
-                
-                /* Right Inspector */
-                .inspector-panel {
-                    border-left: 1px solid #2a2a3a;
-                    background: #16161e;
-                    overflow: hidden;
-                }
-
-                .node-palette {
-                    flex: 0 0 auto;
-                    padding: 12px;
-                    border-bottom: 1px solid #2a2a3a;
-                    overflow-y: auto;
-                    max-height: 50%;
-                }
-
-                .palette-category {
-                    margin-bottom: 16px;
-                }
-
-                .palette-category h4 {
-                    margin: 0 0 8px 0;
-                    font-size: 10px;
-                    text-transform: uppercase;
-                    color: #555;
-                    letter-spacing: 1px;
-                }
-
-                .palette-nodes {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 6px;
-                }
-
-                .palette-node {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    padding: 8px 10px;
-                    background: #1e1e2e;
-                    border-radius: 4px;
-                    border-left: 3px solid #888;
-                    cursor: grab;
-                    transition: all 0.2s;
-                    color: #c0c0c0;
-                    font-size: 11px;
-                    flex: 1 1 45%;
-                    min-width: 90px;
-                }
-
-                .palette-node:hover {
-                    background: #2a2a3a;
-                    transform: translateY(-1px);
-                }
-
-                .palette-node .icon {
-                    font-size: 12px;
-                }
-
-                /* Tabs */
-                .graph-tabs {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    gap: 12px;
-                    padding: 8px 12px;
-                    border-bottom: 1px solid #1f1f2a;
-                    background: #101019;
-                }
-
-                .graph-tab-list {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    overflow-x: auto;
-                }
-
-                .graph-tab {
-                    background: #1a1a24;
-                    border: 1px solid #2a2a3a;
-                    color: #b0b0c0;
-                    padding: 4px 10px;
-                    font-size: 10px;
-                    border-radius: 999px;
-                    cursor: pointer;
-                    white-space: nowrap;
-                }
-
-                .graph-tab.active {
-                    border-color: #4488ff;
-                    color: #e6f0ff;
-                    box-shadow: 0 0 0 1px rgba(68, 136, 255, 0.35);
-                }
-
-                .graph-tab.add {
-                    background: #212133;
-                    color: #7aa7ff;
-                    border-color: #2a2a3a;
-                }
-
-                .graph-name {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                }
-
-                .graph-name label {
-                    font-size: 9px;
-                    text-transform: uppercase;
-                    color: #555;
-                    letter-spacing: 0.5px;
-                }
-
-                .graph-name input {
-                    background: #1a1a24;
-                    border: 1px solid #2a2a3a;
-                    border-radius: 4px;
-                    padding: 4px 8px;
-                    font-size: 11px;
-                    color: #e0e0f0;
-                    width: 160px;
-                }
-
-                .graph-name input:focus {
-                    outline: none;
-                    border-color: #4488ff;
-                    box-shadow: 0 0 0 2px rgba(68, 136, 255, 0.2);
-                }
-
-                .component-name {
-                    font-size: 9px;
-                    color: #7a7a8a;
-                    font-family: 'JetBrains Mono', 'Fira Code', monospace;
-                }
-
-                .graph-delete {
-                    background: #2a1a24;
-                    border: 1px solid #4a2230;
-                    color: #ff6677;
-                    border-radius: 4px;
-                    font-size: 10px;
-                    padding: 4px 8px;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                }
-
-                .graph-delete:hover {
-                    background: #3a1a24;
-                    color: #ff99aa;
-                }
-
-                .graph-delete:disabled {
-                    opacity: 0.5;
-                    cursor: not-allowed;
-                }
-
-                /* ReactFlow canvas */
-                .canvas-container {
-                    position: relative;
-                    background: #0a0a12;
-                    display: flex;
-                    flex-direction: column;
-                    min-height: 0;
-                }
-
-                .flow-wrapper {
-                    flex: 1;
-                    min-height: 0;
-                }
-
-                .react-flow {
-                    background: #0a0a12;
-                    height: 100%;
-                }
-
-                .react-flow__background {
-                    background: #0a0a12;
-                }
-
-                .react-flow__edge-path {
-                    stroke: #4488ff;
-                    stroke-width: 2;
-                }
-
-                .react-flow__edge-path:hover {
-                    stroke: #66aaff;
-                }
-
-                /* Audio nodes styling */
-                .audio-node {
-                    background: #1a1a24;
-                    border: 1px solid #2a2a3a;
-                    border-radius: 6px;
-                    min-width: 140px;
-                    font-family: system-ui, sans-serif;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                }
-
-                .audio-node.selected {
-                    border-color: #4488ff;
-                    box-shadow: 0 0 0 2px rgba(68,136,255,0.3);
-                }
-
-                .node-header {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    padding: 6px 10px;
-                    border-radius: 5px 5px 0 0;
-                    font-weight: 600;
-                    font-size: 11px;
-                    color: #fff;
-                    cursor: grab;
-                }
-                
-                .node-header:active {
-                    cursor: grabbing;
-                }
-
-                .osc-node .node-header { background: #ff8844; }
-                .gain-node .node-header { background: #44cc44; }
-                .filter-node .node-header { background: #aa44ff; }
-                .output-node .node-header { background: #ff4466; }
-                .noise-node .node-header { background: #666666; }
-                .delay-node .node-header { background: #4488ff; }
-                .reverb-node .node-header { background: #8844ff; }
-                .panner-node .node-header { background: #44cccc; }
-                .mixer-node .node-header { background: #ffaa44; }
-                .input-node .node-header { background: #555555; }
-
-                .node-icon { font-size: 12px; }
-                .node-title { flex: 1; }
-
-                .node-content {
-                    padding: 10px;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 8px;
-                }
-
-                .node-control {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 3px;
-                }
-
-                .node-control label {
-                    font-size: 9px;
-                    text-transform: uppercase;
-                    color: #555;
-                    letter-spacing: 0.5px;
-                }
-
-                .node-control input[type="range"] {
-                    width: 100%;
-                    height: 3px;
-                    border-radius: 2px;
-                    background: #2a2a3a;
-                    outline: none;
-                    -webkit-appearance: none;
-                }
-
-                .node-control input[type="range"]::-webkit-slider-thumb {
-                    -webkit-appearance: none;
-                    width: 10px;
-                    height: 10px;
-                    border-radius: 50%;
-                    background: #4488ff;
-                    cursor: pointer;
-                }
-
-                .node-control select {
-                    padding: 3px 6px;
-                    background: #2a2a3a;
-                    border: none;
-                    border-radius: 3px;
-                    color: #e0e0e0;
-                    font-size: 10px;
-                    cursor: pointer;
-                }
-
-                .node-control .value {
-                    font-size: 10px;
-                    color: #4488ff;
-                    text-align: right;
-                }
-
-                .play-button {
-                    padding: 6px 12px;
-                    border: none;
-                    border-radius: 3px;
-                    font-size: 11px;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                }
-
-                .play-button.play {
-                    background: linear-gradient(135deg, #22cc66, #22aa55);
-                    color: white;
-                }
-
-                .play-button.stop {
-                    background: linear-gradient(135deg, #ff4466, #dd3355);
-                    color: white;
-                }
-
-                .output-node.playing {
-                    animation: pulse 1s ease-in-out infinite;
-                }
-
-                @keyframes pulse {
-                    0%, 100% { box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-                    50% { box-shadow: 0 4px 20px rgba(255,68,102,0.4); }
-                }
-
-                /* Handles - vertical layout */
-                .handle {
-                    width: 10px !important;
-                    height: 10px !important;
-                    border-radius: 50% !important;
-                    background: #2a2a3a !important;
-                    border: 2px solid #4488ff !important;
-                }
-
-                .handle:hover {
-                    background: #4488ff !important;
-                }
-                
-                .handle-audio {
-                   background: #00ff41 !important;
-                   border-color: #00ff41 !important;
-                }
-
-                /* MiniMap */
-                .react-flow__minimap {
-                    background: #1a1a24;
-                    border-radius: 6px;
-                }
-
-                /* Controls */
-                .react-flow__controls {
-                    border-radius: 6px;
-                    overflow: hidden;
-                }
-
-                .react-flow__controls-button {
-                    background: #1a1a24;
-                    border-bottom: 1px solid #2a2a3a;
-                }
-
-                .react-flow__controls-button:hover {
-                    background: #2a2a3a;
-                }
-
-                .react-flow__controls-button svg {
-                    fill: #888;
-                }
-            `}</style>
-
-            <div className="sidebar">
+        <div className="grid h-screen w-full grid-cols-[240px_minmax(0,1fr)_320px] bg-[var(--app-bg)] text-[var(--text)]">
+            <aside className="flex h-full flex-col border-r border-[var(--panel-border)] bg-[var(--panel-bg)]">
                 <NodePalette />
 
-                <div className="templates-section" style={{ borderTop: '1px solid #2a2a3a', padding: '12px', flex: '0 0 auto' }}>
-                    <h4 style={{ margin: '0 0 8px 0', fontSize: '10px', textTransform: 'uppercase', color: '#555', letterSpacing: '1px' }}>Templates</h4>
-                    <button
-                        onClick={() => {
-                            const nodes: Node<AudioNodeData>[] = [
-                                { id: 'transport', type: 'transportNode', dragHandle: '.node-header', position: { x: 50, y: 50 }, data: { type: 'transport', bpm: 120, playing: false, label: 'Transport' } as any },
-                                { id: 'sequencer', type: 'stepSequencerNode', dragHandle: '.node-header', position: { x: 50, y: 200 }, data: { type: 'stepSequencer', steps: 16, pattern: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0], activeSteps: [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false], label: 'Step Sequencer' } as any },
-                                { id: 'voice', type: 'voiceNode', dragHandle: '.node-header', position: { x: 300, y: 200 }, data: { type: 'voice', portamento: 0, label: 'Voice' } as any },
-                                { id: 'osc', type: 'oscNode', dragHandle: '.node-header', position: { x: 550, y: 150 }, data: { type: 'osc', frequency: 0, waveform: 'sawtooth', detune: 0, label: 'Oscillator' } as any },
-                                { id: 'adsr', type: 'adsrNode', dragHandle: '.node-header', position: { x: 550, y: 300 }, data: { type: 'adsr', attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.5, label: 'ADSR' } as any },
-                                { id: 'gain', type: 'gainNode', dragHandle: '.node-header', position: { x: 800, y: 200 }, data: { type: 'gain', gain: 0, label: 'VCA' } as any },
-                                { id: 'output', type: 'outputNode', dragHandle: '.node-header', position: { x: 1000, y: 200 }, data: { type: 'output', masterGain: 0.5, playing: false, label: 'Output' } as any }
-                            ];
-                            const edges = [
-                                { id: 'e_t_s', source: 'transport', target: 'sequencer', style: { stroke: '#4488ff', strokeDasharray: '5,5' }, animated: true },
-                                { id: 'e_s_v', source: 'sequencer', target: 'voice', targetHandle: 'trigger', style: { stroke: '#ff4466' }, animated: true },
-                                { id: 'e_v_osc', source: 'voice', sourceHandle: 'note', target: 'osc', targetHandle: 'frequency', style: { stroke: '#ff8844' }, animated: true },
-                                { id: 'e_v_adsr', source: 'voice', sourceHandle: 'gate', target: 'adsr', style: { stroke: '#44cc44' }, animated: true },
-                                { id: 'e_osc_gain', source: 'osc', target: 'gain', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
-                                { id: 'e_adsr_gain', source: 'adsr', target: 'gain', targetHandle: 'gain', style: { stroke: '#4488ff' }, animated: true },
-                                { id: 'e_gain_out', source: 'gain', target: 'output', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false }
-                            ];
+                <div className="border-t border-[var(--panel-border)] px-4 py-4">
+                    <h4 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--text-subtle)]">
+                        Templates
+                    </h4>
+                    <div className="flex flex-col gap-2">
+                        <button
+                            onClick={() => {
+                                const nodes: Node<AudioNodeData>[] = [
+                                    { id: 'transport', type: 'transportNode', dragHandle: '.node-header', position: { x: 50, y: 50 }, data: { type: 'transport', bpm: 120, playing: false, label: 'Transport' } as any },
+                                    { id: 'sequencer', type: 'stepSequencerNode', dragHandle: '.node-header', position: { x: 50, y: 200 }, data: { type: 'stepSequencer', steps: 16, pattern: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0], activeSteps: [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false], label: 'Step Sequencer' } as any },
+                                    { id: 'voice', type: 'voiceNode', dragHandle: '.node-header', position: { x: 300, y: 200 }, data: { type: 'voice', portamento: 0, label: 'Voice' } as any },
+                                    { id: 'osc', type: 'oscNode', dragHandle: '.node-header', position: { x: 550, y: 150 }, data: { type: 'osc', frequency: 0, waveform: 'sawtooth', detune: 0, label: 'Oscillator' } as any },
+                                    { id: 'adsr', type: 'adsrNode', dragHandle: '.node-header', position: { x: 550, y: 300 }, data: { type: 'adsr', attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.5, label: 'ADSR' } as any },
+                                    { id: 'gain', type: 'gainNode', dragHandle: '.node-header', position: { x: 800, y: 200 }, data: { type: 'gain', gain: 0, label: 'VCA' } as any },
+                                    { id: 'output', type: 'outputNode', dragHandle: '.node-header', position: { x: 1000, y: 200 }, data: { type: 'output', masterGain: 0.5, playing: false, label: 'Output' } as any }
+                                ];
+                                const edges = [
+                                    { id: 'e_t_s', source: 'transport', target: 'sequencer', style: { stroke: '#4488ff', strokeDasharray: '5,5' }, animated: true },
+                                    { id: 'e_s_v', source: 'sequencer', target: 'voice', targetHandle: 'trigger', style: { stroke: '#ff4466' }, animated: true },
+                                    { id: 'e_v_osc', source: 'voice', sourceHandle: 'note', target: 'osc', targetHandle: 'frequency', style: { stroke: '#ff8844' }, animated: true },
+                                    { id: 'e_v_adsr', source: 'voice', sourceHandle: 'gate', target: 'adsr', style: { stroke: '#44cc44' }, animated: true },
+                                    { id: 'e_osc_gain', source: 'osc', target: 'gain', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
+                                    { id: 'e_adsr_gain', source: 'adsr', target: 'gain', targetHandle: 'gain', style: { stroke: '#4488ff' }, animated: true },
+                                    { id: 'e_gain_out', source: 'gain', target: 'output', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false }
+                                ];
 
-                            useAudioGraphStore.getState().loadGraph(nodes, edges);
-                        }}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            width: '100%',
-                            padding: '10px',
-                            background: '#1e1e2e',
-                            border: '1px solid #2a2a3a',
-                            borderRadius: '4px',
-                            color: '#c0c0c0',
-                            fontSize: '11px',
-                            cursor: 'pointer',
-                            textAlign: 'left'
-                        }}
-                    >
-                        <span style={{ fontSize: '14px' }}>🎹</span>
-                        <span>Voice Synth</span>
-                    </button>
+                                useAudioGraphStore.getState().loadGraph(nodes, edges);
+                            }}
+                            className={templateButtonBase}
+                        >
+                            <span className="text-sm">🎹</span>
+                            <span>Voice Synth</span>
+                        </button>
 
-                    <button
-                        onClick={() => {
-                            const nodes: Node<AudioNodeData>[] = [
-                                { id: 'transport', type: 'transportNode', dragHandle: '.node-header', position: { x: 50, y: 50 }, data: { type: 'transport', bpm: 120, playing: false, label: 'Transport' } as any },
-                                { id: 'sequencer', type: 'stepSequencerNode', dragHandle: '.node-header', position: { x: 50, y: 200 }, data: { type: 'stepSequencer', steps: 16, pattern: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], activeSteps: [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false], label: 'Kick Seq' } as any },
-                                { id: 'noise', type: 'noiseNode', dragHandle: '.node-header', position: { x: 300, y: 200 }, data: { type: 'noise', noiseType: 'white', label: 'Noise' } as any },
-                                { id: 'adsr', type: 'adsrNode', dragHandle: '.node-header', position: { x: 500, y: 200 }, data: { type: 'adsr', attack: 0.001, decay: 0.1, sustain: 0, release: 0.1, label: 'Env' } as any },
-                                { id: 'gain', type: 'gainNode', dragHandle: '.node-header', position: { x: 700, y: 200 }, data: { type: 'gain', gain: 0, label: 'VCA' } as any },
-                                { id: 'output', type: 'outputNode', dragHandle: '.node-header', position: { x: 900, y: 200 }, data: { type: 'output', masterGain: 0.5, playing: false, label: 'Output' } as any }
-                            ];
-                            const edges = [
-                                { id: 'e_t_s', source: 'transport', target: 'sequencer', style: { stroke: '#4488ff', strokeDasharray: '5,5' }, animated: true },
-                                { id: 'e_s_adsr', source: 'sequencer', target: 'adsr', style: { stroke: '#ff4466' }, animated: true },
-                                { id: 'e_n_g', source: 'noise', target: 'gain', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
-                                { id: 'e_a_g', source: 'adsr', target: 'gain', targetHandle: 'gain', style: { stroke: '#4488ff' }, animated: true },
-                                { id: 'e_g_o', source: 'gain', target: 'output', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false }
-                            ];
-                            useAudioGraphStore.getState().loadGraph(nodes, edges);
-                        }}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            width: '100%',
-                            padding: '10px',
-                            background: '#1e1e2e',
-                            border: '1px solid #2a2a3a',
-                            borderRadius: '4px',
-                            color: '#c0c0c0',
-                            fontSize: '11px',
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                            marginTop: '8px'
-                        }}
-                    >
-                        <span style={{ fontSize: '14px' }}>🥁</span>
-                        <span>Drum Synth</span>
-                    </button>
+                        <button
+                            onClick={() => {
+                                const nodes: Node<AudioNodeData>[] = [
+                                    { id: 'transport', type: 'transportNode', dragHandle: '.node-header', position: { x: 50, y: 50 }, data: { type: 'transport', bpm: 120, playing: false, label: 'Transport' } as any },
+                                    { id: 'sequencer', type: 'stepSequencerNode', dragHandle: '.node-header', position: { x: 50, y: 200 }, data: { type: 'stepSequencer', steps: 16, pattern: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], activeSteps: [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false], label: 'Kick Seq' } as any },
+                                    { id: 'noise', type: 'noiseNode', dragHandle: '.node-header', position: { x: 300, y: 200 }, data: { type: 'noise', noiseType: 'white', label: 'Noise' } as any },
+                                    { id: 'adsr', type: 'adsrNode', dragHandle: '.node-header', position: { x: 500, y: 200 }, data: { type: 'adsr', attack: 0.001, decay: 0.1, sustain: 0, release: 0.1, label: 'Env' } as any },
+                                    { id: 'gain', type: 'gainNode', dragHandle: '.node-header', position: { x: 700, y: 200 }, data: { type: 'gain', gain: 0, label: 'VCA' } as any },
+                                    { id: 'output', type: 'outputNode', dragHandle: '.node-header', position: { x: 900, y: 200 }, data: { type: 'output', masterGain: 0.5, playing: false, label: 'Output' } as any }
+                                ];
+                                const edges = [
+                                    { id: 'e_t_s', source: 'transport', target: 'sequencer', style: { stroke: '#4488ff', strokeDasharray: '5,5' }, animated: true },
+                                    { id: 'e_s_adsr', source: 'sequencer', target: 'adsr', style: { stroke: '#ff4466' }, animated: true },
+                                    { id: 'e_n_g', source: 'noise', target: 'gain', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
+                                    { id: 'e_a_g', source: 'adsr', target: 'gain', targetHandle: 'gain', style: { stroke: '#4488ff' }, animated: true },
+                                    { id: 'e_g_o', source: 'gain', target: 'output', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false }
+                                ];
+                                useAudioGraphStore.getState().loadGraph(nodes, edges);
+                            }}
+                            className={templateButtonBase}
+                        >
+                            <span className="text-sm">🥁</span>
+                            <span>Drum Synth</span>
+                        </button>
 
-                    <button
-                        onClick={() => {
-                            const notes = [
-                                { pitch: 60, step: 0, duration: 1, velocity: 0.8 },  // C4
-                                { pitch: 64, step: 2, duration: 1, velocity: 0.8 },  // E4
-                                { pitch: 67, step: 4, duration: 1, velocity: 0.8 },  // G4
-                                { pitch: 72, step: 6, duration: 2, velocity: 1.0 },  // C5
-                                { pitch: 60, step: 8, duration: 1, velocity: 0.6 },  // C4
-                                { pitch: 62, step: 10, duration: 1, velocity: 0.7 }, // D4
-                                { pitch: 64, step: 12, duration: 1, velocity: 0.8 }, // E4
-                                { pitch: 67, step: 14, duration: 1, velocity: 0.9 }, // G4
-                            ];
-                            const nodes: Node<AudioNodeData>[] = [
-                                { id: 'transport', type: 'transportNode', dragHandle: '.node-header', position: { x: 50, y: 50 }, data: { type: 'transport', bpm: 100, playing: false, label: 'Transport' } as any },
-                                { id: 'pianoroll', type: 'pianoRollNode', dragHandle: '.node-header', position: { x: 50, y: 180 }, data: { type: 'pianoRoll', steps: 16, octaves: 2, baseNote: 48, notes, label: 'Piano Roll' } as any },
-                                { id: 'voice', type: 'voiceNode', dragHandle: '.node-header', position: { x: 500, y: 200 }, data: { type: 'voice', portamento: 0.02, label: 'Voice' } as any },
-                                { id: 'osc', type: 'oscNode', dragHandle: '.node-header', position: { x: 700, y: 150 }, data: { type: 'osc', frequency: 0, waveform: 'sine', detune: 0, label: 'Oscillator' } as any },
-                                { id: 'adsr', type: 'adsrNode', dragHandle: '.node-header', position: { x: 700, y: 300 }, data: { type: 'adsr', attack: 0.05, decay: 0.2, sustain: 0.5, release: 0.3, label: 'ADSR' } as any },
-                                { id: 'gain', type: 'gainNode', dragHandle: '.node-header', position: { x: 900, y: 200 }, data: { type: 'gain', gain: 0, label: 'VCA' } as any },
-                                { id: 'output', type: 'outputNode', dragHandle: '.node-header', position: { x: 1100, y: 200 }, data: { type: 'output', masterGain: 0.4, playing: false, label: 'Output' } as any }
-                            ];
-                            const edges = [
-                                { id: 'e_t_pr', source: 'transport', target: 'pianoroll', style: { stroke: '#4488ff', strokeDasharray: '5,5' }, animated: true },
-                                { id: 'e_pr_v', source: 'pianoroll', target: 'voice', targetHandle: 'trigger', style: { stroke: '#ff4466' }, animated: true },
-                                { id: 'e_v_osc', source: 'voice', sourceHandle: 'note', target: 'osc', targetHandle: 'frequency', style: { stroke: '#ff8844' }, animated: true },
-                                { id: 'e_v_adsr', source: 'voice', sourceHandle: 'gate', target: 'adsr', style: { stroke: '#44cc44' }, animated: true },
-                                { id: 'e_osc_gain', source: 'osc', target: 'gain', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
-                                { id: 'e_adsr_gain', source: 'adsr', target: 'gain', targetHandle: 'gain', style: { stroke: '#4488ff' }, animated: true },
-                                { id: 'e_gain_out', source: 'gain', target: 'output', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false }
-                            ];
-                            useAudioGraphStore.getState().loadGraph(nodes, edges);
-                        }}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            width: '100%',
-                            padding: '10px',
-                            background: '#1e1e2e',
-                            border: '1px solid #44ccff',
-                            borderRadius: '4px',
-                            color: '#44ccff',
-                            fontSize: '11px',
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                            marginTop: '8px'
-                        }}
-                    >
-                        <span style={{ fontSize: '14px' }}>🎼</span>
-                        <span>Piano Roll Synth</span>
-                    </button>
+                        <button
+                            onClick={() => {
+                                const notes = [
+                                    { pitch: 60, step: 0, duration: 1, velocity: 0.8 },  // C4
+                                    { pitch: 64, step: 2, duration: 1, velocity: 0.8 },  // E4
+                                    { pitch: 67, step: 4, duration: 1, velocity: 0.8 },  // G4
+                                    { pitch: 72, step: 6, duration: 2, velocity: 1.0 },  // C5
+                                    { pitch: 60, step: 8, duration: 1, velocity: 0.6 },  // C4
+                                    { pitch: 62, step: 10, duration: 1, velocity: 0.7 }, // D4
+                                    { pitch: 64, step: 12, duration: 1, velocity: 0.8 }, // E4
+                                    { pitch: 67, step: 14, duration: 1, velocity: 0.9 }, // G4
+                                ];
+                                const nodes: Node<AudioNodeData>[] = [
+                                    { id: 'transport', type: 'transportNode', dragHandle: '.node-header', position: { x: 50, y: 50 }, data: { type: 'transport', bpm: 100, playing: false, label: 'Transport' } as any },
+                                    { id: 'pianoroll', type: 'pianoRollNode', dragHandle: '.node-header', position: { x: 50, y: 180 }, data: { type: 'pianoRoll', steps: 16, octaves: 2, baseNote: 48, notes, label: 'Piano Roll' } as any },
+                                    { id: 'voice', type: 'voiceNode', dragHandle: '.node-header', position: { x: 500, y: 200 }, data: { type: 'voice', portamento: 0.02, label: 'Voice' } as any },
+                                    { id: 'osc', type: 'oscNode', dragHandle: '.node-header', position: { x: 700, y: 150 }, data: { type: 'osc', frequency: 0, waveform: 'sine', detune: 0, label: 'Oscillator' } as any },
+                                    { id: 'adsr', type: 'adsrNode', dragHandle: '.node-header', position: { x: 700, y: 300 }, data: { type: 'adsr', attack: 0.05, decay: 0.2, sustain: 0.5, release: 0.3, label: 'ADSR' } as any },
+                                    { id: 'gain', type: 'gainNode', dragHandle: '.node-header', position: { x: 900, y: 200 }, data: { type: 'gain', gain: 0, label: 'VCA' } as any },
+                                    { id: 'output', type: 'outputNode', dragHandle: '.node-header', position: { x: 1100, y: 200 }, data: { type: 'output', masterGain: 0.4, playing: false, label: 'Output' } as any }
+                                ];
+                                const edges = [
+                                    { id: 'e_t_pr', source: 'transport', target: 'pianoroll', style: { stroke: '#4488ff', strokeDasharray: '5,5' }, animated: true },
+                                    { id: 'e_pr_v', source: 'pianoroll', target: 'voice', targetHandle: 'trigger', style: { stroke: '#ff4466' }, animated: true },
+                                    { id: 'e_v_osc', source: 'voice', sourceHandle: 'note', target: 'osc', targetHandle: 'frequency', style: { stroke: '#ff8844' }, animated: true },
+                                    { id: 'e_v_adsr', source: 'voice', sourceHandle: 'gate', target: 'adsr', style: { stroke: '#44cc44' }, animated: true },
+                                    { id: 'e_osc_gain', source: 'osc', target: 'gain', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
+                                    { id: 'e_adsr_gain', source: 'adsr', target: 'gain', targetHandle: 'gain', style: { stroke: '#4488ff' }, animated: true },
+                                    { id: 'e_gain_out', source: 'gain', target: 'output', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false }
+                                ];
+                                useAudioGraphStore.getState().loadGraph(nodes, edges);
+                            }}
+                            className={`${templateButtonBase} border-[var(--accent)] text-[var(--accent)] hover:text-[var(--text)]`}
+                        >
+                            <span className="text-sm">🎼</span>
+                            <span>Piano Roll Synth</span>
+                        </button>
 
-                    <button
-                        onClick={() => {
-                            const nodes: Node<AudioNodeData>[] = [
-                                { id: 'transport', type: 'transportNode', dragHandle: '.node-header', position: { x: 50, y: 50 }, data: { type: 'transport', bpm: 140, playing: false, label: 'Transport' } as any },
-                                { id: 'sequencer', type: 'stepSequencerNode', dragHandle: '.node-header', position: { x: 50, y: 180 }, data: { type: 'stepSequencer', steps: 16, pattern: [1, 0.6, 0.8, 0.5, 1, 0.4, 0.9, 0.6, 1, 0.5, 0.7, 0.4, 1, 0.6, 0.8, 0.9], activeSteps: [true, true, true, false, true, true, true, false, true, false, true, true, true, true, false, true], label: 'Acid Seq' } as any },
-                                { id: 'voice', type: 'voiceNode', dragHandle: '.node-header', position: { x: 350, y: 180 }, data: { type: 'voice', portamento: 0.03, label: 'Voice' } as any },
-                                { id: 'osc', type: 'oscNode', dragHandle: '.node-header', position: { x: 550, y: 100 }, data: { type: 'osc', frequency: 0, waveform: 'sawtooth', detune: 0, label: 'VCO' } as any },
-                                { id: 'filter', type: 'filterNode', dragHandle: '.node-header', position: { x: 800, y: 150 }, data: { type: 'filter', frequency: 600, q: 15, filterType: 'lowpass', label: 'VCF' } as any },
-                                { id: 'lfo', type: 'lfoNode', dragHandle: '.node-header', position: { x: 550, y: 350 }, data: { type: 'lfo', rate: 0.5, depth: 400, waveform: 'sine', label: 'LFO' } as any },
-                                { id: 'adsr', type: 'adsrNode', dragHandle: '.node-header', position: { x: 550, y: 220 }, data: { type: 'adsr', attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.1, label: 'Filter Env' } as any },
-                                { id: 'vca', type: 'gainNode', dragHandle: '.node-header', position: { x: 1000, y: 150 }, data: { type: 'gain', gain: 0.7, label: 'VCA' } as any },
-                                { id: 'output', type: 'outputNode', dragHandle: '.node-header', position: { x: 1200, y: 150 }, data: { type: 'output', masterGain: 0.5, playing: false, label: 'Output' } as any }
-                            ];
-                            const edges = [
-                                { id: 'e_t_s', source: 'transport', target: 'sequencer', style: { stroke: '#4488ff', strokeDasharray: '5,5' }, animated: true },
-                                { id: 'e_s_v', source: 'sequencer', target: 'voice', targetHandle: 'trigger', style: { stroke: '#ff4466' }, animated: true },
-                                { id: 'e_v_osc', source: 'voice', sourceHandle: 'note', target: 'osc', targetHandle: 'frequency', style: { stroke: '#ff8844' }, animated: true },
-                                { id: 'e_v_adsr', source: 'voice', sourceHandle: 'gate', target: 'adsr', style: { stroke: '#44cc44' }, animated: true },
-                                { id: 'e_osc_filt', source: 'osc', target: 'filter', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
-                                { id: 'e_adsr_filt', source: 'adsr', target: 'filter', targetHandle: 'frequency', style: { stroke: '#aa44ff' }, animated: true },
-                                { id: 'e_lfo_filt', source: 'lfo', sourceHandle: 'out', target: 'filter', targetHandle: 'frequency', style: { stroke: '#ff44aa' }, animated: true },
-                                { id: 'e_filt_vca', source: 'filter', target: 'vca', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
-                                { id: 'e_vca_out', source: 'vca', target: 'output', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false }
-                            ];
-                            useAudioGraphStore.getState().loadGraph(nodes, edges);
-                        }}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            width: '100%',
-                            padding: '10px',
-                            background: '#1e1e2e',
-                            border: '1px solid #aa44ff',
-                            borderRadius: '4px',
-                            color: '#aa44ff',
-                            fontSize: '11px',
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                            marginTop: '8px'
-                        }}
-                    >
-                        <span style={{ fontSize: '14px' }}>🧪</span>
-                        <span>Acid Synth</span>
-                    </button>
+                        <button
+                            onClick={() => {
+                                const nodes: Node<AudioNodeData>[] = [
+                                    { id: 'transport', type: 'transportNode', dragHandle: '.node-header', position: { x: 50, y: 50 }, data: { type: 'transport', bpm: 140, playing: false, label: 'Transport' } as any },
+                                    { id: 'sequencer', type: 'stepSequencerNode', dragHandle: '.node-header', position: { x: 50, y: 180 }, data: { type: 'stepSequencer', steps: 16, pattern: [1, 0.6, 0.8, 0.5, 1, 0.4, 0.9, 0.6, 1, 0.5, 0.7, 0.4, 1, 0.6, 0.8, 0.9], activeSteps: [true, true, true, false, true, true, true, false, true, false, true, true, true, true, false, true], label: 'Acid Seq' } as any },
+                                    { id: 'voice', type: 'voiceNode', dragHandle: '.node-header', position: { x: 350, y: 180 }, data: { type: 'voice', portamento: 0.03, label: 'Voice' } as any },
+                                    { id: 'osc', type: 'oscNode', dragHandle: '.node-header', position: { x: 550, y: 100 }, data: { type: 'osc', frequency: 0, waveform: 'sawtooth', detune: 0, label: 'VCO' } as any },
+                                    { id: 'filter', type: 'filterNode', dragHandle: '.node-header', position: { x: 800, y: 150 }, data: { type: 'filter', frequency: 600, q: 15, filterType: 'lowpass', label: 'VCF' } as any },
+                                    { id: 'lfo', type: 'lfoNode', dragHandle: '.node-header', position: { x: 550, y: 350 }, data: { type: 'lfo', rate: 0.5, depth: 400, waveform: 'sine', label: 'LFO' } as any },
+                                    { id: 'adsr', type: 'adsrNode', dragHandle: '.node-header', position: { x: 550, y: 220 }, data: { type: 'adsr', attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.1, label: 'Filter Env' } as any },
+                                    { id: 'vca', type: 'gainNode', dragHandle: '.node-header', position: { x: 1000, y: 150 }, data: { type: 'gain', gain: 0.7, label: 'VCA' } as any },
+                                    { id: 'output', type: 'outputNode', dragHandle: '.node-header', position: { x: 1200, y: 150 }, data: { type: 'output', masterGain: 0.5, playing: false, label: 'Output' } as any }
+                                ];
+                                const edges = [
+                                    { id: 'e_t_s', source: 'transport', target: 'sequencer', style: { stroke: '#4488ff', strokeDasharray: '5,5' }, animated: true },
+                                    { id: 'e_s_v', source: 'sequencer', target: 'voice', targetHandle: 'trigger', style: { stroke: '#ff4466' }, animated: true },
+                                    { id: 'e_v_osc', source: 'voice', sourceHandle: 'note', target: 'osc', targetHandle: 'frequency', style: { stroke: '#ff8844' }, animated: true },
+                                    { id: 'e_v_adsr', source: 'voice', sourceHandle: 'gate', target: 'adsr', style: { stroke: '#44cc44' }, animated: true },
+                                    { id: 'e_osc_filt', source: 'osc', target: 'filter', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
+                                    { id: 'e_adsr_filt', source: 'adsr', target: 'filter', targetHandle: 'frequency', style: { stroke: '#aa44ff' }, animated: true },
+                                    { id: 'e_lfo_filt', source: 'lfo', sourceHandle: 'out', target: 'filter', targetHandle: 'frequency', style: { stroke: '#ff44aa' }, animated: true },
+                                    { id: 'e_filt_vca', source: 'filter', target: 'vca', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
+                                    { id: 'e_vca_out', source: 'vca', target: 'output', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false }
+                                ];
+                                useAudioGraphStore.getState().loadGraph(nodes, edges);
+                            }}
+                            className={templateButtonBase}
+                        >
+                            <span className="text-sm">🧪</span>
+                            <span>Acid Synth</span>
+                        </button>
+                    </div>
                 </div>
+            </aside>
 
-            </div>
-
-            <div
-                className="canvas-container"
-                onDrop={onDrop}
-                onDragOver={onDragOver}
-            >
-                <div className="graph-tabs">
-                    <div className="graph-tab-list">
+            <section className="flex h-full flex-col bg-[var(--canvas-bg)]">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--panel-border)] bg-[var(--panel-bg)] px-4 py-2">
+                    <div className="flex items-center gap-2 overflow-x-auto pr-2">
                         {graphs.map((graph) => (
                             <button
                                 key={graph.id}
-                                className={`graph-tab ${graph.id === activeGraphId ? 'active' : ''}`}
+                                className={`${tabBase} ${graph.id === activeGraphId
+                                    ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text)]'
+                                    : 'border-transparent bg-[var(--panel-muted)] text-[var(--text-muted)] hover:border-[var(--panel-border)] hover:text-[var(--text)]'
+                                }`}
                                 onClick={() => setActiveGraph(graph.id)}
                                 title={graph.name}
                             >
@@ -915,15 +508,17 @@ export const PlaygroundDemo: FC = () => {
                             </button>
                         ))}
                         <button
-                            className="graph-tab add"
+                            className={`${tabBase} border-dashed border-[var(--panel-border)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--text)]`}
                             onClick={() => createGraph()}
                             title="New graph"
                         >
                             +
                         </button>
                     </div>
-                    <div className="graph-name">
-                        <label>Graph</label>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                        <label className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-subtle)]">
+                            Graph
+                        </label>
                         <input
                             type="text"
                             value={nameDraft}
@@ -936,22 +531,45 @@ export const PlaygroundDemo: FC = () => {
                                 }
                             }}
                             placeholder="Graph name"
+                            className="h-8 w-40 rounded-md border border-[var(--panel-border)] bg-[var(--panel-muted)] px-2 text-[11px] text-[var(--text)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-soft)]"
                         />
-                        <span className="component-name">{componentName}</span>
+                        <span className="font-mono text-[10px] text-[var(--text-subtle)]">
+                            {componentName}
+                        </span>
                         <button
                             type="button"
-                            className="graph-delete"
+                            className="rounded-md border border-[var(--panel-border)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--danger)] transition hover:border-[var(--danger)] hover:bg-[var(--danger-soft)]"
                             onClick={() => handleDeleteGraph(activeGraphId)}
                             title="Delete graph"
                             disabled={!activeGraphId}
                         >
                             🗑 Delete
                         </button>
+                        <button
+                            type="button"
+                            onClick={() => setTheme(isDark ? 'light' : 'dark')}
+                            className="flex items-center gap-2 rounded-full border border-[var(--panel-border)] bg-[var(--panel-muted)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)] transition hover:border-[var(--accent)]"
+                            aria-pressed={isDark}
+                            title="Toggle theme"
+                        >
+                            <span className="text-xs">{isDark ? '🌙' : '☀️'}</span>
+                            <span className="relative inline-flex h-4 w-8 items-center rounded-full bg-[var(--panel-border)]">
+                                <span
+                                    className={`h-3 w-3 rounded-full bg-[var(--panel-bg)] shadow-sm transition-transform ${isDark ? 'translate-x-4' : 'translate-x-1'}`}
+                                />
+                            </span>
+                            <span className="hidden sm:inline">{isDark ? 'Dark' : 'Light'}</span>
+                        </button>
                     </div>
                 </div>
 
-                <div className="flow-wrapper">
+                <div
+                    className="relative flex-1"
+                    onDrop={onDrop}
+                    onDragOver={onDragOver}
+                >
                     <ReactFlow
+                        className="h-full"
                         nodes={nodes as unknown as Node[]}
                         edges={edges}
                         onNodesChange={onNodesChange as unknown as OnNodesChange}
@@ -968,7 +586,7 @@ export const PlaygroundDemo: FC = () => {
                             animated: true,
                         }}
                     >
-                        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#2a2a3a" />
+                        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--canvas-grid)" />
                         <Controls />
                         <MiniMap
                             nodeColor={(node) => {
@@ -985,15 +603,15 @@ export const PlaygroundDemo: FC = () => {
                                     default: return '#888';
                                 }
                             }}
-                            maskColor="rgba(0,0,0,0.8)"
+                            maskColor="var(--minimap-mask)"
                         />
                     </ReactFlow>
                 </div>
-            </div>
+            </section>
 
-            <div className="inspector-panel">
+            <aside className="flex h-full flex-col border-l border-[var(--panel-border)] bg-[var(--panel-bg)]">
                 <Inspector />
-            </div>
+            </aside>
         </div>
     );
 };

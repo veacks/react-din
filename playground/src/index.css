@@ -1,23 +1,86 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
-  color-scheme: dark;
-  color: #e6e6e6;
-  background-color: #0a0a12;
-  font-family: system-ui, -apple-system, sans-serif;
+  color-scheme: light;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  --app-bg: #f6f4ef;
+  --panel-bg: #ffffff;
+  --panel-border: #e2ded6;
+  --panel-muted: #f1eee8;
+  --text: #1b1b21;
+  --text-muted: #6b6a74;
+  --text-subtle: #8d8c96;
+  --accent: #2563eb;
+  --accent-soft: #dbeafe;
+  --danger: #dc2626;
+  --danger-soft: #fee2e2;
+  --success: #16a34a;
+  --canvas-bg: #f0eee7;
+  --canvas-grid: #d4d0c7;
+  --node-bg: #ffffff;
+  --node-border: #d6d2c8;
+  --node-header-bg: #f7f5f0;
+  --node-header-text: #1b1b21;
+  --node-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+  --node-shadow-focus: 0 0 0 2px rgba(37, 99, 235, 0.25);
+  --control-bg: #f5f2ec;
+  --control-border: #d7d2c7;
+  --edge-color: #2563eb;
+  --minimap-bg: #f3f1ec;
+  --controls-bg: #ffffff;
+  --minimap-mask: rgba(255, 255, 255, 0.55);
 }
 
-* {
-  box-sizing: border-box;
+html.dark {
+  color-scheme: dark;
+  --app-bg: #0a0a12;
+  --panel-bg: #13131b;
+  --panel-border: #2a2a3a;
+  --panel-muted: #1a1a24;
+  --text: #e6e6f0;
+  --text-muted: #8a8aa0;
+  --text-subtle: #66667a;
+  --accent: #60a5fa;
+  --accent-soft: #1e3a8a;
+  --danger: #f87171;
+  --danger-soft: #3a1f2a;
+  --success: #22c55e;
+  --canvas-bg: #0a0a12;
+  --canvas-grid: #2a2a3a;
+  --node-bg: #1a1a24;
+  --node-border: #2a2a3a;
+  --node-header-bg: #20202b;
+  --node-header-text: #ffffff;
+  --node-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+  --node-shadow-focus: 0 0 0 2px rgba(96, 165, 250, 0.35);
+  --control-bg: #1a1a24;
+  --control-border: #2a2a3a;
+  --edge-color: #60a5fa;
+  --minimap-bg: #1a1a24;
+  --controls-bg: #1a1a24;
+  --minimap-mask: rgba(0, 0, 0, 0.8);
 }
 
-html,
-body,
-#root {
-  margin: 0;
-  height: 100%;
-}
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
 
-body {
-  background: #0a0a12;
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    @apply bg-[var(--app-bg)] text-[var(--text)] font-sans antialiased;
+  }
 }
