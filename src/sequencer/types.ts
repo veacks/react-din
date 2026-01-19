@@ -189,6 +189,12 @@ export interface TrackProps {
     probability?: number;
 
     /**
+     * MIDI note number (0-127) to use for triggers from this track.
+     * @default 60
+     */
+    note?: number;
+
+    /**
      * Custom data to attach to all triggers from this track.
      */
     data?: Record<string, unknown>;

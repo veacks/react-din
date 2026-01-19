@@ -48,6 +48,7 @@ export const Track: FC<TrackProps> = ({
     mute = false,
     solo = false,
     probability = 1,
+    note = 60,
     data,
     onTrigger,
 }) => {
@@ -100,6 +101,7 @@ export const Track: FC<TrackProps> = ({
                 time,
                 duration: stepDuration,
                 trackId: id,
+                note,
                 data,
             };
 
@@ -115,7 +117,7 @@ export const Track: FC<TrackProps> = ({
         });
 
         return unsubscribe;
-    }, [context, subscribe, steps, normalizedPattern, mute, probability, stepDuration, id, data, onTrigger]);
+    }, [context, subscribe, steps, normalizedPattern, mute, probability, stepDuration, id, note, data, onTrigger]);
 
     // Subscribe function for children
     const subscribeToTrigger = (callback: (event: TriggerEvent) => void) => {
