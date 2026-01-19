@@ -64,7 +64,7 @@ const nodeCategories = [
     {
         name: 'Sources',
         nodes: [
-            { type: 'input', label: 'Input', icon: '⏱️', color: '#dddddd' },
+            { type: 'input', label: 'Params', icon: '⏱️', color: '#dddddd' },
             { type: 'transport', label: 'Transport', icon: '⏯️', color: '#dddddd' },
             { type: 'stepSequencer', label: 'Step Sequencer', icon: '🎹', color: '#dddddd' },
             { type: 'pianoRoll', label: 'Piano Roll', icon: '🎼', color: '#44ccff' },

@@ -92,8 +92,6 @@ export interface InputParam {
 
 export interface InputNodeData {
     type: 'input';
-    transportEnabled: boolean;
-    bpm: number;
     params: InputParam[];
     label: string;
 }
@@ -346,13 +344,43 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
 
     setGraphs: (graphs, activeGraphId) => {
         const now = Date.now();
-        const normalizedGraphs = (graphs.length ? graphs : get().graphs).map((graph, index) => ({
-            ...graph,
-            name: normalizeGraphName(graph.name),
-            createdAt: graph.createdAt ?? now,
-            updatedAt: graph.updatedAt ?? now,
-            order: graph.order ?? index,
-        }));
+        const normalizedGraphs = (graphs.length ? graphs : get().graphs).map((graph, index) => {
+            const nodes = graph.nodes.map((node) => {
+                if (node.data.type !== 'input') return node;
+
+                const inputData = node.data as InputNodeData & { transportEnabled?: boolean; bpm?: number };
+                const nextLabel = !inputData.label || inputData.label === 'Input'
+                    ? 'Params'
+                    : inputData.label;
+
+                const nextParams = Array.isArray(inputData.params) ? inputData.params : [];
+
+                return {
+                    ...node,
+                    data: {
+                        type: 'input',
+                        params: nextParams,
+                        label: nextLabel,
+                    },
+                };
+            });
+
+            const inputNodeIds = new Set(nodes.filter((node) => node.data.type === 'input').map((node) => node.id));
+            const edges = graph.edges.filter((edge) => {
+                if (!inputNodeIds.has(edge.source)) return true;
+                return edge.sourceHandle !== 'bpm' && edge.sourceHandle !== 'beat';
+            });
+
+            return {
+                ...graph,
+                nodes,
+                edges,
+                name: normalizeGraphName(graph.name),
+                createdAt: graph.createdAt ?? now,
+                updatedAt: graph.updatedAt ?? now,
+                order: graph.order ?? index,
+            };
+        });
 
         const orderedGraphs = [...normalizedGraphs].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
         const fallbackGraph = orderedGraphs[0];
@@ -709,10 +737,8 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     dragHandle: '.node-header',
                     data: {
                         type: 'input',
-                        transportEnabled: true,
-                        bpm: 120,
                         params: [],
-                        label: 'Input'
+                        label: 'Params'
                     } as AudioNodeData,
                 };
                 break;

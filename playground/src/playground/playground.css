@@ -326,15 +326,6 @@
     gap: 8px;
 }
 
-.input-transport-control {
-    min-height: 40px;
-}
-
-.input-control-stack {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
 
 .input-param-row {
     display: flex;
@@ -365,11 +356,6 @@
     right: -14px;
 }
 
-.socket-fix-bpm {
-    position: relative;
-    transform: none;
-    right: -14px;
-}
 
 
 /* Sequencer Node */

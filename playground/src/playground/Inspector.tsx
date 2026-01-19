@@ -13,16 +13,6 @@ const Inspector: React.FC = () => {
 
     const [newParamName, setNewParamName] = useState('');
 
-    const handleTransportToggle = (enabled: boolean) => {
-        if (!selectedNodeId) return;
-        updateNodeData(selectedNodeId, { transportEnabled: enabled });
-    };
-
-    const handleBpmChange = (bpm: number) => {
-        if (!selectedNodeId) return;
-        updateNodeData(selectedNodeId, { bpm });
-    };
-
     const handleAddParam = useCallback(() => {
         if (!selectedNodeId || !newParamName.trim()) return;
         const currentData = nodeData as InputNodeData;
@@ -79,29 +69,7 @@ const Inspector: React.FC = () => {
                 {nodeData.type === 'input' && (
                     <>
                         <div className="inspector-section">
-                            <h4>Transport</h4>
-                            <div className="control-row">
-                                <label>Enabled</label>
-                                <input
-                                    type="checkbox"
-                                    checked={(nodeData as InputNodeData).transportEnabled}
-                                    onChange={(e) => handleTransportToggle(e.target.checked)}
-                                />
-                            </div>
-                            <div className="control-row">
-                                <label>BPM</label>
-                                <input
-                                    type="number"
-                                    value={(nodeData as InputNodeData).bpm}
-                                    onChange={(e) => handleBpmChange(Number(e.target.value))}
-                                    min={40}
-                                    max={240}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="inspector-section">
-                            <h4>Group Sockets</h4>
+                            <h4>Params</h4>
                             <div className="param-list">
                                 {(nodeData as InputNodeData).params.map((param, index) => (
                                     <div key={param.id} className="param-item">

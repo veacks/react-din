@@ -854,11 +854,6 @@ export class AudioEngine {
 
                 const outputs = new Map<string, AudioNode>();
 
-                // Create BPM constant source (could be LFO or clock in future)
-                const bpmSource = ctx.createConstantSource();
-                bpmSource.offset.value = inputData.bpm;
-                outputs.set('bpm', bpmSource);
-
                 // Create custom params as ConstantSourceNodes
                 if (inputData.params) {
                     inputData.params.forEach((param, index) => {
@@ -1098,11 +1093,6 @@ export class AudioEngine {
             }
         } else if (instance.type === 'input') {
             const inputData = data as InputNodeData;
-            // Update BPM if changed
-            if ('bpm' in inputData && instance.outputs?.has('bpm')) {
-                const bpmNode = instance.outputs.get('bpm') as ConstantSourceNode;
-                bpmNode.offset.setTargetAtTime(inputData.bpm, currentTime, 0.01);
-            }
             // Update params
             if ('params' in inputData && instance.outputs) {
                 inputData.params.forEach((param, index) => {
