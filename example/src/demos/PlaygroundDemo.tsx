@@ -28,6 +28,7 @@ import {
     NoteNode,
     TransportNode,
     SequencerNode,
+    ADSRNode,
 } from './playground/nodes';
 import { generateCode } from './playground/CodeGenerator';
 
@@ -46,6 +47,7 @@ const nodeTypes: NodeTypes = {
     noteNode: NoteNode as NodeTypes[string],
     transportNode: TransportNode as NodeTypes[string],
     sequencerNode: SequencerNode as NodeTypes[string],
+    adsrNode: ADSRNode as NodeTypes[string],
 };
 
 // Node palette categories
@@ -56,6 +58,7 @@ const nodeCategories = [
             { type: 'input', label: 'Input', icon: '⏱️', color: '#dddddd' },
             { type: 'transport', label: 'Transport', icon: '⏯️', color: '#dddddd' },
             { type: 'sequencer', label: 'Sequencer', icon: '🎹', color: '#dddddd' },
+            { type: 'adsr', label: 'ADSR', icon: '📈', color: '#dddddd' },
             { type: 'note', label: 'Note', icon: '🎵', color: '#ffcc00' },
             { type: 'osc', label: 'Oscillator', icon: '◐', color: '#ff8844' },
             { type: 'noise', label: 'Noise', icon: '〰️', color: '#888888' },

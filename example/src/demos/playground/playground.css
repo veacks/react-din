@@ -413,10 +413,75 @@
     box-shadow: 0 0 4px #ffcc00;
 }
 
-.sequencer-pad.current-step {
-    border: 2px solid #fff;
-    box-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
-    z-index: 10;
+/* ADSR Node Styles */
+.adsr-viz {
+    margin-bottom: 10px;
+    background: #222;
+    border-radius: 4px;
+    padding: 5px;
+    overflow: hidden;
+}
+
+.adsr-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.control-group label {
+    font-size: 10px;
+    color: #aaa;
+}
+
+.audio-node.adsr-node .node-content {
+    padding: 8px;
+}
+
+.adsr-viz svg {
+    display: block;
+}
+
+.handle-label {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 10px;
+    color: #aaa;
+    pointer-events: none;
+}
+
+.handle-label-in {
+    left: 10px;
+}
+
+.adsr-handle {
+    fill: #fff;
+    stroke: #0088ff;
+    stroke-width: 2px;
+    pointer-events: all;
+    transition: r 0.1s ease;
+}
+
+.adsr-handle:hover {
+    r: 6px;
+}
+
+.adsr-handle.attack {
+    cursor: ew-resize;
+}
+
+.adsr-handle.decay {
+    cursor: move;
+}
+
+.adsr-handle.release {
+    cursor: ew-resize;
 }
 
 .velocity-bar-container {

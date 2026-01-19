@@ -22,6 +22,9 @@ interface AudioNodeInstance {
     params?: Map<string, AudioParam>;
     // Map output handle ID to AudioNode (for InputNode multiple outputs)
     outputs?: Map<string, AudioNode>;
+    // Custom data
+    sequencerData?: any;
+    adsrData?: any;
 }
 
 /**
@@ -88,6 +91,7 @@ export class AudioEngine {
     private audioContext: AudioContext | null = null;
     private audioNodes: Map<string, AudioNodeInstance> = new Map();
     private isPlaying = false;
+    private edges: Edge[] = [];
 
     constructor() {
         this.audioContext = null;
@@ -123,8 +127,6 @@ export class AudioEngine {
     private timerID: number | undefined = undefined;
     private bpm: number = 120;
 
-    // ... (existing constructor)
-
     /**
      * Start the scheduler loop
      */
@@ -155,17 +157,7 @@ export class AudioEngine {
             // Find all sequencer nodes
             this.audioNodes.forEach((instance, id) => {
                 if (instance.type === 'sequencer') {
-                    // We need access to the data to know pattern
-                    // But instance only has the AudioNode.
-                    // We need to look up the Node data from somewhere? 
-                    // The AudioEngine doesn't explicitly store the latest 'data' object in instance, 
-                    // but we can try to attach it or look it up if we passed 'nodes' to start().
-                    // Current architecture: AudioEngine stores instances. 
-                    // We need to update instance to store the active pattern/steps data 
-                    // or access the Store... accessing Store from here is circular/bad for decoupling.
-                    // BEST APPROACH: When createAudioNode or updateNode is called, store the relevant seq data on the instance.
-
-                    const seqInstance = instance as any; // Cast to access custom data
+                    const seqInstance = instance as any;
                     if (seqInstance.sequencerData) {
                         const { steps, pattern, activeSteps } = seqInstance.sequencerData;
 
@@ -176,13 +168,22 @@ export class AudioEngine {
                             const velocity = pattern[stepIndex] || 0.8;
                             const node = instance.node as ConstantSourceNode;
 
-                            // Trigger: High
-                            node.offset.setValueAtTime(velocity, time);
-                            // Trigger: Low (Gate length 0.1s or 50% of step)
-                            // A 16th note at 120bpm is 125ms. Let's do 80% gate.
                             const secondsPerBeat = 60.0 / this.bpm;
                             const stepDuration = 0.25 * secondsPerBeat;
-                            node.offset.setValueAtTime(0, time + (stepDuration * 0.8)); // Release
+
+                            // 1. Direct Gate Output
+                            node.offset.setValueAtTime(velocity, time);
+                            node.offset.setValueAtTime(0, time + (stepDuration * 0.8)); // Release at 80%
+
+                            // 2. Trigger connected ADSRs
+                            // Find edges from this sequencer
+                            const connectedEdges = this.edges.filter(e => e.source === id);
+                            connectedEdges.forEach(edge => {
+                                const targetInstance = this.audioNodes.get(edge.target);
+                                if (targetInstance && targetInstance.type === 'adsr') {
+                                    this.triggerAdsr(edge.target, time, velocity, stepDuration * 0.8);
+                                }
+                            });
                         }
                     }
                 }
@@ -206,6 +207,34 @@ export class AudioEngine {
         scheduler();
     }
 
+    private triggerAdsr(adsrId: string, time: number, velocity: number, duration: number) {
+        const instance = this.audioNodes.get(adsrId);
+        if (!instance || !instance.adsrData) return;
+
+        const { attack, decay, sustain, release } = instance.adsrData;
+        const node = instance.node as ConstantSourceNode;
+        const param = node.offset;
+
+        // Cancel scheduled values
+        param.cancelScheduledValues(time);
+
+        // Attack
+        param.setValueAtTime(0, time);
+        param.linearRampToValueAtTime(velocity, time + attack);
+
+        // Decay -> Sustain
+        param.linearRampToValueAtTime(velocity * sustain, time + attack + decay);
+
+        // Release (at end of step/gate)
+        // Wait until gate is done (time + duration) to release?
+        // ADSR typically: A->D->S (hold while gate high) -> R (when gate low)
+        // Here we schedule the Release phase to start at `time + duration`
+        // Note: If gate matches step duration, it's roughly rhythmic.
+
+        param.setValueAtTime(velocity * sustain, time + duration); // Anchor for release
+        param.linearRampToValueAtTime(0, time + duration + release);
+    }
+
     private stopScheduler() {
         if (this.timerID) {
             window.clearTimeout(this.timerID);
@@ -218,6 +247,8 @@ export class AudioEngine {
      */
     start(nodes: Node<AudioNodeData>[], edges: Edge[]): void {
         if (this.isPlaying) return;
+
+        this.edges = edges;
 
         const ctx = this.init();
         this.cleanup();
@@ -235,20 +266,6 @@ export class AudioEngine {
                 this.audioNodes.set(node.id, audioNode);
             }
         });
-
-        // ... (existing connection logic) ...
-        edges.forEach((edge) => {
-            // ... existing connection loop ...
-            // (Copying strictly from original file content to ensure context match if replacing block, 
-            // but since I am using replace_file_content on the class, I must be careful not to delete logic. 
-            // Ideally I should inject the scheduler methods and modify start/stop only.
-            // But existing start() is huge. 
-            // I will use REPLACE on specific blocks or the whole class if easier. 
-            // The file is 600 lines. I should probably use multi_replace or carefully targeted replace.
-            // I'll try to target `start` method and `createAudioNode` and insert scheduler methods.
-        });
-
-        // ...
 
         // Connect nodes based on edges
         edges.forEach((edge) => {
@@ -277,10 +294,6 @@ export class AudioEngine {
                             if (sourceInstance.type === 'note' && edge.targetHandle === 'frequency') {
                                 param.value = 0;
                             }
-                            // NEW: If connecting Sequencer to Gain, usually we want GAIN to be 0 base?
-                            // But GainNode base value is the knob. 
-                            // If we want Envelope/Gate behavior, user might need to set knob to 0 manually or we force it?
-                            // let's leave it to user to set gain to 0 if modulation is full range.
                         }
                     } else {
                         // Standard Audio to Audio connection
@@ -322,19 +335,17 @@ export class AudioEngine {
         });
 
         this.isPlaying = true;
-        this.startScheduler(); // START SCHEDULER
+        this.startScheduler();
     }
 
     /**
      * Stop all audio and cleanup
      */
     stop(): void {
-        this.stopScheduler(); // STOP SCHEDULER
+        this.stopScheduler();
         this.cleanup();
         this.isPlaying = false;
     }
-
-
 
     /**
      * Cleanup all audio nodes
@@ -345,7 +356,7 @@ export class AudioEngine {
                 if (instance.node instanceof OscillatorNode ||
                     instance.node instanceof AudioBufferSourceNode ||
                     instance.node instanceof ConstantSourceNode) {
-                    instance.node.stop();
+                    try { instance.node.stop(); } catch (e) { }
                 }
 
                 // Stop params
@@ -372,6 +383,21 @@ export class AudioEngine {
         const data = node.data;
 
         switch (data.type) {
+            case 'adsr': {
+                const adsrData = data as any;
+                const source = ctx.createConstantSource();
+                source.offset.value = 0;
+                return {
+                    node: source,
+                    type: 'adsr',
+                    adsrData: {
+                        attack: adsrData.attack,
+                        decay: adsrData.decay,
+                        sustain: adsrData.sustain,
+                        release: adsrData.release
+                    }
+                };
+            }
             case 'sequencer': {
                 const seqData = data as any; // SequencerNodeData
                 // Output is a ConstantSourceNode acting as a Control Signal (Trigger/Gate)
@@ -382,7 +408,6 @@ export class AudioEngine {
                 return {
                     node: source,
                     type: 'sequencer',
-                    // @ts-ignore
                     sequencerData: {
                         steps: seqData.steps,
                         pattern: seqData.pattern,
@@ -518,6 +543,8 @@ export class AudioEngine {
      */
     refreshConnections(nodes: Node<AudioNodeData>[], edges: Edge[]): void {
         if (!this.isPlaying || !this.audioContext) return;
+
+        this.edges = edges;
         const ctx = this.audioContext;
 
         // 0. Sync Nodes: Create new ones, Remove deleted ones
@@ -586,8 +613,6 @@ export class AudioEngine {
                 if (instance.type === 'delay' && instance.feedbackGain) {
                     instance.feedbackGain.disconnect();
                 }
-                // Reverb/others usually don't need distinct internal disconnect if they are single nodes or encapsulated
-                // But Delay loop is external to the main "node" (variable feedbackGain)
             } catch (e) { }
         });
 
@@ -603,7 +628,6 @@ export class AudioEngine {
         edges.forEach((edge) => {
             const sourceInstance = this.audioNodes.get(edge.source);
             const targetInstance = this.audioNodes.get(edge.target);
-
 
             if (sourceInstance && targetInstance) {
                 try {
@@ -732,8 +756,6 @@ export class AudioEngine {
             if ('mix' in data && typeof data.mix === 'number') {
                 node.gain.setTargetAtTime(data.mix, currentTime, 0.01);
             }
-            // NOTE: 'decay' cannot be updated in real-time easily as it requires re-generating the impulse buffer.
-            // We can accept this limitation or try to swap buffer (complex).
         } else if (instance.type === 'panner') {
             const node = instance.node as StereoPannerNode;
             if ('pan' in data && typeof data.pan === 'number') {
@@ -746,10 +768,17 @@ export class AudioEngine {
             }
         } else if (instance.type === 'sequencer') {
             const seqInstance = instance as any;
-            // Update internal data
             if (seqInstance.sequencerData) {
                 if ('pattern' in data) seqInstance.sequencerData.pattern = data.pattern;
                 if ('activeSteps' in data) seqInstance.sequencerData.activeSteps = data.activeSteps;
+            }
+        } else if (instance.type === 'adsr') {
+            const adsrInstance = instance as any;
+            if (adsrInstance.adsrData) {
+                if ('attack' in data) adsrInstance.adsrData.attack = data.attack;
+                if ('decay' in data) adsrInstance.adsrData.decay = data.decay;
+                if ('sustain' in data) adsrInstance.adsrData.sustain = data.sustain;
+                if ('release' in data) adsrInstance.adsrData.release = data.release;
             }
         }
     }

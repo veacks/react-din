@@ -106,6 +106,16 @@ export interface NoteNodeData {
     label: string;
 }
 
+export interface ADSRNodeData {
+    type: 'adsr';
+    attack: number;
+    decay: number;
+    sustain: number;
+    release: number;
+    label: string;
+    [key: string]: unknown;
+}
+
 export interface SequencerNodeData {
     type: 'sequencer';
     steps: number;
@@ -135,6 +145,7 @@ export type AudioNodeData = (
     | NoteNodeData
     | TransportNodeData
     | SequencerNodeData
+    | ADSRNodeData
 ) & Record<string, unknown>;
 
 
@@ -386,6 +397,22 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                         pattern: Array(16).fill(0.8), // Default velocity 0.8
                         activeSteps: Array(16).fill(false), // Default all off
                         label: 'Sequencer'
+                    } as AudioNodeData,
+                };
+                break;
+
+            case 'adsr':
+                newNode = {
+                    id,
+                    type: 'adsrNode',
+                    position,
+                    data: {
+                        type: 'adsr',
+                        attack: 0.1,
+                        decay: 0.2,
+                        sustain: 0.5,
+                        release: 0.5,
+                        label: 'ADSR'
                     } as AudioNodeData,
                 };
                 break;

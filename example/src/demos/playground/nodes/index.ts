@@ -11,3 +11,4 @@ export { default as InputNode } from './InputNode';
 export { default as NoteNode } from './NoteNode';
 export { TransportNode } from './TransportNode';
 export { SequencerNode } from './SequencerNode';
+export { ADSRNode } from './ADSRNode';
