@@ -1,4 +1,5 @@
 import type { ReactNode, RefObject } from 'react';
+import type { ModulatableValue } from '../core/ModulatableValue';
 
 // =============================================================================
 // Base Node Props
@@ -41,9 +42,17 @@ export interface GainProps extends AudioNodeProps {
      * - 0 = silence
      * - 1 = unity (no change)
      * - >1 = amplification
+     * Can be a fixed number or an LFO for modulation.
      * @default 1
      */
-    gain?: number;
+    gain?: ModulatableValue;
+
+    /**
+     * Base value when using LFO modulation.
+     * The LFO will modulate around this value.
+     * @default 1
+     */
+    gainBase?: number;
 
     /**
      * Target time for parameter automation (seconds from now).
@@ -87,16 +96,29 @@ export interface FilterProps extends AudioNodeProps {
 
     /**
      * Cutoff/center frequency in Hz.
+     * Can be a fixed number or an LFO for modulation.
      * @default 350
      */
-    frequency?: number;
+    frequency?: ModulatableValue;
+
+    /**
+     * Base frequency when using LFO modulation.
+     * The LFO will modulate around this value.
+     */
+    frequencyBase?: number;
 
     /**
      * Q (quality) factor.
      * Higher values create a narrower resonance.
+     * Can be a fixed number or an LFO for modulation.
      * @default 1
      */
-    Q?: number;
+    Q?: ModulatableValue;
+
+    /**
+     * Base Q when using LFO modulation.
+     */
+    QBase?: number;
 
     /**
      * Gain in dB (for peaking and shelf filters).
@@ -132,15 +154,30 @@ export interface OscProps extends AudioNodeProps {
 
     /**
      * Frequency in Hz.
+     * Can be a fixed number or an LFO for modulation.
      * @default 440
      */
-    frequency?: number;
+    frequency?: ModulatableValue;
+
+    /**
+     * Base frequency when using LFO modulation.
+     * The LFO will modulate around this value.
+     * @default 440
+     */
+    frequencyBase?: number;
 
     /**
      * Detune in cents.
+     * Can be a fixed number or an LFO for modulation.
      * @default 0
      */
-    detune?: number;
+    detune?: ModulatableValue;
+
+    /**
+     * Base detune when using LFO modulation.
+     * @default 0
+     */
+    detuneBase?: number;
 
     /**
      * Start the oscillator immediately on mount.

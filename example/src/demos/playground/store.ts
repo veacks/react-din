@@ -166,6 +166,17 @@ export interface VoiceNodeData {
     [key: string]: unknown;
 }
 
+export interface SamplerNodeData {
+    type: 'sampler';
+    src: string;           // URL of the sample
+    loop: boolean;         // Whether to loop
+    playbackRate: number;  // Playback speed (1 = normal)
+    detune: number;        // Detune in cents
+    loaded: boolean;       // Whether the sample is loaded
+    label: string;
+    [key: string]: unknown;
+}
+
 export type AudioNodeData = (
     | OscNodeData
     | GainNodeData
@@ -184,6 +195,7 @@ export type AudioNodeData = (
     | PianoRollNodeData
     | ADSRNodeData
     | VoiceNodeData
+    | SamplerNodeData
 ) & Record<string, unknown>;
 
 
@@ -535,6 +547,24 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                         type: 'voice',
                         portamento: 0,
                         label: 'Voice'
+                    } as AudioNodeData,
+                };
+                break;
+
+            case 'sampler':
+                newNode = {
+                    id,
+                    type: 'samplerNode',
+                    position,
+                    dragHandle: '.node-header',
+                    data: {
+                        type: 'sampler',
+                        src: '',
+                        loop: false,
+                        playbackRate: 1,
+                        detune: 0,
+                        loaded: false,
+                        label: 'Sampler'
                     } as AudioNodeData,
                 };
                 break;

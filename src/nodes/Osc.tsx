@@ -14,8 +14,9 @@ import { AudioOutProvider } from '../core/AudioOutContext';
  * // Simple sine wave
  * <Osc type="sine" frequency={440} autoStart />
  *
- * // Detuned sawtooth
- * <Osc type="sawtooth" frequency={220} detune={-5} autoStart />
+ * // With LFO modulation (vibrato effect)
+ * const lfo = useLFO({ rate: 6, depth: 20 });
+ * <Osc type="sine" frequency={lfo} frequencyBase={440} autoStart />
  * ```
  */
 export const Osc: FC<OscProps> = ({
@@ -24,7 +25,9 @@ export const Osc: FC<OscProps> = ({
     bypass = false,
     type = 'sine',
     frequency = 440,
+    frequencyBase,
     detune = 0,
+    detuneBase,
     autoStart = false,
     periodicWave,
     id,
@@ -59,9 +62,9 @@ export const Osc: FC<OscProps> = ({
         }
     }, [periodicWave]);
 
-    // Apply parameters
-    useAudioParam(nodeRef.current?.frequency, frequency);
-    useAudioParam(nodeRef.current?.detune, detune);
+    // Apply parameters (with LFO support)
+    useAudioParam(nodeRef.current?.frequency, frequency, frequencyBase ?? 440);
+    useAudioParam(nodeRef.current?.detune, detune, detuneBase ?? 0);
 
     // Auto-start
     useEffect(() => {
@@ -83,3 +86,4 @@ export const Osc: FC<OscProps> = ({
         </AudioOutProvider>
     );
 };
+

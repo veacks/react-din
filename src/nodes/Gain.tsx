@@ -16,9 +16,10 @@ import { AudioOutProvider } from '../core/AudioOutContext';
  *   <Osc frequency={440} />
  * </Gain>
  *
- * // With automation
- * <Gain gain={0.8} rampTo={0.5} rampType="exponential">
- *   <Sampler src="/drum.wav" />
+ * // With LFO modulation (tremolo effect)
+ * const lfo = useLFO({ rate: 5, depth: 0.3, waveform: 'sine' });
+ * <Gain gain={lfo} gainBase={0.7}>
+ *   <Osc frequency={440} />
  * </Gain>
  * ```
  */
@@ -27,6 +28,7 @@ export const Gain: FC<GainProps> = ({
     nodeRef: externalRef,
     bypass = false,
     gain = 1,
+    gainBase,
     rampTo,
     rampType = 'exponential',
     id,
@@ -43,8 +45,8 @@ export const Gain: FC<GainProps> = ({
         }
     }, [externalRef, nodeRef.current]);
 
-    // Apply gain parameter
-    useAudioParam(nodeRef.current?.gain, gain, rampTo, rampType);
+    // Apply gain parameter (with LFO support)
+    useAudioParam(nodeRef.current?.gain, gain, gainBase ?? 1, rampTo, rampType);
 
     return (
         <AudioOutProvider node={bypass ? null : nodeRef.current}>
@@ -52,3 +54,4 @@ export const Gain: FC<GainProps> = ({
         </AudioOutProvider>
     );
 };
+

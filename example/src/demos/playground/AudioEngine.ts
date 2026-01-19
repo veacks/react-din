@@ -13,6 +13,7 @@ import type {
     InputNodeData,
     NoteNodeData,
     VoiceNodeData,
+    SamplerNodeData,
 } from './store';
 
 import type { TriggerEvent } from '../../../../src/sequencer/types';
@@ -98,9 +99,155 @@ export class AudioEngine {
     private audioNodes: Map<string, AudioNodeInstance> = new Map();
     private isPlaying = false;
     private edges: Edge[] = [];
+    private sampleBufferCache: Map<string, AudioBuffer> = new Map();
 
     constructor() {
         this.audioContext = null;
+    }
+
+    /**
+     * Load a sample buffer from URL, with caching
+     */
+    async loadSamplerBuffer(_nodeId: string, url: string): Promise<AudioBuffer | null> {
+        if (!this.audioContext) return null;
+
+        // Check cache first
+        if (this.sampleBufferCache.has(url)) {
+            return this.sampleBufferCache.get(url)!;
+        }
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                console.warn(`[AudioEngine] Failed to load sample: ${url}`);
+                return null;
+            }
+            const arrayBuffer = await response.arrayBuffer();
+            const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+            this.sampleBufferCache.set(url, audioBuffer);
+            return audioBuffer;
+        } catch (error) {
+            console.warn(`[AudioEngine] Error loading sample ${url}:`, error);
+            return null;
+        }
+    }
+
+    // Track active sampler sources
+    private activeSamplerSources: Map<string, AudioBufferSourceNode> = new Map();
+
+    /**
+     * Play a sampler (one-shot or looped)
+     */
+    playSampler(nodeId: string, data: { src: string; loop: boolean; playbackRate: number; detune: number }): void {
+        if (!this.audioContext) {
+            this.init();
+        }
+        const ctx = this.audioContext!;
+
+        // Stop any existing playback first
+        this.stopSampler(nodeId);
+
+        // Get buffer from cache
+        const buffer = this.sampleBufferCache.get(data.src);
+        if (!buffer) {
+            console.warn(`[AudioEngine] Buffer not loaded for ${data.src}`);
+            // Try to load it
+            this.loadSamplerBuffer(nodeId, data.src).then(loadedBuffer => {
+                if (loadedBuffer) {
+                    this.playSampler(nodeId, data);
+                }
+            });
+            return;
+        }
+
+        // Create buffer source
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.loop = data.loop;
+        source.playbackRate.value = data.playbackRate;
+        source.detune.value = data.detune;
+
+        // Connect to destination (or to the sampler's output node if it exists)
+        const instance = this.audioNodes.get(nodeId);
+        if (instance && instance.node) {
+            source.connect(instance.node);
+        } else {
+            // Fallback: connect to destination directly
+            source.connect(ctx.destination);
+        }
+
+        // Track the source
+        this.activeSamplerSources.set(nodeId, source);
+
+        // Clean up when finished (for non-looping samples)
+        const samplerNodeId = nodeId; // Capture for closure
+        source.onended = () => {
+            this.activeSamplerSources.delete(samplerNodeId);
+            this.notifySamplerEnd(samplerNodeId);
+        };
+
+        // Start playback
+        source.start(0);
+    }
+
+    /**
+     * Stop a sampler playback
+     */
+    stopSampler(nodeId: string): void {
+        const source = this.activeSamplerSources.get(nodeId);
+        if (source) {
+            try {
+                source.stop();
+            } catch {
+                // Already stopped
+            }
+            this.activeSamplerSources.delete(nodeId);
+        }
+    }
+
+    /**
+     * Update sampler parameter in real-time
+     */
+    updateSamplerParam(nodeId: string, param: 'playbackRate' | 'detune', value: number): void {
+        const source = this.activeSamplerSources.get(nodeId);
+        if (source) {
+            if (param === 'playbackRate') {
+                source.playbackRate.value = value;
+            } else if (param === 'detune') {
+                source.detune.value = value;
+            }
+        }
+    }
+
+    // Callbacks for sampler end events
+    private samplerEndCallbacks: Map<string, Set<() => void>> = new Map();
+
+    /**
+     * Subscribe to end-of-playback events for a sampler
+     */
+    onSamplerEnd(nodeId: string, callback: () => void): () => void {
+        if (!this.samplerEndCallbacks.has(nodeId)) {
+            this.samplerEndCallbacks.set(nodeId, new Set());
+        }
+        this.samplerEndCallbacks.get(nodeId)!.add(callback);
+
+        // Return unsubscribe function
+        return () => {
+            const callbacks = this.samplerEndCallbacks.get(nodeId);
+            if (callbacks) {
+                callbacks.delete(callback);
+            }
+        };
+    }
+
+    /**
+     * Notify subscribers that a sampler has ended
+     */
+    private notifySamplerEnd(nodeId: string): void {
+        const callbacks = this.samplerEndCallbacks.get(nodeId);
+        if (callbacks) {
+            callbacks.forEach(cb => cb());
+        }
     }
 
     /**
@@ -730,6 +877,37 @@ export class AudioEngine {
                 freqSource.offset.value = noteData.frequency;
 
                 return { node: freqSource, type: 'note' };
+            }
+            case 'sampler': {
+                const samplerData = data as SamplerNodeData;
+                // Create a gain node as the main output
+                // The actual sample playback will be handled via triggers
+                const samplerOutput = ctx.createGain();
+                samplerOutput.gain.value = 1;
+
+                // Store sampler configuration for triggering
+                const samplerInstance = {
+                    node: samplerOutput,
+                    type: 'sampler',
+                    samplerData: {
+                        src: samplerData.src,
+                        loop: samplerData.loop,
+                        playbackRate: samplerData.playbackRate,
+                        detune: samplerData.detune,
+                        buffer: null as AudioBuffer | null,
+                    }
+                };
+
+                // Load the sample if src is provided
+                if (samplerData.src) {
+                    this.loadSamplerBuffer(samplerData.src, samplerData.src).then(buffer => {
+                        if (buffer && samplerInstance.samplerData) {
+                            samplerInstance.samplerData.buffer = buffer;
+                        }
+                    });
+                }
+
+                return samplerInstance;
             }
             default:
                 return null;

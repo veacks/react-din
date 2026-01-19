@@ -16,8 +16,9 @@ import { AudioOutProvider } from '../core/AudioOutContext';
  *   <Noise type="white" />
  * </Filter>
  *
- * // Resonant high-pass
- * <Filter type="highpass" frequency={200} Q={10}>
+ * // With LFO modulation
+ * const lfo = useLFO({ rate: 2, depth: 500 });
+ * <Filter type="lowpass" frequency={lfo} frequencyBase={1000}>
  *   <Osc type="sawtooth" frequency={110} />
  * </Filter>
  * ```
@@ -28,7 +29,9 @@ export const Filter: FC<FilterProps> = ({
     bypass = false,
     type = 'lowpass',
     frequency = 350,
+    frequencyBase,
     Q = 1,
+    QBase,
     gain = 0,
     detune = 0,
     id,
@@ -52,9 +55,9 @@ export const Filter: FC<FilterProps> = ({
         }
     }, [type]);
 
-    // Apply parameters
-    useAudioParam(nodeRef.current?.frequency, frequency);
-    useAudioParam(nodeRef.current?.Q, Q);
+    // Apply parameters (with LFO support)
+    useAudioParam(nodeRef.current?.frequency, frequency, frequencyBase ?? 350);
+    useAudioParam(nodeRef.current?.Q, Q, QBase ?? 1);
     useAudioParam(nodeRef.current?.gain, gain);
     useAudioParam(nodeRef.current?.detune, detune);
 
@@ -64,3 +67,4 @@ export const Filter: FC<FilterProps> = ({
         </AudioOutProvider>
     );
 };
+

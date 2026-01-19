@@ -32,6 +32,7 @@ import {
     LFONode,
     ADSRNode,
     VoiceNode,
+    SamplerNode,
 } from './playground/nodes';
 import { generateCode } from './playground/CodeGenerator';
 
@@ -54,6 +55,7 @@ const nodeTypes: NodeTypes = {
     lfoNode: LFONode as NodeTypes[string],
     adsrNode: ADSRNode as NodeTypes[string],
     voiceNode: VoiceNode as NodeTypes[string],
+    samplerNode: SamplerNode as NodeTypes[string],
 };
 
 // Node palette categories
@@ -71,6 +73,7 @@ const nodeCategories = [
             { type: 'note', label: 'Note', icon: '🎵', color: '#ffcc00' },
             { type: 'osc', label: 'Oscillator', icon: '◐', color: '#ff8844' },
             { type: 'noise', label: 'Noise', icon: '〰️', color: '#888888' },
+            { type: 'sampler', label: 'Sampler', icon: '🎹', color: '#44ccff' },
         ],
     },
     {

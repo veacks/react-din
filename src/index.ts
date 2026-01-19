@@ -15,6 +15,9 @@ export {
     // Internal (advanced use)
     AudioOutProvider,
     useAudioOut,
+    // Modulatable utilities
+    isLFOOutput,
+    getNumericValue,
 } from './core';
 
 export type {
@@ -23,6 +26,10 @@ export type {
     AudioProviderProps,
     AudioContextState,
     AudioOutContextValue,
+    // Modulatable types
+    ModulatableValue,
+    LFOOutput,
+    LFOWaveform,
 } from './core';
 
 // -----------------------------------------------------------------------------
@@ -142,6 +149,9 @@ export {
     NoiseBurst,
     MediaStream,
     ConstantSource,
+    // LFO
+    LFO,
+    useLFO,
 } from './sources';
 
 export type {
@@ -152,6 +162,9 @@ export type {
     NoiseBurstProps,
     MediaStreamProps,
     ConstantSourceProps,
+    // LFO types
+    LFOProps,
+    UseLFOOptions,
 } from './sources';
 
 

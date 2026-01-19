@@ -151,35 +151,73 @@ export function useAudioNode<T extends AudioNode>({
 
 /**
  * Hook to set an AudioParam value with optional automation.
+ * Supports both fixed values and LFO modulation.
  *
  * @param param - The AudioParam to control
- * @param value - The target value
+ * @param value - The target value (number) or LFO output for modulation
+ * @param baseValue - Base value to use when LFO is connected (LFO adds to this)
  * @param rampTime - Time to ramp to the value (0 = immediate)
  * @param rampType - Type of ramp ('linear' or 'exponential')
  */
 export function useAudioParam(
     param: AudioParam | null | undefined,
-    value: number,
+    value: number | import('../core/ModulatableValue').ModulatableValue,
+    baseValue?: number,
     rampTime = 0,
     rampType: 'linear' | 'exponential' = 'exponential'
 ): void {
     useEffect(() => {
         if (!param) return;
 
+        // Check if value is an LFO output
+        const isLFO = (
+            value !== null &&
+            value !== undefined &&
+            typeof value === 'object' &&
+            '__lfoOutput' in value &&
+            (value as any).__lfoOutput === true
+        );
+
+        if (isLFO) {
+            const lfoOutput = value as import('../core/ModulatableValue').LFOOutput;
+
+            // Set base value (LFO will modulate around this)
+            const base = baseValue ?? 0;
+            param.value = base;
+
+            // Connect LFO node to the AudioParam
+            try {
+                lfoOutput.node.connect(param);
+            } catch (e) {
+                console.warn('[react-din] Failed to connect LFO to AudioParam:', e);
+            }
+
+            return () => {
+                try {
+                    lfoOutput.node.disconnect(param);
+                } catch {
+                    // May already be disconnected
+                }
+            };
+        }
+
+        // Fixed value handling (original behavior)
+        const numericValue = value as number;
+
         if (rampTime <= 0) {
-            param.value = value;
+            param.value = numericValue;
         } else {
             // Note: For proper automation, we use setValueAtTime and ramps
             // The ramp times are relative to current time
             param.setValueAtTime(param.value, 0);
 
             if (rampType === 'linear') {
-                param.linearRampToValueAtTime(value, rampTime);
+                param.linearRampToValueAtTime(numericValue, rampTime);
             } else {
                 // Exponential ramp can't go to 0, use a very small value
-                const safeValue = Math.max(0.0001, value);
+                const safeValue = Math.max(0.0001, numericValue);
                 param.exponentialRampToValueAtTime(safeValue, rampTime);
             }
         }
-    }, [param, value, rampTime, rampType]);
+    }, [param, value, baseValue, rampTime, rampType]);
 }

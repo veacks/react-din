@@ -15,3 +15,5 @@ export { PianoRollNode } from './PianoRollNode';
 export { LFONode } from './LFONode';
 export { ADSRNode } from './ADSRNode';
 export { VoiceNode } from './VoiceNode';
+export { SamplerNode } from './SamplerNode';
+
