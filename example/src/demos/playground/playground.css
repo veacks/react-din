@@ -620,3 +620,18 @@
 .piano-cell.beat.active {
     background: #44ccff;
 }
+
+/* Piano Roll extended note styles */
+.piano-cell.note-cont {
+    background: #2299cc;
+    border-left: none;
+    border-radius: 0;
+}
+
+.piano-cell.note-start {
+    border-radius: 3px 0 0 3px;
+}
+
+.piano-cell.selecting {
+    background: rgba(68, 204, 255, 0.5);
+}

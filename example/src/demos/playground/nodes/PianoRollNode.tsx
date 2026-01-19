@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useState, useCallback } from 'react';
+import React, { memo, useEffect, useState, useCallback, useRef } from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { useAudioGraphStore, type PianoRollNodeData, type NoteEvent } from '../store';
 import { audioEngine } from '../AudioEngine';
@@ -12,13 +12,29 @@ const midiToNoteName = (midi: number): string => {
     return `${note}${octave}`;
 };
 
+interface DragState {
+    isDrawing: boolean;
+    startPitch: number;
+    startStep: number;
+    currentStep: number;
+    isDeleting: boolean;
+}
+
 export const PianoRollNode: React.FC<NodeProps<Node<PianoRollNodeData>>> = memo(({ id, data, selected }) => {
     const updateNodeData = useAudioGraphStore((s) => s.updateNodeData);
-    const [currentStep, setCurrentStep] = useState<number>(-1);
+    const [currentPlayStep, setCurrentPlayStep] = useState<number>(-1);
+    const [dragState, setDragState] = useState<DragState>({
+        isDrawing: false,
+        startPitch: -1,
+        startStep: -1,
+        currentStep: -1,
+        isDeleting: false,
+    });
+    const gridRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         return audioEngine.subscribeStep((step) => {
-            setCurrentStep(step);
+            setCurrentPlayStep(step);
         });
     }, []);
 
@@ -33,26 +49,107 @@ export const PianoRollNode: React.FC<NodeProps<Node<PianoRollNodeData>>> = memo(
         return notes.find((n) => n.pitch === pitch && n.step === step);
     }, [notes]);
 
-    const toggleNote = useCallback((pitch: number, step: number) => {
-        const existingNote = hasNoteAt(pitch, step);
-        let newNotes: NoteEvent[];
+    // Check if a cell is covered by a note (note starts before but extends to this step)
+    const isNoteCovering = useCallback((pitch: number, step: number): NoteEvent | undefined => {
+        return notes.find((n) =>
+            n.pitch === pitch &&
+            n.step <= step &&
+            n.step + n.duration > step
+        );
+    }, [notes]);
 
+    const handleMouseDown = useCallback((pitch: number, step: number, e: React.MouseEvent) => {
+        e.preventDefault();
+        const existingNote = isNoteCovering(pitch, step);
+
+        setDragState({
+            isDrawing: true,
+            startPitch: pitch,
+            startStep: step,
+            currentStep: step,
+            isDeleting: !!existingNote,
+        });
+
+        // If deleting, remove the note immediately
         if (existingNote) {
-            // Remove note
-            newNotes = notes.filter((n) => !(n.pitch === pitch && n.step === step));
-        } else {
-            // Add note
-            const newNote: NoteEvent = {
-                pitch,
-                step,
-                duration: 1,
-                velocity: 0.8,
-            };
-            newNotes = [...notes, newNote];
+            const newNotes = notes.filter((n) => !(n.pitch === pitch && n.step === existingNote.step));
+            updateNodeData(id, { notes: newNotes });
+        }
+    }, [notes, isNoteCovering, updateNodeData, id]);
+
+    const handleMouseEnter = useCallback((pitch: number, step: number) => {
+        if (!dragState.isDrawing) return;
+
+        // Only allow horizontal drawing on the same pitch
+        if (pitch !== dragState.startPitch) return;
+
+        setDragState(prev => ({
+            ...prev,
+            currentStep: step,
+        }));
+    }, [dragState.isDrawing, dragState.startPitch]);
+
+    const handleMouseUp = useCallback(() => {
+        if (!dragState.isDrawing || dragState.isDeleting) {
+            setDragState(prev => ({ ...prev, isDrawing: false }));
+            return;
         }
 
+        // Create a note from startStep to currentStep
+        const startStep = Math.min(dragState.startStep, dragState.currentStep);
+        const endStep = Math.max(dragState.startStep, dragState.currentStep);
+        const duration = endStep - startStep + 1;
+
+        // Remove any existing notes that overlap
+        const newNotes = notes.filter((n) => {
+            if (n.pitch !== dragState.startPitch) return true;
+            // Remove if overlapping
+            const noteEnd = n.step + n.duration;
+            if (n.step >= startStep && n.step <= endStep) return false;
+            if (noteEnd > startStep && noteEnd <= endStep + 1) return false;
+            if (n.step < startStep && noteEnd > endStep + 1) return false;
+            return true;
+        });
+
+        // Add new note
+        const newNote: NoteEvent = {
+            pitch: dragState.startPitch,
+            step: startStep,
+            duration,
+            velocity: 0.8,
+        };
+        newNotes.push(newNote);
+
         updateNodeData(id, { notes: newNotes });
-    }, [notes, hasNoteAt, updateNodeData, id]);
+
+        setDragState({
+            isDrawing: false,
+            startPitch: -1,
+            startStep: -1,
+            currentStep: -1,
+            isDeleting: false,
+        });
+    }, [dragState, notes, updateNodeData, id]);
+
+    // Handle mouse up outside the grid
+    useEffect(() => {
+        const handleGlobalMouseUp = () => {
+            if (dragState.isDrawing) {
+                handleMouseUp();
+            }
+        };
+        window.addEventListener('mouseup', handleGlobalMouseUp);
+        return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+    }, [dragState.isDrawing, handleMouseUp]);
+
+    // Check if a cell is part of the current drag selection
+    const isInDragSelection = useCallback((pitch: number, step: number): boolean => {
+        if (!dragState.isDrawing || dragState.isDeleting) return false;
+        if (pitch !== dragState.startPitch) return false;
+        const minStep = Math.min(dragState.startStep, dragState.currentStep);
+        const maxStep = Math.max(dragState.startStep, dragState.currentStep);
+        return step >= minStep && step <= maxStep;
+    }, [dragState]);
 
     return (
         <div className={`audio-node piano-roll-node ${selected ? 'selected' : ''}`}>
@@ -62,7 +159,7 @@ export const PianoRollNode: React.FC<NodeProps<Node<PianoRollNodeData>>> = memo(
             </div>
 
             <div className="node-content">
-                <div className="piano-roll-grid">
+                <div className="piano-roll-grid" ref={gridRef}>
                     {/* Piano keys column */}
                     <div className="piano-keys">
                         {Array.from({ length: totalNotes }).map((_, i) => {
@@ -88,15 +185,20 @@ export const PianoRollNode: React.FC<NodeProps<Node<PianoRollNodeData>>> = memo(
                                 <div key={`row-${pitch}`} className="piano-grid-row">
                                     {Array.from({ length: steps }).map((_, stepIdx) => {
                                         const noteEvent = hasNoteAt(pitch, stepIdx);
-                                        const isCurrent = currentStep === stepIdx;
+                                        const coveringNote = isNoteCovering(pitch, stepIdx);
+                                        const isCurrent = currentPlayStep % steps === stepIdx;
                                         const isBeat = stepIdx % 4 === 0;
+                                        const isSelected = isInDragSelection(pitch, stepIdx);
+                                        const isNoteStart = noteEvent !== undefined;
+                                        const isNoteContinuation = coveringNote && !isNoteStart;
 
                                         return (
-                                            <button
+                                            <div
                                                 key={`cell-${pitch}-${stepIdx}`}
-                                                className={`piano-cell ${noteEvent ? 'active' : ''} ${isCurrent ? 'current' : ''} ${isBeat ? 'beat' : ''}`}
-                                                onClick={() => toggleNote(pitch, stepIdx)}
-                                                title={`${midiToNoteName(pitch)} Step ${stepIdx + 1}`}
+                                                className={`piano-cell ${isNoteStart ? 'active note-start' : ''} ${isNoteContinuation ? 'active note-cont' : ''} ${isCurrent ? 'current' : ''} ${isBeat ? 'beat' : ''} ${isSelected ? 'selecting' : ''}`}
+                                                onMouseDown={(e) => handleMouseDown(pitch, stepIdx, e)}
+                                                onMouseEnter={() => handleMouseEnter(pitch, stepIdx)}
+                                                title={`${midiToNoteName(pitch)} Step ${stepIdx + 1}${noteEvent ? ` (dur: ${noteEvent.duration})` : ''}`}
                                             />
                                         );
                                     })}
