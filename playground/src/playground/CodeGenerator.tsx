@@ -1,15 +1,32 @@
 import React, { useMemo, useState } from 'react';
-import { useAudioGraphStore, type AudioNodeData, type OscNodeData, type GainNodeData, type FilterNodeData, type DelayNodeData, type ReverbNodeData, type StereoPannerNodeData, type NoteNodeData, type InputNodeData, type ADSRNodeData, type VoiceNodeData } from './store';
+import {
+    useAudioGraphStore,
+    type AudioNodeData,
+    type OscNodeData,
+    type GainNodeData,
+    type FilterNodeData,
+    type DelayNodeData,
+    type ReverbNodeData,
+    type StereoPannerNodeData,
+    type NoteNodeData,
+    type ADSRNodeData,
+    type VoiceNodeData
+} from './store';
 import { type Node, type Edge } from '@xyflow/react';
+import { toPascalCase } from './graphUtils';
 
 export const CodeGenerator: React.FC = () => {
     const nodes = useAudioGraphStore((s) => s.nodes);
     const edges = useAudioGraphStore((s) => s.edges);
+    const graphName = useAudioGraphStore((s) => {
+        const activeGraph = s.graphs.find((graph) => graph.id === s.activeGraphId);
+        return activeGraph?.name ?? 'AudioGraph';
+    });
     const [includeProvider, setIncludeProvider] = useState(false);
 
     const generatedCode = useMemo(() => {
-        return generateCode(nodes, edges, includeProvider);
-    }, [nodes, edges, includeProvider]);
+        return generateCode(nodes, edges, includeProvider, graphName);
+    }, [nodes, edges, includeProvider, graphName]);
 
     const handleCopy = () => {
         navigator.clipboard.writeText(generatedCode);
@@ -98,22 +115,21 @@ export const CodeGenerator: React.FC = () => {
     );
 };
 
-export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includeProvider: boolean = false): string {
+export function generateCode(
+    nodes: Node<AudioNodeData>[],
+    edges: Edge[],
+    includeProvider: boolean = false,
+    graphName: string = 'AudioGraph'
+): string {
     const indent = (level: number) => '    '.repeat(level);
+    const componentName = toPascalCase(graphName);
+    const rootName = `${componentName}Root`;
 
-    // 1. Identify Modulations (Param connections) & Audio Connections
     const audioEdges = edges.filter(e => !e.targetHandle || e.targetHandle === 'in');
 
-    // 2. Identify Roots (Nodes that are Destinations or have no outgoing audio edges)
-    // A node is a root if it has NO outgoing audio edges.
     const nodesWithOutputs = new Set(audioEdges.map(e => e.source));
     const rootNodes = nodes.filter(n => !nodesWithOutputs.has(n.id) || n.data.type === 'output');
 
-    // Sort roots: Output nodes last (or first?), usually we want main output at top if wrapping
-    // But in React nesting: Output is Parent. So Output is Root of Tree.
-    // So we render Roots.
-
-    // Helper to render props
     const renderProps = (node: Node<AudioNodeData>) => {
         const data = node.data;
         const props: string[] = [];
@@ -124,15 +140,10 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
                 if (osc.type) props.push(`type="${osc.waveform}"`);
                 if (osc.frequency !== undefined) props.push(`frequency={${osc.frequency}}`);
                 if (osc.detune) props.push(`detune={${osc.detune}}`);
-                // Only autoStart if NOT sequenced?
-                // Using Sequencer usually means we want to trigger envelopes.
-                // But for standard Osc, it plays continuously.
-                // If we want gated notes, we usually need an Envelope node.
-                // Assuming simple Playground usage: autoStart always for now.
                 props.push('autoStart');
                 break;
             case 'gain':
-            case 'output': // Output is essentially a gain before destination
+            case 'output':
                 const gain = (data as any).gain ?? (data as any).masterGain ?? 1;
                 props.push(`gain={${gain}}`);
                 break;
@@ -146,25 +157,19 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
             case 'delay':
                 const delay = data as DelayNodeData;
                 if (delay.delayTime !== undefined) props.push(`delayTime={${delay.delayTime}}`);
-                // Feedback is not a prop on simple Delay component usually, structure handles it?
-                // No, DelayNode is simple. Feedback requires external loop.
                 break;
             case 'panner':
                 const pan = data as StereoPannerNodeData;
                 if (pan.pan !== undefined) props.push(`pan={${pan.pan}}`);
                 break;
             case 'reverb':
-                // Reverb component might take impulse url
-                props.push(`impulse="/ir/hall.wav"`); // Placeholder
+                props.push(`impulse="/ir/hall.wav"`);
                 break;
             case 'note':
                 const note = data as NoteNodeData;
-                // NoteNode is a constant source usually used for modulation,
-                // but if in audio path, it's a valid source.
                 props.push(`offset={${note.frequency}}`);
                 break;
             case 'noise':
-                // Noise component props?
                 break;
             case 'adsr':
                 const adsr = data as ADSRNodeData;
@@ -181,30 +186,28 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
         return props.length > 0 ? ' ' + props.join(' ') : '';
     };
 
-    // Helper to render a node and its children (sources)
-    // usedVoiceIds tracks which Voice nodes have already been used for wrapping
-    const renderNode = (node: Node<AudioNodeData>, level: number, visitedIds: Set<string> = new Set(), usedVoiceIds: Set<string> = new Set()): string => {
-        // Prevent infinite loops
+    const renderNode = (
+        node: Node<AudioNodeData>,
+        level: number,
+        visitedIds: Set<string> = new Set(),
+        usedVoiceIds: Set<string> = new Set()
+    ): string => {
         if (visitedIds.has(node.id)) return '';
         visitedIds.add(node.id);
 
         const componentName = getComponentName(node.data.type);
-        if (!componentName) return ''; // Skip unknown
+        if (!componentName) return '';
 
-        // Find sources connected TO this node (audio/modulation edges)
         const sources = audioEdges
             .filter(e => e.target === node.id)
             .map(e => nodes.find(n => n.id === e.source))
             .filter((n): n is Node<AudioNodeData> => !!n);
 
-        // ALSO find sequencers connected via trigger edges (targetHandle === 'trigger')
         const triggerEdges = edges.filter(e => e.target === node.id && e.targetHandle === 'trigger');
         const triggerSequencers = triggerEdges
             .map(e => nodes.find(n => n.id === e.source))
             .filter((n): n is Node<AudioNodeData> => !!n && n.data.type === 'stepSequencer');
 
-        // Find Voice nodes that control THIS node via CV outputs (note, gate, velocity)
-        // But only if that Voice hasn't already been used for wrapping
         const voiceCVEdges = edges.filter(e =>
             e.target === node.id &&
             (e.sourceHandle === 'note' || e.sourceHandle === 'gate' || e.sourceHandle === 'velocity')
@@ -213,7 +216,6 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
             .map(e => nodes.find(n => n.id === e.source))
             .filter((n): n is Node<AudioNodeData> => !!n && n.data.type === 'voice' && !usedVoiceIds.has(n.id));
 
-        // Separate Sequencers from Audio Sources
         const sequencers = [...sources.filter(n => n.data.type === 'stepSequencer'), ...triggerSequencers];
         const audioSources = sources.filter(n => n.data.type !== 'stepSequencer' && n.data.type !== 'voice');
 
@@ -234,14 +236,11 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
             nodeJsx = `${indentation}<${componentName}${props} />`;
         }
 
-        // If this node is controlled by a Voice via CV, wrap it in Voice
-        // Mark the Voice as used to prevent double-wrapping
         if (controllingVoices.length > 0 && node.data.type !== 'voice') {
             const voice = controllingVoices[0];
-            usedVoiceIds.add(voice.id); // Mark as used
+            usedVoiceIds.add(voice.id);
             const voiceProps = renderProps(voice);
 
-            // Check if Voice itself is triggered by a sequencer
             const voiceSequencerEdges = edges.filter(e => e.target === voice.id && e.targetHandle === 'trigger');
             const voiceSequencers = voiceSequencerEdges
                 .map(e => nodes.find(n => n.id === e.source))
@@ -251,7 +250,6 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
                 nodeJsx.split('\n').map(l => indent(1) + l).join('\n') + '\n' +
                 `${indentation}</Voice>`;
 
-            // If Voice is sequenced, wrap in Track
             if (voiceSequencers.length > 0) {
                 const seq = voiceSequencers[0];
                 const seqData = seq.data as any;
@@ -268,12 +266,10 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
             return wrappedJsx;
         }
 
-        // Wrap in Track if sequenced (direct sequencer -> node connection)
         if (sequencers.length > 0) {
-            const seq = sequencers[0]; // Determine primary sequencer
+            const seq = sequencers[0];
             const seqData = seq.data as any;
 
-            // Construct pattern: activeSteps combines with velocities
             const activeSteps = seqData.activeSteps || Array(seqData.steps || 16).fill(false);
             const velocities = seqData.pattern || Array(seqData.steps || 16).fill(0.8);
 
@@ -281,7 +277,6 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
             const patternStr = `[${pattern.join(', ')}]`;
 
             return `${indentation}<Track steps={${seqData.steps}} pattern={${patternStr}}>\n` +
-                // Indent the internal node one more level
                 nodeJsx.split('\n').map(l => indent(1) + l).join('\n') + '\n' +
                 `${indentation}</Track>`;
         }
@@ -289,14 +284,12 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
         return nodeJsx;
     };
 
-    // Generate Imports
     const usedTypes = new Set(nodes.map(n => getComponentName(n.data.type)).filter(Boolean));
     if (includeProvider) {
         usedTypes.add('AudioProvider');
         usedTypes.add('TransportProvider');
     }
 
-    // Check for Transport Node
     const transportNode = nodes.find(n => n.data.type === 'transport');
     if (transportNode) {
         usedTypes.add('useTransport');
@@ -310,30 +303,22 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
 
     let code = `import { ${Array.from(usedTypes).join(', ')} } from 'react-din';\n\n`;
 
-    // Helper functions for indentation
-    const indentBlock = (text: string, level: number) => text.split('\n').map(line => line ? indent(level) + line : line).join('\n');
-
-    // Generate the inner logic (nodes + hooks)
     const generateInnerContent = (level: number) => {
         let content = '';
 
         if (transportNode) {
-            const tData = transportNode.data as any; // Cast to access extended props
-            // Generate hook usage reading all values
             const params = ['bpm', 'playing', 'beatsPerBar', 'beatUnit', 'stepsPerBeat', 'barsPerPhrase', 'swing'];
             content += `${indent(level)}const { ${params.join(', ')}, toggle } = useTransport();\n\n`;
         }
 
         content += `${indent(level)}return (\n`;
 
-        // Wrap with Sequencer if needed
         let innerLevel = level;
         if (hasSequencer) {
             content += `${indent(level + 1)}<Sequencer steps={16}>\n`;
             innerLevel++;
         }
 
-        // Render roots
         let nodesContent = '';
         rootNodes.forEach(root => {
             if (root.data.type !== 'transport' && root.data.type !== 'stepSequencer') {
@@ -341,7 +326,6 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
             }
         });
 
-        // If no nodes (only transport?), render empty fragment or null
         if (!nodesContent.trim()) {
             nodesContent = `${indent(innerLevel + 1)}null\n`;
         }
@@ -356,10 +340,8 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
         return content;
     };
 
-
     if (includeProvider) {
-        // Wrapper Component
-        code += `export const AudioGraphRoot = () => {\n`;
+        code += `export const ${rootName} = () => {\n`;
         code += `${indent(1)}return (\n`;
         code += `${indent(2)}<AudioProvider>\n`;
 
@@ -368,31 +350,28 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
             const props: string[] = [];
             if (tData.bpm) props.push(`bpm={${tData.bpm}}`);
             if (tData.beatsPerBar) props.push(`beatsPerBar={${tData.beatsPerBar}}`);
-            // ... (rest of transport props can be expanded if needed or rely on defaults)
             if (tData.beatUnit) props.push(`beatUnit={${tData.beatUnit}}`);
             if (tData.stepsPerBeat) props.push(`stepsPerBeat={${tData.stepsPerBeat}}`);
             if (tData.barsPerPhrase) props.push(`barsPerPhrase={${tData.barsPerPhrase}}`);
             if (tData.swing) props.push(`swing={${tData.swing}}`);
 
             code += `${indent(3)}<TransportProvider ${props.join(' ')}>\n`;
-            code += `${indent(4)}<AudioGraph />\n`;
+            code += `${indent(4)}<${componentName} />\n`;
             code += `${indent(3)}</TransportProvider>\n`;
         } else {
-            code += `${indent(3)}<AudioGraph />\n`;
+            code += `${indent(3)}<${componentName} />\n`;
         }
 
         code += `${indent(2)}</AudioProvider>\n`;
         code += `${indent(1)});\n`;
         code += `};\n\n`;
 
-        // Inner Component
-        code += `export const AudioGraph = () => {\n`;
+        code += `export const ${componentName} = () => {\n`;
         code += generateInnerContent(1);
         code += `};\n`;
 
     } else {
-        // Single Component (assumes context provided)
-        code += `export const AudioGraph = () => {\n`;
+        code += `export const ${componentName} = () => {\n`;
         code += generateInnerContent(1);
         code += `};\n`;
     }
@@ -406,18 +385,17 @@ function getComponentName(type: string): string | null {
         case 'gain': return 'Gain';
         case 'filter': return 'Filter';
         case 'delay': return 'Delay';
-        case 'reverb': return 'Reverb'; // Assuming Reverb export available
+        case 'reverb': return 'Reverb';
         case 'panner': return 'StereoPanner';
-        case 'output': return 'Gain'; // Use Gain for master output
-        case 'mixer': return 'Gain'; // Mixer is just a summing Gain
-        case 'note': return 'ConstantSource'; // Assuming ConstantSource export
+        case 'output': return 'Gain';
+        case 'mixer': return 'Gain';
+        case 'note': return 'ConstantSource';
         case 'noise': return 'Noise';
         case 'adsr': return 'ADSR';
         case 'voice': return 'Voice';
-        case 'stepSequencer': return null; // Logic handled in renderNode wrap
-        case 'input': return null; // Input node is usually UI specific, skip for audio graph code
-        case 'transport': return null; // Handled in provider/hook logic
+        case 'stepSequencer': return null;
+        case 'input': return null;
+        case 'transport': return null;
         default: return null;
     }
 }
-

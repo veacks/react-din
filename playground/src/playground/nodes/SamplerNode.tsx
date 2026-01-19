@@ -2,24 +2,42 @@ import React, { memo, useCallback, useRef, useState, useEffect } from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { useAudioGraphStore, type SamplerNodeData } from '../store';
 import { audioEngine } from '../AudioEngine';
+import { saveAudioToCache } from '../audioCache';
 import '../playground.css';
 
 export const SamplerNode: React.FC<NodeProps<Node<SamplerNodeData>>> = memo(({ id, data, selected }) => {
     const updateNodeData = useAudioGraphStore((s) => s.updateNodeData);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [fileName, setFileName] = useState<string>('');
     const [isPlaying, setIsPlaying] = useState(false);
+    const localObjectUrlRef = useRef<string | null>(null);
 
     const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Create object URL for the file
+        const sampleId = crypto.randomUUID();
         const objectUrl = URL.createObjectURL(file);
-        setFileName(file.name);
-        updateNodeData(id, { src: objectUrl, loaded: false });
 
-        // Load the buffer in the audio engine
+        if (localObjectUrlRef.current) {
+            URL.revokeObjectURL(localObjectUrlRef.current);
+        }
+        localObjectUrlRef.current = objectUrl;
+
+        updateNodeData(id, {
+            src: objectUrl,
+            sampleId,
+            fileName: file.name,
+            loaded: false,
+        });
+
+        saveAudioToCache(sampleId, file)
+            .then(() => {
+                updateNodeData(id, { loaded: true });
+            })
+            .catch(() => {
+                updateNodeData(id, { loaded: false });
+            });
+
         audioEngine.loadSamplerBuffer(id, objectUrl);
     }, [id, updateNodeData]);
 
@@ -55,18 +73,27 @@ export const SamplerNode: React.FC<NodeProps<Node<SamplerNodeData>>> = memo(({ i
         audioEngine.updateSamplerParam(id, 'detune', detune);
     }, [id, updateNodeData]);
 
-    // Reset playing state when sample changes
     useEffect(() => {
         setIsPlaying(false);
     }, [data.src]);
 
-    // Subscribe to end-of-playback events
     useEffect(() => {
         const unsubscribe = audioEngine.onSamplerEnd(id, () => {
             setIsPlaying(false);
         });
         return unsubscribe;
     }, [id]);
+
+    useEffect(() => {
+        return () => {
+            if (localObjectUrlRef.current) {
+                URL.revokeObjectURL(localObjectUrlRef.current);
+                localObjectUrlRef.current = null;
+            }
+        };
+    }, []);
+
+    const fileLabel = data.fileName || (data.src ? 'Loaded' : 'No file selected');
 
     return (
         <div className={`audio-node sampler-node ${selected ? 'selected' : ''}`}>
@@ -82,7 +109,6 @@ export const SamplerNode: React.FC<NodeProps<Node<SamplerNodeData>>> = memo(({ i
             </div>
 
             <div className="node-content">
-                {/* File input (hidden) */}
                 <input
                     ref={fileInputRef}
                     type="file"
@@ -92,7 +118,6 @@ export const SamplerNode: React.FC<NodeProps<Node<SamplerNodeData>>> = memo(({ i
                     title="Select audio file"
                 />
 
-                {/* Browse button */}
                 <div className="node-control">
                     <label>Audio File</label>
                     <button
@@ -112,12 +137,10 @@ export const SamplerNode: React.FC<NodeProps<Node<SamplerNodeData>>> = memo(({ i
                     </button>
                 </div>
 
-                {/* File name display */}
                 <div className="node-control" style={{ fontSize: '10px', color: data.src ? '#44cc44' : '#888' }}>
-                    {data.src ? `✅ ${fileName || 'Loaded'}` : '⚪ No file selected'}
+                    {data.src ? `✅ ${fileLabel}` : '⚪ No file selected'}
                 </div>
 
-                {/* Play/Stop button */}
                 <div className="node-control">
                     <button
                         onClick={handlePlayClick}
@@ -138,7 +161,6 @@ export const SamplerNode: React.FC<NodeProps<Node<SamplerNodeData>>> = memo(({ i
                     </button>
                 </div>
 
-                {/* Loop toggle */}
                 <div className="node-control">
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <input
@@ -150,7 +172,6 @@ export const SamplerNode: React.FC<NodeProps<Node<SamplerNodeData>>> = memo(({ i
                     </label>
                 </div>
 
-                {/* Playback Rate */}
                 <div className="node-control">
                     <label>Speed {data.playbackRate.toFixed(2)}x</label>
                     <input
@@ -164,7 +185,6 @@ export const SamplerNode: React.FC<NodeProps<Node<SamplerNodeData>>> = memo(({ i
                     />
                 </div>
 
-                {/* Detune */}
                 <div className="node-control">
                     <label>Detune {data.detune}¢</label>
                     <input
@@ -179,7 +199,6 @@ export const SamplerNode: React.FC<NodeProps<Node<SamplerNodeData>>> = memo(({ i
                 </div>
             </div>
 
-            {/* Trigger input for sequencer/gate */}
             <Handle
                 type="target"
                 position={Position.Left}
@@ -193,5 +212,3 @@ export const SamplerNode: React.FC<NodeProps<Node<SamplerNodeData>>> = memo(({ i
 
 SamplerNode.displayName = 'SamplerNode';
 export default SamplerNode;
-
-

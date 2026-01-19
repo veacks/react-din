@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, type FC } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, type FC } from 'react';
 import {
     ReactFlow,
     Background,
@@ -13,7 +13,7 @@ import '@xyflow/react/dist/style.css';
 import './playground/playground.css';
 import Inspector from './playground/Inspector';
 
-import { useAudioGraphStore, type AudioNodeData } from './playground/store';
+import { useAudioGraphStore, type AudioNodeData, type SamplerNodeData } from './playground/store';
 import {
     OscNode,
     GainNode,
@@ -35,8 +35,11 @@ import {
     SamplerNode,
 } from './playground/nodes';
 import { generateCode } from './playground/CodeGenerator';
+import { deleteGraph as deleteStoredGraph, loadActiveGraphId, loadGraphs, saveActiveGraphId, saveGraph } from './playground/graphStorage';
+import { deleteAudioFromCache, getAudioObjectUrl } from './playground/audioCache';
+import { sanitizeGraphForStorage, toPascalCase } from './playground/graphUtils';
+import { audioEngine } from './playground/AudioEngine';
 
-// Node types mapping - all available nodes
 const nodeTypes: NodeTypes = {
     oscNode: OscNode as NodeTypes[string],
     gainNode: GainNode as NodeTypes[string],
@@ -58,7 +61,6 @@ const nodeTypes: NodeTypes = {
     samplerNode: SamplerNode as NodeTypes[string],
 };
 
-// Node palette categories
 const nodeCategories = [
     {
         name: 'Sources',
@@ -95,7 +97,6 @@ const nodeCategories = [
     },
 ];
 
-// Node palette for adding new nodes
 const NodePalette: FC = () => {
     const addNode = useAudioGraphStore((s) => s.addNode);
 
@@ -130,7 +131,6 @@ const NodePalette: FC = () => {
     );
 };
 
-// Code preview panel
 const CodePreview: FC<{ code: string }> = ({ code }) => {
     const [copied, setCopied] = useState(false);
 
@@ -161,17 +161,174 @@ const CodePreview: FC<{ code: string }> = ({ code }) => {
 export const PlaygroundDemo: FC = () => {
     const nodes = useAudioGraphStore((s) => s.nodes);
     const edges = useAudioGraphStore((s) => s.edges);
+    const graphs = useAudioGraphStore((s) => s.graphs);
+    const activeGraphId = useAudioGraphStore((s) => s.activeGraphId);
     const onNodesChange = useAudioGraphStore((s) => s.onNodesChange);
     const onEdgesChange = useAudioGraphStore((s) => s.onEdgesChange);
     const onConnect = useAudioGraphStore((s) => s.onConnect);
     const addNode = useAudioGraphStore((s) => s.addNode);
-
+    const setGraphs = useAudioGraphStore((s) => s.setGraphs);
+    const setActiveGraph = useAudioGraphStore((s) => s.setActiveGraph);
+    const createGraph = useAudioGraphStore((s) => s.createGraph);
+    const renameGraph = useAudioGraphStore((s) => s.renameGraph);
+    const removeGraph = useAudioGraphStore((s) => s.removeGraph);
     const setSelectedNode = useAudioGraphStore((s) => s.setSelectedNode);
+    const updateNodeData = useAudioGraphStore((s) => s.updateNodeData);
+    const isHydrated = useAudioGraphStore((s) => s.isHydrated);
+    const setHydrated = useAudioGraphStore((s) => s.setHydrated);
 
-    // Generate code from current graph
-    const generatedCode = useMemo(() => generateCode(nodes, edges), [nodes, edges]);
+    const activeGraph = graphs.find((graph) => graph.id === activeGraphId) ?? graphs[0];
+    const activeGraphName = activeGraph?.name ?? 'Untitled Graph';
+    const componentName = toPascalCase(activeGraphName);
 
-    // Handle drop from palette
+    const [nameDraft, setNameDraft] = useState(activeGraphName);
+    const saveTimerRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        setNameDraft(activeGraphName);
+    }, [activeGraphName, activeGraphId]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const hydrate = async () => {
+            try {
+                const [storedGraphs, storedActiveId] = await Promise.all([
+                    loadGraphs(),
+                    loadActiveGraphId(),
+                ]);
+
+                if (cancelled) return;
+
+                if (storedGraphs.length > 0) {
+                    setGraphs(storedGraphs, storedActiveId ?? null);
+                } else {
+                    const state = useAudioGraphStore.getState();
+                    const fallbackGraph = state.graphs[0];
+                    if (fallbackGraph) {
+                        await saveGraph(sanitizeGraphForStorage({
+                            ...fallbackGraph,
+                            updatedAt: Date.now(),
+                        }));
+                        await saveActiveGraphId(state.activeGraphId ?? null);
+                    }
+                }
+            } catch (error) {
+                console.warn('[Playground] Failed to hydrate graphs', error);
+            } finally {
+                if (!cancelled) {
+                    setHydrated(true);
+                }
+            }
+        };
+
+        hydrate();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [setGraphs, setHydrated]);
+
+    useEffect(() => {
+        if (!isHydrated || !activeGraph || !activeGraphId) return;
+
+        if (saveTimerRef.current) {
+            window.clearTimeout(saveTimerRef.current);
+        }
+
+        saveTimerRef.current = window.setTimeout(() => {
+            const updatedGraph = {
+                ...activeGraph,
+                nodes,
+                edges,
+                updatedAt: Date.now(),
+            };
+
+            saveGraph(sanitizeGraphForStorage(updatedGraph)).catch((error) => {
+                console.warn('[Playground] Failed to save graph', error);
+            });
+
+            saveActiveGraphId(activeGraphId).catch((error) => {
+                console.warn('[Playground] Failed to save active graph id', error);
+            });
+        }, 300);
+
+        return () => {
+            if (saveTimerRef.current) {
+                window.clearTimeout(saveTimerRef.current);
+            }
+        };
+    }, [nodes, edges, activeGraph, activeGraphId, activeGraphName, isHydrated]);
+
+    useEffect(() => {
+        if (!isHydrated) return;
+
+        nodes.forEach((node) => {
+            if (node.data.type !== 'sampler') return;
+            const sampler = node.data as SamplerNodeData;
+            if (!sampler.sampleId || sampler.src) return;
+
+            getAudioObjectUrl(sampler.sampleId)
+                .then((url) => {
+                    if (!url) return;
+                    updateNodeData(node.id, { src: url, loaded: true });
+                    audioEngine.loadSamplerBuffer(node.id, url);
+                })
+                .catch(() => {
+                    // Ignore cache errors for now
+                });
+        });
+    }, [nodes, isHydrated, updateNodeData]);
+
+    const commitGraphName = useCallback(() => {
+        if (!activeGraphId) return;
+        const trimmed = nameDraft.trim();
+        const nextName = trimmed || 'Untitled Graph';
+        if (nextName !== activeGraphName) {
+            renameGraph(activeGraphId, nextName);
+        } else if (nameDraft !== nextName) {
+            setNameDraft(nextName);
+        }
+    }, [activeGraphId, nameDraft, activeGraphName, renameGraph]);
+
+    const handleDeleteGraph = useCallback((graphId: string | null) => {
+        if (!graphId) return;
+
+        const graph = graphs.find((item) => item.id === graphId);
+        if (!graph) return;
+
+        const confirmMessage = graphs.length === 1
+            ? `Delete "${graph.name}"? A new blank graph will be created.`
+            : `Delete "${graph.name}"? This cannot be undone.`;
+
+        if (!window.confirm(confirmMessage)) return;
+
+        const removedGraph = removeGraph(graphId);
+        if (!removedGraph) return;
+
+        deleteStoredGraph(graphId).catch((error) => {
+            console.warn('[Playground] Failed to delete graph', error);
+        });
+
+        const sampleIds = removedGraph.nodes
+            .filter((node) => node.data.type === 'sampler')
+            .map((node) => (node.data as SamplerNodeData).sampleId)
+            .filter((sampleId): sampleId is string => Boolean(sampleId));
+
+        if (sampleIds.length > 0) {
+            Promise.all(sampleIds.map((sampleId) => deleteAudioFromCache(sampleId))).catch((error) => {
+                console.warn('[Playground] Failed to delete cached audio', error);
+            });
+        }
+
+        const nextActiveId = useAudioGraphStore.getState().activeGraphId ?? null;
+        saveActiveGraphId(nextActiveId).catch((error) => {
+            console.warn('[Playground] Failed to save active graph id', error);
+        });
+    }, [graphs, removeGraph]);
+
+    const generatedCode = useMemo(() => generateCode(nodes, edges, false, activeGraphName), [nodes, edges, activeGraphName]);
+
     const onDrop = useCallback(
         (event: React.DragEvent) => {
             event.preventDefault();
@@ -196,7 +353,6 @@ export const PlaygroundDemo: FC = () => {
         event.dataTransfer.dropEffect = 'move';
     }, []);
 
-    // Handle selection
     const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
         setSelectedNode(node.id);
     }, [setSelectedNode]);
@@ -240,8 +396,6 @@ export const PlaygroundDemo: FC = () => {
                     max-height: 50%;
                 }
                 
-                /* ... keep existing styles ... */
-                
                 /* Code preview adjustment */
                 .code-preview {
                    display: flex;
@@ -249,11 +403,6 @@ export const PlaygroundDemo: FC = () => {
                    flex: 1;
                    min-height: 0;
                 }
-                
-                /* Existing styles... I'll assume they persist or need to be re-added if I'm replacing the whole layout.
-                   Wait, I am doing a partial replace of the logic + render. 
-                   Ideally I should just inject the Inspector. 
-                   But I need to change grid-template-columns. */
 
                 .palette-category {
                     margin-bottom: 16px;
@@ -354,14 +503,120 @@ export const PlaygroundDemo: FC = () => {
                     white-space: pre;
                 }
 
+                /* Tabs */
+                .graph-tabs {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 12px;
+                    padding: 8px 12px;
+                    border-bottom: 1px solid #1f1f2a;
+                    background: #101019;
+                }
+
+                .graph-tab-list {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    overflow-x: auto;
+                }
+
+                .graph-tab {
+                    background: #1a1a24;
+                    border: 1px solid #2a2a3a;
+                    color: #b0b0c0;
+                    padding: 4px 10px;
+                    font-size: 10px;
+                    border-radius: 999px;
+                    cursor: pointer;
+                    white-space: nowrap;
+                }
+
+                .graph-tab.active {
+                    border-color: #4488ff;
+                    color: #e6f0ff;
+                    box-shadow: 0 0 0 1px rgba(68, 136, 255, 0.35);
+                }
+
+                .graph-tab.add {
+                    background: #212133;
+                    color: #7aa7ff;
+                    border-color: #2a2a3a;
+                }
+
+                .graph-name {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+
+                .graph-name label {
+                    font-size: 9px;
+                    text-transform: uppercase;
+                    color: #555;
+                    letter-spacing: 0.5px;
+                }
+
+                .graph-name input {
+                    background: #1a1a24;
+                    border: 1px solid #2a2a3a;
+                    border-radius: 4px;
+                    padding: 4px 8px;
+                    font-size: 11px;
+                    color: #e0e0f0;
+                    width: 160px;
+                }
+
+                .graph-name input:focus {
+                    outline: none;
+                    border-color: #4488ff;
+                    box-shadow: 0 0 0 2px rgba(68, 136, 255, 0.2);
+                }
+
+                .component-name {
+                    font-size: 9px;
+                    color: #7a7a8a;
+                    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+                }
+
+                .graph-delete {
+                    background: #2a1a24;
+                    border: 1px solid #4a2230;
+                    color: #ff6677;
+                    border-radius: 4px;
+                    font-size: 10px;
+                    padding: 4px 8px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .graph-delete:hover {
+                    background: #3a1a24;
+                    color: #ff99aa;
+                }
+
+                .graph-delete:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+
                 /* ReactFlow canvas */
                 .canvas-container {
                     position: relative;
                     background: #0a0a12;
+                    display: flex;
+                    flex-direction: column;
+                    min-height: 0;
+                }
+
+                .flow-wrapper {
+                    flex: 1;
+                    min-height: 0;
                 }
 
                 .react-flow {
                     background: #0a0a12;
+                    height: 100%;
                 }
 
                 .react-flow__background {
@@ -566,19 +821,12 @@ export const PlaygroundDemo: FC = () => {
                                 { id: 'output', type: 'outputNode', dragHandle: '.node-header', position: { x: 1000, y: 200 }, data: { type: 'output', masterGain: 0.5, playing: false, label: 'Output' } as any }
                             ];
                             const edges = [
-                                // Transport -> Sequencer
                                 { id: 'e_t_s', source: 'transport', target: 'sequencer', style: { stroke: '#4488ff', strokeDasharray: '5,5' }, animated: true },
-                                // Sequencer -> Voice (Trigger)
                                 { id: 'e_s_v', source: 'sequencer', target: 'voice', targetHandle: 'trigger', style: { stroke: '#ff4466' }, animated: true },
-                                // Voice (Note) -> Osc (Freq)
                                 { id: 'e_v_osc', source: 'voice', sourceHandle: 'note', target: 'osc', targetHandle: 'frequency', style: { stroke: '#ff8844' }, animated: true },
-                                // Voice (Gate) -> ADSR (simulated connection for visual, logic handled by engine loop if connected)
                                 { id: 'e_v_adsr', source: 'voice', sourceHandle: 'gate', target: 'adsr', style: { stroke: '#44cc44' }, animated: true },
-                                // Osc -> Gain
                                 { id: 'e_osc_gain', source: 'osc', target: 'gain', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
-                                // ADSR -> Gain (Mod)
                                 { id: 'e_adsr_gain', source: 'adsr', target: 'gain', targetHandle: 'gain', style: { stroke: '#4488ff' }, animated: true },
-                                // Gain -> Output
                                 { id: 'e_gain_out', source: 'gain', target: 'output', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false }
                             ];
 
@@ -615,13 +863,9 @@ export const PlaygroundDemo: FC = () => {
                             ];
                             const edges = [
                                 { id: 'e_t_s', source: 'transport', target: 'sequencer', style: { stroke: '#4488ff', strokeDasharray: '5,5' }, animated: true },
-                                // Sequencer -> ADSR (Direct Trigger)
                                 { id: 'e_s_adsr', source: 'sequencer', target: 'adsr', style: { stroke: '#ff4466' }, animated: true },
-                                // Noise -> Gain
                                 { id: 'e_n_g', source: 'noise', target: 'gain', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
-                                // ADSR -> Gain (Mod)
                                 { id: 'e_a_g', source: 'adsr', target: 'gain', targetHandle: 'gain', style: { stroke: '#4488ff' }, animated: true },
-                                // Gain -> Out
                                 { id: 'e_g_o', source: 'gain', target: 'output', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false }
                             ];
                             useAudioGraphStore.getState().loadGraph(nodes, edges);
@@ -668,19 +912,12 @@ export const PlaygroundDemo: FC = () => {
                                 { id: 'output', type: 'outputNode', dragHandle: '.node-header', position: { x: 1100, y: 200 }, data: { type: 'output', masterGain: 0.4, playing: false, label: 'Output' } as any }
                             ];
                             const edges = [
-                                // Transport -> Piano Roll
                                 { id: 'e_t_pr', source: 'transport', target: 'pianoroll', style: { stroke: '#4488ff', strokeDasharray: '5,5' }, animated: true },
-                                // Piano Roll -> Voice (Trigger)
                                 { id: 'e_pr_v', source: 'pianoroll', target: 'voice', targetHandle: 'trigger', style: { stroke: '#ff4466' }, animated: true },
-                                // Voice (Note) -> Osc (Freq)
                                 { id: 'e_v_osc', source: 'voice', sourceHandle: 'note', target: 'osc', targetHandle: 'frequency', style: { stroke: '#ff8844' }, animated: true },
-                                // Voice (Gate) -> ADSR
                                 { id: 'e_v_adsr', source: 'voice', sourceHandle: 'gate', target: 'adsr', style: { stroke: '#44cc44' }, animated: true },
-                                // Osc -> Gain
                                 { id: 'e_osc_gain', source: 'osc', target: 'gain', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
-                                // ADSR -> Gain (Mod)
                                 { id: 'e_adsr_gain', source: 'adsr', target: 'gain', targetHandle: 'gain', style: { stroke: '#4488ff' }, animated: true },
-                                // Gain -> Output
                                 { id: 'e_gain_out', source: 'gain', target: 'output', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false }
                             ];
                             useAudioGraphStore.getState().loadGraph(nodes, edges);
@@ -719,23 +956,14 @@ export const PlaygroundDemo: FC = () => {
                                 { id: 'output', type: 'outputNode', dragHandle: '.node-header', position: { x: 1200, y: 150 }, data: { type: 'output', masterGain: 0.5, playing: false, label: 'Output' } as any }
                             ];
                             const edges = [
-                                // Transport -> Sequencer
                                 { id: 'e_t_s', source: 'transport', target: 'sequencer', style: { stroke: '#4488ff', strokeDasharray: '5,5' }, animated: true },
-                                // Sequencer -> Voice (Trigger)
                                 { id: 'e_s_v', source: 'sequencer', target: 'voice', targetHandle: 'trigger', style: { stroke: '#ff4466' }, animated: true },
-                                // Voice (Note) -> Osc (Freq)
                                 { id: 'e_v_osc', source: 'voice', sourceHandle: 'note', target: 'osc', targetHandle: 'frequency', style: { stroke: '#ff8844' }, animated: true },
-                                // Voice (Gate) -> ADSR
                                 { id: 'e_v_adsr', source: 'voice', sourceHandle: 'gate', target: 'adsr', style: { stroke: '#44cc44' }, animated: true },
-                                // Osc -> Filter
                                 { id: 'e_osc_filt', source: 'osc', target: 'filter', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
-                                // ADSR -> Filter (Frequency mod)
                                 { id: 'e_adsr_filt', source: 'adsr', target: 'filter', targetHandle: 'frequency', style: { stroke: '#aa44ff' }, animated: true },
-                                // LFO -> Filter (Frequency mod - wobble)
                                 { id: 'e_lfo_filt', source: 'lfo', sourceHandle: 'out', target: 'filter', targetHandle: 'frequency', style: { stroke: '#ff44aa' }, animated: true },
-                                // Filter -> VCA
                                 { id: 'e_filt_vca', source: 'filter', target: 'vca', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
-                                // VCA -> Output
                                 { id: 'e_vca_out', source: 'vca', target: 'output', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false }
                             ];
                             useAudioGraphStore.getState().loadGraph(nodes, edges);
@@ -769,43 +997,93 @@ export const PlaygroundDemo: FC = () => {
                 onDrop={onDrop}
                 onDragOver={onDragOver}
             >
-                <ReactFlow
-                    nodes={nodes as unknown as Node[]}
-                    edges={edges}
-                    onNodesChange={onNodesChange as unknown as OnNodesChange}
-                    onEdgesChange={onEdgesChange}
-                    onConnect={onConnect}
-                    onNodeClick={onNodeClick}
-                    onPaneClick={onPaneClick}
-                    nodeTypes={nodeTypes}
-                    fitView
-                    snapToGrid
-                    snapGrid={[15, 15]}
-                    defaultEdgeOptions={{
-                        type: 'smoothstep',
-                        animated: true,
-                    }}
-                >
-                    <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#2a2a3a" />
-                    <Controls />
-                    <MiniMap
-                        nodeColor={(node) => {
-                            switch (node.type) {
-                                case 'oscNode': return '#ff8844';
-                                case 'gainNode': return '#44cc44';
-                                case 'filterNode': return '#aa44ff';
-                                case 'outputNode': return '#ff4466';
-                                case 'noiseNode': return '#666666';
-                                case 'delayNode': return '#4488ff';
-                                case 'reverbNode': return '#8844ff';
-                                case 'pannerNode': return '#44cccc';
-                                case 'mixerNode': return '#ffaa44';
-                                default: return '#888';
-                            }
+                <div className="graph-tabs">
+                    <div className="graph-tab-list">
+                        {graphs.map((graph) => (
+                            <button
+                                key={graph.id}
+                                className={`graph-tab ${graph.id === activeGraphId ? 'active' : ''}`}
+                                onClick={() => setActiveGraph(graph.id)}
+                                title={graph.name}
+                            >
+                                {graph.name}
+                            </button>
+                        ))}
+                        <button
+                            className="graph-tab add"
+                            onClick={() => createGraph()}
+                            title="New graph"
+                        >
+                            +
+                        </button>
+                    </div>
+                    <div className="graph-name">
+                        <label>Graph</label>
+                        <input
+                            type="text"
+                            value={nameDraft}
+                            onChange={(e) => setNameDraft(e.target.value)}
+                            onBlur={commitGraphName}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    commitGraphName();
+                                    e.currentTarget.blur();
+                                }
+                            }}
+                            placeholder="Graph name"
+                        />
+                        <span className="component-name">{componentName}</span>
+                        <button
+                            type="button"
+                            className="graph-delete"
+                            onClick={() => handleDeleteGraph(activeGraphId)}
+                            title="Delete graph"
+                            disabled={!activeGraphId}
+                        >
+                            🗑 Delete
+                        </button>
+                    </div>
+                </div>
+
+                <div className="flow-wrapper">
+                    <ReactFlow
+                        nodes={nodes as unknown as Node[]}
+                        edges={edges}
+                        onNodesChange={onNodesChange as unknown as OnNodesChange}
+                        onEdgesChange={onEdgesChange}
+                        onConnect={onConnect}
+                        onNodeClick={onNodeClick}
+                        onPaneClick={onPaneClick}
+                        nodeTypes={nodeTypes}
+                        fitView
+                        snapToGrid
+                        snapGrid={[15, 15]}
+                        defaultEdgeOptions={{
+                            type: 'smoothstep',
+                            animated: true,
                         }}
-                        maskColor="rgba(0,0,0,0.8)"
-                    />
-                </ReactFlow>
+                    >
+                        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#2a2a3a" />
+                        <Controls />
+                        <MiniMap
+                            nodeColor={(node) => {
+                                switch (node.type) {
+                                    case 'oscNode': return '#ff8844';
+                                    case 'gainNode': return '#44cc44';
+                                    case 'filterNode': return '#aa44ff';
+                                    case 'outputNode': return '#ff4466';
+                                    case 'noiseNode': return '#666666';
+                                    case 'delayNode': return '#4488ff';
+                                    case 'reverbNode': return '#8844ff';
+                                    case 'pannerNode': return '#44cccc';
+                                    case 'mixerNode': return '#ffaa44';
+                                    default: return '#888';
+                                }
+                            }}
+                            maskColor="rgba(0,0,0,0.8)"
+                        />
+                    </ReactFlow>
+                </div>
             </div>
 
             <div className="inspector-panel">

@@ -10,6 +10,7 @@ import {
     addEdge,
 } from '@xyflow/react';
 import { audioEngine } from './AudioEngine';
+import { normalizeGraphName } from './graphUtils';
 
 // ============================================================================
 // Audio Node Data Types
@@ -173,6 +174,8 @@ export interface SamplerNodeData {
     playbackRate: number;  // Playback speed (1 = normal)
     detune: number;        // Detune in cents
     loaded: boolean;       // Whether the sample is loaded
+    sampleId?: string;     // Cache ID for stored audio
+    fileName?: string;     // Original file name
     label: string;
     [key: string]: unknown;
 }
@@ -198,7 +201,15 @@ export type AudioNodeData = (
     | SamplerNodeData
 ) & Record<string, unknown>;
 
-
+export interface GraphDocument {
+    id: string;
+    name: string;
+    nodes: Node<AudioNodeData>[];
+    edges: Edge[];
+    createdAt: number;
+    updatedAt: number;
+    order: number;
+}
 
 // ============================================================================
 // Store State
@@ -207,6 +218,9 @@ export type AudioNodeData = (
 interface AudioGraphState {
     nodes: Node<AudioNodeData>[];
     edges: Edge[];
+    graphs: GraphDocument[];
+    activeGraphId: string | null;
+    isHydrated: boolean;
     audioContext: AudioContext | null;
     selectedNodeId: string | null;
 
@@ -214,6 +228,14 @@ interface AudioGraphState {
     onNodesChange: OnNodesChange<Node<AudioNodeData>>;
     onEdgesChange: OnEdgesChange;
     onConnect: OnConnect;
+
+    // Graph actions
+    setGraphs: (graphs: GraphDocument[], activeGraphId?: string | null) => void;
+    setActiveGraph: (graphId: string) => void;
+    createGraph: (name?: string) => GraphDocument;
+    renameGraph: (graphId: string, name: string) => void;
+    removeGraph: (graphId: string) => GraphDocument | null;
+    setHydrated: (isHydrated: boolean) => void;
 
     // Custom actions
     addNode: (type: AudioNodeData['type'], position?: { x: number; y: number }) => void;
@@ -227,6 +249,49 @@ interface AudioGraphState {
 
 let nodeIdCounter = 0;
 const getNodeId = () => `node_${++nodeIdCounter}`;
+
+const deepClone = <T>(value: T): T => {
+    if (typeof structuredClone === 'function') {
+        return structuredClone(value);
+    }
+    return JSON.parse(JSON.stringify(value)) as T;
+};
+
+const createGraphId = () => {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+        return crypto.randomUUID();
+    }
+    return `graph_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+};
+
+const stopOutputNodes = (nodes: Node<AudioNodeData>[]) =>
+    nodes.map((node) => {
+        if (node.data.type !== 'output') return node;
+        return {
+            ...node,
+            data: {
+                ...node.data,
+                playing: false,
+            } as OutputNodeData,
+        };
+    });
+
+const syncNodeIdCounter = (nodes: Node<AudioNodeData>[]) => {
+    let maxId = 0;
+
+    nodes.forEach((node) => {
+        const match = /^node_(\d+)$/.exec(node.id);
+        if (!match) return;
+        const value = Number(match[1]);
+        if (Number.isFinite(value)) {
+            maxId = Math.max(maxId, value);
+        }
+    });
+
+    if (maxId > nodeIdCounter) {
+        nodeIdCounter = maxId;
+    }
+};
 
 // Initial nodes - Horizontal layout
 const initialNodes: Node<AudioNodeData>[] = [
@@ -258,55 +323,260 @@ const initialEdges: Edge[] = [
     { id: 'e2-3', source: 'gain_1', target: 'output_1', sourceHandle: 'out', targetHandle: 'in' },
 ];
 
+const initialGraph: GraphDocument = {
+    id: createGraphId(),
+    name: 'Graph 1',
+    nodes: deepClone(initialNodes),
+    edges: deepClone(initialEdges),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    order: 0,
+};
+
 export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
-    nodes: initialNodes,
-    edges: initialEdges,
+    nodes: initialGraph.nodes,
+    edges: initialGraph.edges,
+    graphs: [initialGraph],
+    activeGraphId: initialGraph.id,
+    isHydrated: false,
     audioContext: null,
     selectedNodeId: null,
 
-    setSelectedNode: (nodeId) => {
-        set({ selectedNodeId: nodeId });
+    setHydrated: (isHydrated) => set({ isHydrated }),
+
+    setGraphs: (graphs, activeGraphId) => {
+        const now = Date.now();
+        const normalizedGraphs = (graphs.length ? graphs : get().graphs).map((graph, index) => ({
+            ...graph,
+            name: normalizeGraphName(graph.name),
+            createdAt: graph.createdAt ?? now,
+            updatedAt: graph.updatedAt ?? now,
+            order: graph.order ?? index,
+        }));
+
+        const orderedGraphs = [...normalizedGraphs].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        const fallbackGraph = orderedGraphs[0];
+        if (!fallbackGraph) return;
+
+        const resolvedActiveId = activeGraphId && orderedGraphs.some((graph) => graph.id === activeGraphId)
+            ? activeGraphId
+            : fallbackGraph.id;
+        const activeGraph = orderedGraphs.find((graph) => graph.id === resolvedActiveId) ?? fallbackGraph;
+
+        audioEngine.stop();
+        syncNodeIdCounter(activeGraph.nodes);
+
+        set({
+            graphs: orderedGraphs,
+            activeGraphId: activeGraph.id,
+            nodes: activeGraph.nodes,
+            edges: activeGraph.edges,
+            selectedNodeId: null,
+        });
+
+        audioEngine.refreshConnections(activeGraph.nodes, activeGraph.edges);
+    },
+
+    setActiveGraph: (graphId) => {
+        const state = get();
+        if (state.activeGraphId === graphId) return;
+
+        const targetGraph = state.graphs.find((graph) => graph.id === graphId);
+        if (!targetGraph) return;
+
+        const stoppedNodes = stopOutputNodes(state.nodes);
+        const updatedGraphs = state.graphs.map((graph) => {
+            if (graph.id !== state.activeGraphId) return graph;
+            return {
+                ...graph,
+                nodes: stoppedNodes,
+                updatedAt: Date.now(),
+            };
+        });
+
+        audioEngine.stop();
+        syncNodeIdCounter(targetGraph.nodes);
+
+        set({
+            graphs: updatedGraphs,
+            activeGraphId: graphId,
+            nodes: targetGraph.nodes,
+            edges: targetGraph.edges,
+            selectedNodeId: null,
+        });
+
+        audioEngine.refreshConnections(targetGraph.nodes, targetGraph.edges);
+    },
+    createGraph: (name) => {
+        const state = get();
+        const nextIndex = state.graphs.length + 1;
+        const graphName = normalizeGraphName(name ?? `Graph ${nextIndex}`);
+        const now = Date.now();
+        const order = state.graphs.reduce((max, graph) => Math.max(max, graph.order ?? 0), -1) + 1;
+
+        const graph: GraphDocument = {
+            id: createGraphId(),
+            name: graphName,
+            nodes: deepClone(initialNodes),
+            edges: deepClone(initialEdges),
+            createdAt: now,
+            updatedAt: now,
+            order,
+        };
+
+        const stoppedNodes = stopOutputNodes(state.nodes);
+        const updatedGraphs = state.graphs.map((existing) =>
+            existing.id === state.activeGraphId
+                ? { ...existing, nodes: stoppedNodes, updatedAt: now }
+                : existing
+        );
+
+        syncNodeIdCounter(graph.nodes);
+        audioEngine.stop();
+
+        set({
+            graphs: [...updatedGraphs, graph],
+            activeGraphId: graph.id,
+            nodes: graph.nodes,
+            edges: graph.edges,
+            selectedNodeId: null,
+        });
+
+        audioEngine.refreshConnections(graph.nodes, graph.edges);
+        return graph;
+    },
+
+    renameGraph: (graphId, name) => {
+        const nextName = normalizeGraphName(name);
         set((state) => ({
-            nodes: state.nodes.map((n) => ({
-                ...n,
-                selected: n.id === nodeId,
-            })),
+            graphs: state.graphs.map((graph) =>
+                graph.id === graphId
+                    ? { ...graph, name: nextName, updatedAt: Date.now() }
+                    : graph
+            ),
         }));
     },
 
-    onNodesChange: (changes) => {
-        set({
-            nodes: applyNodeChanges(changes, get().nodes),
+    removeGraph: (graphId) => {
+        const state = get();
+        const targetGraph = state.graphs.find((graph) => graph.id === graphId);
+        if (!targetGraph) return null;
+
+        const remaining = state.graphs.filter((graph) => graph.id !== graphId);
+
+        if (remaining.length === 0) {
+            const now = Date.now();
+            const fallbackGraph: GraphDocument = {
+                id: createGraphId(),
+                name: normalizeGraphName('Graph 1'),
+                nodes: deepClone(initialNodes),
+                edges: deepClone(initialEdges),
+                createdAt: now,
+                updatedAt: now,
+                order: 0,
+            };
+
+            syncNodeIdCounter(fallbackGraph.nodes);
+            audioEngine.stop();
+
+            set({
+                graphs: [fallbackGraph],
+                activeGraphId: fallbackGraph.id,
+                nodes: fallbackGraph.nodes,
+                edges: fallbackGraph.edges,
+                selectedNodeId: null,
+            });
+
+            audioEngine.refreshConnections(fallbackGraph.nodes, fallbackGraph.edges);
+            return targetGraph;
+        }
+
+        if (state.activeGraphId === graphId) {
+            const ordered = [...remaining].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+            const nextGraph = ordered[0] ?? remaining[0];
+
+            audioEngine.stop();
+            syncNodeIdCounter(nextGraph.nodes);
+
+            set({
+                graphs: remaining,
+                activeGraphId: nextGraph.id,
+                nodes: nextGraph.nodes,
+                edges: nextGraph.edges,
+                selectedNodeId: null,
+            });
+
+            audioEngine.refreshConnections(nextGraph.nodes, nextGraph.edges);
+        } else {
+            set({ graphs: remaining });
+        }
+
+        return targetGraph;
+    },
+
+    setSelectedNode: (nodeId) => {
+        set((state) => {
+            const nodes = state.nodes.map((node) => ({
+                ...node,
+                selected: node.id === nodeId,
+            }));
+
+            const graphs = state.activeGraphId
+                ? state.graphs.map((graph) =>
+                    graph.id === state.activeGraphId
+                        ? { ...graph, nodes, updatedAt: Date.now() }
+                        : graph
+                )
+                : state.graphs;
+
+            return {
+                selectedNodeId: nodeId,
+                nodes,
+                graphs,
+            };
         });
-        // Note: We don't trigger engine update here for typical "position" changes.
-        // Data changes come via updateNodeData. 
-        // Deletions come via onNodesChange 'remove' type? 
-        // xyflow calls onNodesChange for deletions if using the delete key.
+    },
+
+    onNodesChange: (changes) => {
+        const nextNodes = applyNodeChanges(changes, get().nodes);
+
+        set((state) => {
+            const graphs = state.activeGraphId
+                ? state.graphs.map((graph) =>
+                    graph.id === state.activeGraphId
+                        ? { ...graph, nodes: nextNodes, updatedAt: Date.now() }
+                        : graph
+                )
+                : state.graphs;
+
+            return { nodes: nextNodes, graphs };
+        });
+
         changes.forEach(change => {
             if (change.type === 'remove') {
-                // If a node is removed, edges might also be removed by flow but we handle checking edges in onEdgesChange 
-                // or we rely on explicit removeNode which updates edges.
-                // However, applyNodeChanges might not update edges? 
-                // xyflow usually handles cascading edge removal if we pass onEdgesChange properly?
-                // Actually we should rely on onEdgesChange for edge removals.
-                // For node removal, we need to stop/disconnect the node in engine.
-                // But our engine is rebuilt from current nodes list if we call refresh maybe?
-                // Actually removeNode action is better for explicit removal. 
-                // If user presses "Delete" key, we might miss it here unless we hook into it.
-                // Let's assume standard interaction is sufficient for now or rely on refreshConnections clearing unconnected nodes? No.
+                // Deletions handled in onEdgesChange/removeNode
             }
         });
     },
 
     onEdgesChange: (changes) => {
-        set({
-            edges: applyEdgeChanges(changes, get().edges),
+        const nextEdges = applyEdgeChanges(changes, get().edges);
+
+        set((state) => {
+            const graphs = state.activeGraphId
+                ? state.graphs.map((graph) =>
+                    graph.id === state.activeGraphId
+                        ? { ...graph, edges: nextEdges, updatedAt: Date.now() }
+                        : graph
+                )
+                : state.graphs;
+
+            return { edges: nextEdges, graphs };
         });
-        // Refresh connections whenever edges change (add/remove/select)
-        // Only strictly need for add/remove, but safe to call if check is efficient.
+
         const hasStructuralChange = changes.some(c => c.type === 'add' || c.type === 'remove');
         if (hasStructuralChange) {
-            audioEngine.refreshConnections(get().nodes, get().edges);
+            audioEngine.refreshConnections(get().nodes, nextEdges);
         }
     },
 
@@ -322,7 +592,18 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
         const newEdges = addEdge({ ...connection, style: edgeStyle, animated: !isAudioConnection }, get().edges);
         set({ edges: newEdges });
 
-        // Refresh engine connections
+        set((state) => {
+            const graphs = state.activeGraphId
+                ? state.graphs.map((graph) =>
+                    graph.id === state.activeGraphId
+                        ? { ...graph, edges: newEdges, updatedAt: Date.now() }
+                        : graph
+                )
+                : state.graphs;
+
+            return { graphs };
+        });
+
         audioEngine.refreshConnections(get().nodes, newEdges);
     },
 
@@ -573,45 +854,78 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
         }
 
         const newNodes = [...get().nodes, newNode];
-        set({ nodes: newNodes });
 
-        // Refresh connections to sync new node to engine
+        set((state) => ({
+            nodes: newNodes,
+            graphs: state.activeGraphId
+                ? state.graphs.map((graph) =>
+                    graph.id === state.activeGraphId
+                        ? { ...graph, nodes: newNodes, updatedAt: Date.now() }
+                        : graph
+                )
+                : state.graphs,
+        }));
+
         audioEngine.refreshConnections(newNodes, get().edges);
     },
 
     updateNodeData: (nodeId, data) => {
-        set({
-            nodes: get().nodes.map((node) =>
-                node.id === nodeId
-                    ? { ...node, data: { ...node.data, ...data } }
-                    : node
-            ),
-        });
+        const nextNodes = get().nodes.map((node) =>
+            node.id === nodeId
+                ? { ...node, data: { ...node.data, ...data } }
+                : node
+        );
 
-        // Trigger Engine Update
+        set((state) => ({
+            nodes: nextNodes,
+            graphs: state.activeGraphId
+                ? state.graphs.map((graph) =>
+                    graph.id === state.activeGraphId
+                        ? { ...graph, nodes: nextNodes, updatedAt: Date.now() }
+                        : graph
+                )
+                : state.graphs,
+        }));
+
         audioEngine.updateNode(nodeId, data);
     },
 
     removeNode: (nodeId) => {
         const newNodes = get().nodes.filter((node) => node.id !== nodeId);
         const newEdges = get().edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId);
-        set({
+
+        set((state) => ({
             nodes: newNodes,
             edges: newEdges,
-        });
+            graphs: state.activeGraphId
+                ? state.graphs.map((graph) =>
+                    graph.id === state.activeGraphId
+                        ? { ...graph, nodes: newNodes, edges: newEdges, updatedAt: Date.now() }
+                        : graph
+                )
+                : state.graphs,
+        }));
 
-        // We should also remove from engine...
-        // audioEngine.removeNode(nodeId); // Not implemented yet
-        // But refreshing connections will at least disconnect logic involving it.
         audioEngine.refreshConnections(newNodes, newEdges);
     },
 
     loadGraph: (nodes, edges) => {
-        set({
+        syncNodeIdCounter(nodes);
+        audioEngine.stop();
+
+        set((state) => ({
             nodes,
             edges,
             selectedNodeId: null,
-        });
+            graphs: state.activeGraphId
+                ? state.graphs.map((graph) =>
+                    graph.id === state.activeGraphId
+                        ? { ...graph, nodes, edges, updatedAt: Date.now() }
+                        : graph
+                )
+                : state.graphs,
+        }));
+
         audioEngine.refreshConnections(nodes, edges);
     },
 
