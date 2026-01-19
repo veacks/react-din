@@ -1,10 +1,10 @@
 import React, { memo, useEffect, useState } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { useAudioGraphStore, type SequencerNodeData } from '../store';
+import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
+import { useAudioGraphStore, type StepSequencerNodeData } from '../store';
 import { audioEngine } from '../AudioEngine';
 import '../playground.css';
 
-export const SequencerNode: React.FC<NodeProps<ReactFlow.Node<SequencerNodeData>>> = memo(({ id, data, selected }) => {
+export const StepSequencerNode: React.FC<NodeProps<Node<StepSequencerNodeData>>> = memo(({ id, data, selected }) => {
     const updateNodeData = useAudioGraphStore((s) => s.updateNodeData);
     const [currentStep, setCurrentStep] = useState<number>(-1);
 

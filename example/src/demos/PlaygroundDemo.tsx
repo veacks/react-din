@@ -27,7 +27,8 @@ import {
     InputNode,
     NoteNode,
     TransportNode,
-    SequencerNode,
+    StepSequencerNode,
+    PianoRollNode,
     ADSRNode,
     VoiceNode,
 } from './playground/nodes';
@@ -47,7 +48,8 @@ const nodeTypes: NodeTypes = {
     inputNode: InputNode as NodeTypes[string],
     noteNode: NoteNode as NodeTypes[string],
     transportNode: TransportNode as NodeTypes[string],
-    sequencerNode: SequencerNode as NodeTypes[string],
+    stepSequencerNode: StepSequencerNode as NodeTypes[string],
+    pianoRollNode: PianoRollNode as NodeTypes[string],
     adsrNode: ADSRNode as NodeTypes[string],
     voiceNode: VoiceNode as NodeTypes[string],
 };
@@ -59,7 +61,8 @@ const nodeCategories = [
         nodes: [
             { type: 'input', label: 'Input', icon: '⏱️', color: '#dddddd' },
             { type: 'transport', label: 'Transport', icon: '⏯️', color: '#dddddd' },
-            { type: 'sequencer', label: 'Sequencer', icon: '🎹', color: '#dddddd' },
+            { type: 'stepSequencer', label: 'Step Sequencer', icon: '🎹', color: '#dddddd' },
+            { type: 'pianoRoll', label: 'Piano Roll', icon: '🎼', color: '#44ccff' },
             { type: 'voice', label: 'Voice', icon: '🗣️', color: '#ff4466' },
             { type: 'adsr', label: 'ADSR', icon: '📈', color: '#dddddd' },
             { type: 'note', label: 'Note', icon: '🎵', color: '#ffcc00' },
@@ -549,7 +552,7 @@ export const PlaygroundDemo: FC = () => {
                         onClick={() => {
                             const nodes: Node<AudioNodeData>[] = [
                                 { id: 'transport', type: 'transportNode', position: { x: 50, y: 50 }, data: { type: 'transport', bpm: 120, playing: false, label: 'Transport' } as any },
-                                { id: 'sequencer', type: 'sequencerNode', position: { x: 50, y: 200 }, data: { type: 'sequencer', steps: 16, pattern: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0], activeSteps: [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false], label: 'Sequencer' } as any },
+                                { id: 'sequencer', type: 'stepSequencerNode', position: { x: 50, y: 200 }, data: { type: 'stepSequencer', steps: 16, pattern: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0], activeSteps: [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false], label: 'Step Sequencer' } as any },
                                 { id: 'voice', type: 'voiceNode', position: { x: 300, y: 200 }, data: { type: 'voice', portamento: 0, label: 'Voice' } as any },
                                 { id: 'osc', type: 'oscNode', position: { x: 550, y: 150 }, data: { type: 'osc', frequency: 0, waveform: 'sawtooth', detune: 0, label: 'Oscillator' } as any },
                                 { id: 'adsr', type: 'adsrNode', position: { x: 550, y: 300 }, data: { type: 'adsr', attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.5, label: 'ADSR' } as any },
@@ -598,7 +601,7 @@ export const PlaygroundDemo: FC = () => {
                         onClick={() => {
                             const nodes: Node<AudioNodeData>[] = [
                                 { id: 'transport', type: 'transportNode', position: { x: 50, y: 50 }, data: { type: 'transport', bpm: 120, playing: false, label: 'Transport' } as any },
-                                { id: 'sequencer', type: 'sequencerNode', position: { x: 50, y: 200 }, data: { type: 'sequencer', steps: 16, pattern: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], activeSteps: [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false], label: 'Kick Seq' } as any },
+                                { id: 'sequencer', type: 'stepSequencerNode', position: { x: 50, y: 200 }, data: { type: 'stepSequencer', steps: 16, pattern: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], activeSteps: [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false], label: 'Kick Seq' } as any },
                                 { id: 'noise', type: 'noiseNode', position: { x: 300, y: 200 }, data: { type: 'noise', noiseType: 'white', label: 'Noise' } as any },
                                 { id: 'adsr', type: 'adsrNode', position: { x: 500, y: 200 }, data: { type: 'adsr', attack: 0.001, decay: 0.1, sustain: 0, release: 0.1, label: 'Env' } as any },
                                 { id: 'gain', type: 'gainNode', position: { x: 700, y: 200 }, data: { type: 'gain', gain: 0, label: 'VCA' } as any },
@@ -635,6 +638,65 @@ export const PlaygroundDemo: FC = () => {
                     >
                         <span style={{ fontSize: '14px' }}>🥁</span>
                         <span>Drum Synth</span>
+                    </button>
+
+                    <button
+                        onClick={() => {
+                            const notes = [
+                                { pitch: 60, step: 0, duration: 1, velocity: 0.8 },  // C4
+                                { pitch: 64, step: 2, duration: 1, velocity: 0.8 },  // E4
+                                { pitch: 67, step: 4, duration: 1, velocity: 0.8 },  // G4
+                                { pitch: 72, step: 6, duration: 2, velocity: 1.0 },  // C5
+                                { pitch: 60, step: 8, duration: 1, velocity: 0.6 },  // C4
+                                { pitch: 62, step: 10, duration: 1, velocity: 0.7 }, // D4
+                                { pitch: 64, step: 12, duration: 1, velocity: 0.8 }, // E4
+                                { pitch: 67, step: 14, duration: 1, velocity: 0.9 }, // G4
+                            ];
+                            const nodes: Node<AudioNodeData>[] = [
+                                { id: 'transport', type: 'transportNode', position: { x: 50, y: 50 }, data: { type: 'transport', bpm: 100, playing: false, label: 'Transport' } as any },
+                                { id: 'pianoroll', type: 'pianoRollNode', position: { x: 50, y: 180 }, data: { type: 'pianoRoll', steps: 16, octaves: 2, baseNote: 48, notes, label: 'Piano Roll' } as any },
+                                { id: 'voice', type: 'voiceNode', position: { x: 500, y: 200 }, data: { type: 'voice', portamento: 0.02, label: 'Voice' } as any },
+                                { id: 'osc', type: 'oscNode', position: { x: 700, y: 150 }, data: { type: 'osc', frequency: 0, waveform: 'sine', detune: 0, label: 'Oscillator' } as any },
+                                { id: 'adsr', type: 'adsrNode', position: { x: 700, y: 300 }, data: { type: 'adsr', attack: 0.05, decay: 0.2, sustain: 0.5, release: 0.3, label: 'ADSR' } as any },
+                                { id: 'gain', type: 'gainNode', position: { x: 900, y: 200 }, data: { type: 'gain', gain: 0, label: 'VCA' } as any },
+                                { id: 'output', type: 'outputNode', position: { x: 1100, y: 200 }, data: { type: 'output', masterGain: 0.4, playing: false, label: 'Output' } as any }
+                            ];
+                            const edges = [
+                                // Transport -> Piano Roll
+                                { id: 'e_t_pr', source: 'transport', target: 'pianoroll', style: { stroke: '#4488ff', strokeDasharray: '5,5' }, animated: true },
+                                // Piano Roll -> Voice (Trigger)
+                                { id: 'e_pr_v', source: 'pianoroll', target: 'voice', targetHandle: 'trigger', style: { stroke: '#ff4466' }, animated: true },
+                                // Voice (Note) -> Osc (Freq)
+                                { id: 'e_v_osc', source: 'voice', sourceHandle: 'note', target: 'osc', targetHandle: 'frequency', style: { stroke: '#ff8844' }, animated: true },
+                                // Voice (Gate) -> ADSR
+                                { id: 'e_v_adsr', source: 'voice', sourceHandle: 'gate', target: 'adsr', style: { stroke: '#44cc44' }, animated: true },
+                                // Osc -> Gain
+                                { id: 'e_osc_gain', source: 'osc', target: 'gain', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
+                                // ADSR -> Gain (Mod)
+                                { id: 'e_adsr_gain', source: 'adsr', target: 'gain', targetHandle: 'gain', style: { stroke: '#4488ff' }, animated: true },
+                                // Gain -> Output
+                                { id: 'e_gain_out', source: 'gain', target: 'output', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false }
+                            ];
+                            useAudioGraphStore.getState().loadGraph(nodes, edges);
+                        }}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            width: '100%',
+                            padding: '10px',
+                            background: '#1e1e2e',
+                            border: '1px solid #44ccff',
+                            borderRadius: '4px',
+                            color: '#44ccff',
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            marginTop: '8px'
+                        }}
+                    >
+                        <span style={{ fontSize: '14px' }}>🎼</span>
+                        <span>Piano Roll Synth</span>
                     </button>
                 </div>
 

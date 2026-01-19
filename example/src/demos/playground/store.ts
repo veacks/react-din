@@ -116,12 +116,30 @@ export interface ADSRNodeData {
     [key: string]: unknown;
 }
 
-export interface SequencerNodeData {
-    type: 'sequencer';
+export interface StepSequencerNodeData {
+    type: 'stepSequencer';
     steps: number;
     pattern: number[]; // Velocities (0-1)
     activeSteps: boolean[]; // On/Off toggles
     label: string;
+    [key: string]: unknown;
+}
+
+export interface NoteEvent {
+    pitch: number;      // MIDI note number (0-127)
+    step: number;       // Start step (0-based)
+    duration: number;   // Duration in steps
+    velocity: number;   // 0-1
+}
+
+export interface PianoRollNodeData {
+    type: 'pianoRoll';
+    steps: number;      // 16, 32, 64
+    octaves: number;    // 2-4 octaves
+    baseNote: number;   // Base MIDI note (e.g., 48 for C3)
+    notes: NoteEvent[];
+    label: string;
+    [key: string]: unknown;
 }
 
 export interface TransportNodeData {
@@ -152,7 +170,8 @@ export type AudioNodeData = (
     | InputNodeData
     | NoteNodeData
     | TransportNodeData
-    | SequencerNodeData
+    | StepSequencerNodeData
+    | PianoRollNodeData
     | ADSRNodeData
     | VoiceNodeData
 ) & Record<string, unknown>;
@@ -410,18 +429,35 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     } as AudioNodeData,
                 };
                 break;
-            case 'sequencer':
+            case 'stepSequencer':
                 newNode = {
                     id,
-                    type: 'sequencerNode',
+                    type: 'stepSequencerNode',
                     position,
                     dragHandle: '.node-header',
                     data: {
-                        type: 'sequencer',
+                        type: 'stepSequencer',
                         steps: 16,
                         pattern: Array(16).fill(0.8), // Default velocity 0.8
                         activeSteps: Array(16).fill(false), // Default all off
-                        label: 'Sequencer'
+                        label: 'Step Sequencer'
+                    } as AudioNodeData,
+                };
+                break;
+
+            case 'pianoRoll':
+                newNode = {
+                    id,
+                    type: 'pianoRollNode',
+                    position,
+                    dragHandle: '.node-header',
+                    data: {
+                        type: 'pianoRoll',
+                        steps: 16,
+                        octaves: 2,
+                        baseNote: 48, // C3
+                        notes: [],
+                        label: 'Piano Roll'
                     } as AudioNodeData,
                 };
                 break;

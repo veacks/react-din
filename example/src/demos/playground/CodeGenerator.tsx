@@ -182,7 +182,12 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
     };
 
     // Helper to render a node and its children (sources)
-    const renderNode = (node: Node<AudioNodeData>, level: number): string => {
+    // usedVoiceIds tracks which Voice nodes have already been used for wrapping
+    const renderNode = (node: Node<AudioNodeData>, level: number, visitedIds: Set<string> = new Set(), usedVoiceIds: Set<string> = new Set()): string => {
+        // Prevent infinite loops
+        if (visitedIds.has(node.id)) return '';
+        visitedIds.add(node.id);
+
         const componentName = getComponentName(node.data.type);
         if (!componentName) return ''; // Skip unknown
 
@@ -196,11 +201,21 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
         const triggerEdges = edges.filter(e => e.target === node.id && e.targetHandle === 'trigger');
         const triggerSequencers = triggerEdges
             .map(e => nodes.find(n => n.id === e.source))
-            .filter((n): n is Node<AudioNodeData> => !!n && n.data.type === 'sequencer');
+            .filter((n): n is Node<AudioNodeData> => !!n && n.data.type === 'stepSequencer');
+
+        // Find Voice nodes that control THIS node via CV outputs (note, gate, velocity)
+        // But only if that Voice hasn't already been used for wrapping
+        const voiceCVEdges = edges.filter(e =>
+            e.target === node.id &&
+            (e.sourceHandle === 'note' || e.sourceHandle === 'gate' || e.sourceHandle === 'velocity')
+        );
+        const controllingVoices = voiceCVEdges
+            .map(e => nodes.find(n => n.id === e.source))
+            .filter((n): n is Node<AudioNodeData> => !!n && n.data.type === 'voice' && !usedVoiceIds.has(n.id));
 
         // Separate Sequencers from Audio Sources
-        const sequencers = [...sources.filter(n => n.data.type === 'sequencer'), ...triggerSequencers];
-        const audioSources = sources.filter(n => n.data.type !== 'sequencer');
+        const sequencers = [...sources.filter(n => n.data.type === 'stepSequencer'), ...triggerSequencers];
+        const audioSources = sources.filter(n => n.data.type !== 'stepSequencer' && n.data.type !== 'voice');
 
         const props = renderProps(node);
         const indentation = indent(level);
@@ -208,7 +223,7 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
 
         if (audioSources.length > 0) {
             audioSources.forEach(source => {
-                content += '\n' + renderNode(source, level + 1);
+                content += '\n' + renderNode(source, level + 1, visitedIds, usedVoiceIds);
             });
         }
 
@@ -219,7 +234,41 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
             nodeJsx = `${indentation}<${componentName}${props} />`;
         }
 
-        // Wrap in Track if sequenced
+        // If this node is controlled by a Voice via CV, wrap it in Voice
+        // Mark the Voice as used to prevent double-wrapping
+        if (controllingVoices.length > 0 && node.data.type !== 'voice') {
+            const voice = controllingVoices[0];
+            usedVoiceIds.add(voice.id); // Mark as used
+            const voiceProps = renderProps(voice);
+
+            // Check if Voice itself is triggered by a sequencer
+            const voiceSequencerEdges = edges.filter(e => e.target === voice.id && e.targetHandle === 'trigger');
+            const voiceSequencers = voiceSequencerEdges
+                .map(e => nodes.find(n => n.id === e.source))
+                .filter((n): n is Node<AudioNodeData> => !!n && n.data.type === 'stepSequencer');
+
+            let wrappedJsx = `${indentation}<Voice${voiceProps}>\n` +
+                nodeJsx.split('\n').map(l => indent(1) + l).join('\n') + '\n' +
+                `${indentation}</Voice>`;
+
+            // If Voice is sequenced, wrap in Track
+            if (voiceSequencers.length > 0) {
+                const seq = voiceSequencers[0];
+                const seqData = seq.data as any;
+                const activeSteps = seqData.activeSteps || Array(seqData.steps || 16).fill(false);
+                const velocities = seqData.pattern || Array(seqData.steps || 16).fill(0.8);
+                const pattern = activeSteps.map((on: boolean, i: number) => on ? (velocities[i] ?? 1) : 0);
+                const patternStr = `[${pattern.join(', ')}]`;
+
+                return `${indentation}<Track steps={${seqData.steps}} pattern={${patternStr}}>\n` +
+                    wrappedJsx.split('\n').map(l => indent(1) + l).join('\n') + '\n' +
+                    `${indentation}</Track>`;
+            }
+
+            return wrappedJsx;
+        }
+
+        // Wrap in Track if sequenced (direct sequencer -> node connection)
         if (sequencers.length > 0) {
             const seq = sequencers[0]; // Determine primary sequencer
             const seqData = seq.data as any;
@@ -253,7 +302,7 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
         usedTypes.add('useTransport');
     }
 
-    const hasSequencer = nodes.some(n => n.data.type === 'sequencer');
+    const hasSequencer = nodes.some(n => n.data.type === 'stepSequencer');
     if (hasSequencer) {
         usedTypes.add('Sequencer');
         usedTypes.add('Track');
@@ -287,7 +336,7 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
         // Render roots
         let nodesContent = '';
         rootNodes.forEach(root => {
-            if (root.data.type !== 'transport' && root.data.type !== 'sequencer') {
+            if (root.data.type !== 'transport' && root.data.type !== 'stepSequencer') {
                 nodesContent += renderNode(root, innerLevel + 1) + '\n';
             }
         });
@@ -365,7 +414,7 @@ function getComponentName(type: string): string | null {
         case 'noise': return 'Noise';
         case 'adsr': return 'ADSR';
         case 'voice': return 'Voice';
-        case 'sequencer': return null; // Logic handled in renderNode wrap
+        case 'stepSequencer': return null; // Logic handled in renderNode wrap
         case 'input': return null; // Input node is usually UI specific, skip for audio graph code
         case 'transport': return null; // Handled in provider/hook logic
         default: return null;

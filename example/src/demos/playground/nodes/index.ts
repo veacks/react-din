@@ -10,6 +10,7 @@ export { default as MixerNode } from './MixerNode';
 export { default as InputNode } from './InputNode';
 export { default as NoteNode } from './NoteNode';
 export { TransportNode } from './TransportNode';
-export { SequencerNode } from './SequencerNode';
+export { StepSequencerNode } from './StepSequencerNode';
+export { PianoRollNode } from './PianoRollNode';
 export { ADSRNode } from './ADSRNode';
 export { VoiceNode } from './VoiceNode';

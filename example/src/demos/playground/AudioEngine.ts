@@ -27,6 +27,7 @@ interface AudioNodeInstance {
     outputs?: Map<string, AudioNode>;
     // Custom data
     sequencerData?: any;
+    pianoRollData?: any;
     adsrData?: any;
     voiceData?: any;
 }
@@ -160,7 +161,7 @@ export class AudioEngine {
 
             // Find all sequencer nodes
             this.audioNodes.forEach((instance, id) => {
-                if (instance.type === 'sequencer') {
+                if (instance.type === 'stepSequencer') {
                     const seqInstance = instance as any;
                     if (seqInstance.sequencerData) {
                         const { steps, pattern, activeSteps } = seqInstance.sequencerData;
@@ -190,6 +191,37 @@ export class AudioEngine {
                                         this.triggerVoice(edge.target, time, velocity, stepDuration * 0.8);
                                     }
                                 }
+                            });
+                        }
+                    }
+                }
+
+                // Piano Roll handling
+                if (instance.type === 'pianoRoll') {
+                    const prInstance = instance as any;
+                    if (prInstance.pianoRollData) {
+                        const { steps, notes } = prInstance.pianoRollData;
+                        const stepIndex = beatNumber % (steps || 16);
+
+                        // Find notes that start at this step
+                        const notesAtStep = notes.filter((n: any) => n.step === stepIndex);
+
+                        if (notesAtStep.length > 0) {
+                            const secondsPerBeat = 60.0 / this.bpm;
+                            const stepDuration = 0.25 * secondsPerBeat;
+
+                            notesAtStep.forEach((noteEvent: any) => {
+                                const { pitch, duration, velocity } = noteEvent;
+                                const noteDuration = duration * stepDuration;
+
+                                // Trigger connected Voice nodes with pitch info
+                                const connectedEdges = this.edges.filter(e => e.source === id);
+                                connectedEdges.forEach(edge => {
+                                    const targetInstance = this.audioNodes.get(edge.target);
+                                    if (targetInstance && targetInstance.type === 'voice') {
+                                        this.triggerVoiceWithPitch(edge.target, time, pitch, velocity, noteDuration * 0.9);
+                                    }
+                                });
                             });
                         }
                     }
@@ -250,6 +282,48 @@ export class AudioEngine {
             });
         }
 
+        if (velocitySource) {
+            velocitySource.offset.setValueAtTime(velocity, time);
+        }
+    }
+
+    /**
+     * Trigger a Voice node with a specific MIDI pitch
+     */
+    private triggerVoiceWithPitch(voiceId: string, time: number, midiPitch: number, velocity: number, duration: number) {
+        const instance = this.audioNodes.get(voiceId);
+        if (!instance || !instance.outputs) return;
+
+        const freqSource = instance.outputs.get('note') as ConstantSourceNode;
+        const gateSource = instance.outputs.get('gate') as ConstantSourceNode;
+        const velocitySource = instance.outputs.get('velocity') as ConstantSourceNode;
+
+        // Convert MIDI pitch to frequency: f = 440 * 2^((n-69)/12)
+        const frequency = 440 * Math.pow(2, (midiPitch - 69) / 12);
+
+        // 1. Frequency (Note)
+        if (freqSource) {
+            freqSource.offset.setValueAtTime(frequency, time);
+        }
+
+        // 2. Gate
+        if (gateSource) {
+            gateSource.offset.setValueAtTime(1, time);
+            gateSource.offset.setValueAtTime(0, time + duration);
+
+            // Propagate Trigger to connected nodes (e.g. ADSR) via Gate handle
+            const connectedEdges = this.edges.filter(e => e.source === voiceId && e.sourceHandle === 'gate');
+            connectedEdges.forEach(edge => {
+                const targetInstance = this.audioNodes.get(edge.target);
+                if (targetInstance) {
+                    if (targetInstance.type === 'adsr') {
+                        this.triggerAdsr(edge.target, time, velocity, duration);
+                    }
+                }
+            });
+        }
+
+        // 3. Velocity
         if (velocitySource) {
             velocitySource.offset.setValueAtTime(velocity, time);
         }
@@ -474,7 +548,7 @@ export class AudioEngine {
                     }
                 };
             }
-            case 'sequencer': {
+            case 'stepSequencer': {
                 const seqData = data as any; // SequencerNodeData
                 // Output is a ConstantSourceNode acting as a Control Signal (Trigger/Gate)
                 const source = ctx.createConstantSource();
@@ -483,11 +557,28 @@ export class AudioEngine {
                 // Store data on instance for scheduler
                 return {
                     node: source,
-                    type: 'sequencer',
+                    type: 'stepSequencer',
                     sequencerData: {
                         steps: seqData.steps,
                         pattern: seqData.pattern,
                         activeSteps: seqData.activeSteps
+                    }
+                };
+            }
+            case 'pianoRoll': {
+                const prData = data as any; // PianoRollNodeData
+                // Piano Roll also uses a ConstantSourceNode for output
+                const source = ctx.createConstantSource();
+                source.offset.value = 0;
+
+                return {
+                    node: source,
+                    type: 'pianoRoll',
+                    pianoRollData: {
+                        steps: prData.steps,
+                        octaves: prData.octaves,
+                        baseNote: prData.baseNote,
+                        notes: prData.notes || []
                     }
                 };
             }
@@ -842,11 +933,17 @@ export class AudioEngine {
             if ('masterGain' in data && typeof data.masterGain === 'number') {
                 node.gain.setTargetAtTime(data.masterGain, currentTime, 0.01);
             }
-        } else if (instance.type === 'sequencer') {
+        } else if (instance.type === 'stepSequencer') {
             const seqInstance = instance as any;
             if (seqInstance.sequencerData) {
                 if ('pattern' in data) seqInstance.sequencerData.pattern = data.pattern;
                 if ('activeSteps' in data) seqInstance.sequencerData.activeSteps = data.activeSteps;
+            }
+        } else if (instance.type === 'pianoRoll') {
+            const prInstance = instance as any;
+            if (prInstance.pianoRollData) {
+                if ('notes' in data) prInstance.pianoRollData.notes = data.notes;
+                if ('steps' in data) prInstance.pianoRollData.steps = data.steps;
             }
         } else if (instance.type === 'adsr') {
             const adsrInstance = instance as any;
