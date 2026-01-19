@@ -12,7 +12,10 @@ import type {
     MixerNodeData,
     InputNodeData,
     NoteNodeData,
+    VoiceNodeData,
 } from './store';
+
+import type { TriggerEvent } from '../../../../src/sequencer/types';
 
 interface AudioNodeInstance {
     node: AudioNode;
@@ -25,6 +28,7 @@ interface AudioNodeInstance {
     // Custom data
     sequencerData?: any;
     adsrData?: any;
+    voiceData?: any;
 }
 
 /**
@@ -176,12 +180,15 @@ export class AudioEngine {
                             node.offset.setValueAtTime(0, time + (stepDuration * 0.8)); // Release at 80%
 
                             // 2. Trigger connected ADSRs
-                            // Find edges from this sequencer
                             const connectedEdges = this.edges.filter(e => e.source === id);
                             connectedEdges.forEach(edge => {
                                 const targetInstance = this.audioNodes.get(edge.target);
-                                if (targetInstance && targetInstance.type === 'adsr') {
-                                    this.triggerAdsr(edge.target, time, velocity, stepDuration * 0.8);
+                                if (targetInstance) {
+                                    if (targetInstance.type === 'adsr') {
+                                        this.triggerAdsr(edge.target, time, velocity, stepDuration * 0.8);
+                                    } else if (targetInstance.type === 'voice') {
+                                        this.triggerVoice(edge.target, time, velocity, stepDuration * 0.8);
+                                    }
                                 }
                             });
                         }
@@ -206,6 +213,48 @@ export class AudioEngine {
         this.nextNoteTime = this.audioContext?.currentTime || 0;
         scheduler();
     }
+
+    private triggerVoice(voiceId: string, time: number, velocity: number, duration: number) {
+        const instance = this.audioNodes.get(voiceId);
+        if (!instance || !instance.outputs) return;
+
+        const freqSource = instance.outputs.get('note') as ConstantSourceNode;
+        const gateSource = instance.outputs.get('gate') as ConstantSourceNode;
+        const velocitySource = instance.outputs.get('velocity') as ConstantSourceNode;
+
+        // 1. Frequency (Note)
+        // Default to C4 (261.63 Hz) for now since Sequencer doesn't provide pitch
+        if (freqSource) {
+            // We can set a fixed note or random, but for consistency let's use C4
+            // User can modulate this later if we add Pitch inputs to Voice
+            freqSource.offset.setValueAtTime(261.63, time);
+        }
+
+        // 2. Gate
+        if (gateSource) {
+            gateSource.offset.setValueAtTime(1, time);
+            gateSource.offset.setValueAtTime(0, time + duration);
+
+            // Propagate Trigger to connected nodes (e.g. ADSR) via Gate handle
+            // This simulates CV triggering for the scheduler-driven nodes
+            const connectedEdges = this.edges.filter(e => e.source === voiceId && e.sourceHandle === 'gate');
+            connectedEdges.forEach(edge => {
+                const targetInstance = this.audioNodes.get(edge.target);
+                if (targetInstance) {
+                    if (targetInstance.type === 'adsr') {
+                        this.triggerAdsr(edge.target, time, velocity, duration);
+                    } else if (targetInstance.type === 'voice') {
+                        this.triggerVoice(edge.target, time, velocity, duration);
+                    }
+                }
+            });
+        }
+
+        if (velocitySource) {
+            velocitySource.offset.setValueAtTime(velocity, time);
+        }
+    }
+
 
     private triggerAdsr(adsrId: string, time: number, velocity: number, duration: number) {
         const instance = this.audioNodes.get(adsrId);
@@ -276,7 +325,7 @@ export class AudioEngine {
                 try {
                     // Determine source node (handle output)
                     let sourceNode: AudioNode = sourceInstance.node;
-                    if (sourceInstance.type === 'input' && edge.sourceHandle && sourceInstance.outputs) {
+                    if (edge.sourceHandle && sourceInstance.outputs) {
                         const specificOutput = sourceInstance.outputs.get(edge.sourceHandle);
                         if (specificOutput) {
                             sourceNode = specificOutput;
@@ -290,8 +339,8 @@ export class AudioEngine {
                         if (param) {
                             sourceNode.connect(param);
 
-                            // If connecting a Note node (absolute Hz) to frequency, zero out the base frequency
-                            if (sourceInstance.type === 'note' && edge.targetHandle === 'frequency') {
+                            // If connecting a Note node (absolute Hz) or Voice node (outputs Hz) to frequency, zero out the base frequency
+                            if ((sourceInstance.type === 'note' || sourceInstance.type === 'voice') && edge.targetHandle === 'frequency') {
                                 param.value = 0;
                             }
                         }
@@ -395,6 +444,33 @@ export class AudioEngine {
                         decay: adsrData.decay,
                         sustain: adsrData.sustain,
                         release: adsrData.release
+                    }
+                };
+            }
+            case 'voice': {
+                const voiceData = data as VoiceNodeData;
+                const dummy = ctx.createGain(); // Dummy main node, we use outputs
+
+                const outputs = new Map<string, AudioNode>();
+
+                const freqSource = ctx.createConstantSource();
+                freqSource.offset.value = 440;
+                outputs.set('note', freqSource); // Handle ID 'note' (Frequency)
+
+                const gateSource = ctx.createConstantSource();
+                gateSource.offset.value = 0;
+                outputs.set('gate', gateSource);
+
+                const velocitySource = ctx.createConstantSource();
+                velocitySource.offset.value = 0;
+                outputs.set('velocity', velocitySource);
+
+                return {
+                    node: dummy,
+                    type: 'voice',
+                    outputs,
+                    voiceData: {
+                        portamento: voiceData.portamento
                     }
                 };
             }
@@ -633,7 +709,7 @@ export class AudioEngine {
                 try {
                     // Determine source node (handle output)
                     let sourceNode: AudioNode = sourceInstance.node;
-                    if (sourceInstance.type === 'input' && edge.sourceHandle && sourceInstance.outputs) {
+                    if (edge.sourceHandle && sourceInstance.outputs) {
                         const specificOutput = sourceInstance.outputs.get(edge.sourceHandle);
                         if (specificOutput) {
                             sourceNode = specificOutput;
@@ -647,8 +723,8 @@ export class AudioEngine {
                         if (param) {
                             sourceNode.connect(param);
 
-                            // If connecting a Note node (absolute Hz) to frequency, zero out the base frequency
-                            if (sourceInstance.type === 'note' && edge.targetHandle === 'frequency') {
+                            // If connecting a Note node (absolute Hz) or Voice node (outputs Hz) to frequency, zero out the base frequency
+                            if ((sourceInstance.type === 'note' || sourceInstance.type === 'voice') && edge.targetHandle === 'frequency') {
                                 param.value = 0;
                             }
                         }
@@ -779,6 +855,10 @@ export class AudioEngine {
                 if ('decay' in data) adsrInstance.adsrData.decay = data.decay;
                 if ('sustain' in data) adsrInstance.adsrData.sustain = data.sustain;
                 if ('release' in data) adsrInstance.adsrData.release = data.release;
+            }
+        } else if (instance.type === 'voice') {
+            if ('portamento' in data && instance.voiceData) {
+                instance.voiceData.portamento = data.portamento;
             }
         }
     }

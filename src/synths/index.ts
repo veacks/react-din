@@ -42,3 +42,5 @@ export { FMSynth } from './FMSynth';
 export { AMSynth } from './AMSynth';
 export { NoiseSynth } from './NoiseSynth';
 export { DrumSynth } from './DrumSynth';
+export { Voice, type VoiceProps, type VoiceRenderProps } from './Voice';
+export { PolyVoice, type PolyVoiceProps } from './PolyVoice';

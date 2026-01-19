@@ -131,6 +131,14 @@ export interface TransportNodeData {
     label: string;
 }
 
+export interface VoiceNodeData {
+    type: 'voice';
+    /** Portamento time in seconds */
+    portamento: number;
+    label: string;
+    [key: string]: unknown;
+}
+
 export type AudioNodeData = (
     | OscNodeData
     | GainNodeData
@@ -146,6 +154,7 @@ export type AudioNodeData = (
     | TransportNodeData
     | SequencerNodeData
     | ADSRNodeData
+    | VoiceNodeData
 ) & Record<string, unknown>;
 
 
@@ -169,6 +178,7 @@ interface AudioGraphState {
     addNode: (type: AudioNodeData['type'], position?: { x: number; y: number }) => void;
     updateNodeData: (nodeId: string, data: Partial<AudioNodeData>) => void;
     removeNode: (nodeId: string) => void;
+    loadGraph: (nodes: Node<AudioNodeData>[], edges: Edge[]) => void;
     setPlaying: (playing: boolean) => void;
     setSelectedNode: (nodeId: string | null) => void;
     initAudioContext: () => void;
@@ -183,18 +193,21 @@ const initialNodes: Node<AudioNodeData>[] = [
         id: 'osc_1',
         type: 'oscNode',
         position: { x: 50, y: 150 },
+        dragHandle: '.node-header',
         data: { type: 'osc', frequency: 440, detune: 0, waveform: 'sine', label: 'Oscillator' } as AudioNodeData,
     },
     {
         id: 'gain_1',
         type: 'gainNode',
         position: { x: 300, y: 150 },
+        dragHandle: '.node-header',
         data: { type: 'gain', gain: 0.5, label: 'Gain' } as AudioNodeData,
     },
     {
         id: 'output_1',
         type: 'outputNode',
         position: { x: 520, y: 150 },
+        dragHandle: '.node-header',
         data: { type: 'output', playing: false, masterGain: 0.5, label: 'Output' } as AudioNodeData,
     },
 ];
@@ -282,6 +295,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'oscNode',
                     position,
+                    dragHandle: '.node-header',
                     data: { type: 'osc', frequency: 440, detune: 0, waveform: 'sine', label: 'Oscillator' } as AudioNodeData,
                 };
                 break;
@@ -290,6 +304,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'gainNode',
                     position,
+                    dragHandle: '.node-header',
                     data: { type: 'gain', gain: 0.5, label: 'Gain' } as AudioNodeData,
                 };
                 break;
@@ -298,6 +313,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'filterNode',
                     position,
+                    dragHandle: '.node-header',
                     data: {
                         type: 'filter',
                         filterType: 'lowpass',
@@ -314,6 +330,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'outputNode',
                     position,
+                    dragHandle: '.node-header',
                     data: { type: 'output', playing: false, masterGain: 0.5, label: 'Output' } as AudioNodeData,
                 };
                 break;
@@ -322,6 +339,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'noiseNode',
                     position,
+                    dragHandle: '.node-header',
                     data: { type: 'noise', noiseType: 'white', label: 'Noise' } as AudioNodeData,
                 };
                 break;
@@ -330,6 +348,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'delayNode',
                     position,
+                    dragHandle: '.node-header',
                     data: { type: 'delay', delayTime: 0.3, feedback: 0.4, label: 'Delay' } as AudioNodeData,
                 };
                 break;
@@ -338,6 +357,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'reverbNode',
                     position,
+                    dragHandle: '.node-header',
                     data: { type: 'reverb', decay: 2, mix: 0.5, label: 'Reverb' } as AudioNodeData,
                 };
                 break;
@@ -346,6 +366,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'pannerNode',
                     position,
+                    dragHandle: '.node-header',
                     data: { type: 'panner', pan: 0, label: 'Pan' } as AudioNodeData,
                 };
                 break;
@@ -354,6 +375,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'mixerNode',
                     position,
+                    dragHandle: '.node-header',
                     data: { type: 'mixer', inputs: 3, label: 'Mixer' } as AudioNodeData,
                 };
                 break;
@@ -362,6 +384,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'inputNode',
                     position,
+                    dragHandle: '.node-header',
                     data: {
                         type: 'input',
                         transportEnabled: true,
@@ -376,6 +399,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'noteNode',
                     position,
+                    dragHandle: '.node-header',
                     data: {
                         type: 'note',
                         note: 'C',
@@ -391,6 +415,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'sequencerNode',
                     position,
+                    dragHandle: '.node-header',
                     data: {
                         type: 'sequencer',
                         steps: 16,
@@ -406,6 +431,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'adsrNode',
                     position,
+                    dragHandle: '.node-header',
                     data: {
                         type: 'adsr',
                         attack: 0.1,
@@ -422,6 +448,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     id,
                     type: 'transportNode',
                     position,
+                    dragHandle: '.node-header',
                     data: {
                         type: 'transport',
                         bpm: 120,
@@ -432,6 +459,20 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                         barsPerPhrase: 4,
                         swing: 0,
                         label: 'Transport'
+                    } as AudioNodeData,
+                };
+                break;
+
+            case 'voice':
+                newNode = {
+                    id,
+                    type: 'voiceNode',
+                    position,
+                    dragHandle: '.node-header',
+                    data: {
+                        type: 'voice',
+                        portamento: 0,
+                        label: 'Voice'
                     } as AudioNodeData,
                 };
                 break;
@@ -471,6 +512,15 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
         // audioEngine.removeNode(nodeId); // Not implemented yet
         // But refreshing connections will at least disconnect logic involving it.
         audioEngine.refreshConnections(newNodes, newEdges);
+    },
+
+    loadGraph: (nodes, edges) => {
+        set({
+            nodes,
+            edges,
+            selectedNodeId: null,
+        });
+        audioEngine.refreshConnections(nodes, edges);
     },
 
     setPlaying: (playing) => {

@@ -211,6 +211,31 @@ import { Synth, MonoSynth, FMSynth, AMSynth, NoiseSynth, Envelope } from 'react-
 <Envelope attack={0.01} decay={0.2} sustain={0.7} release={0.5}>
   <Osc type="sawtooth" frequency={440} autoStart />
 </Envelope>
+
+// Custom Patching with Voice (Mono)
+<Track id="lead" pattern={pattern}>
+  <Voice portamento={0.02}>
+    {(v) => (
+      <Envelope trigger={v.gate} velocity={v.velocity} duration={v.duration}>
+        <Filter frequency={v.frequency * 4}>
+           {/* v.oscRef allows Voice to schedule frequency updates without re-renders */}
+           <Osc nodeRef={v.oscRef} type="sawtooth" autoStart />
+        </Filter>
+      </Envelope>
+    )}
+  </Voice>
+</Track>
+
+// Polyphonic Patching
+<Track id="pad" pattern={pattern}>
+  <PolyVoice voices={8} notes={notes} portamento={0.05}>
+    {(v) => (
+      <Envelope trigger={v.gate} velocity={v.velocity} duration={v.duration}>
+        <Osc nodeRef={v.oscRef} type="sine" autoStart />
+      </Envelope>
+    )}
+  </PolyVoice>
+</Track>
 ```
 
 ### 3D Spatial Audio

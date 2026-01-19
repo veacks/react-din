@@ -224,6 +224,8 @@ export {
     DEFAULT_ENVELOPE,
     DEFAULT_OSCILLATOR,
     DEFAULT_FILTER,
+    Voice,
+    PolyVoice,
 } from './synths';
 
 export type {
@@ -243,5 +245,8 @@ export type {
     DrumSynthProps,
     DrumOscillatorConfig,
     DrumNoiseConfig,
+    VoiceProps,
+    VoiceRenderProps,
+    PolyVoiceProps,
 } from './synths';
 

@@ -53,7 +53,16 @@ export interface TriggerEvent {
     /**
      * Additional custom data attached to the trigger.
      */
+    /**
+     * Additional custom data attached to the trigger.
+     */
     data?: Record<string, unknown>;
+
+    /**
+     * MIDI note number (0-127).
+     * @default 60 (C4)
+     */
+    note: number;
 }
 
 // =============================================================================

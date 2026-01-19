@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useAudioGraphStore, type AudioNodeData, type OscNodeData, type GainNodeData, type FilterNodeData, type DelayNodeData, type ReverbNodeData, type StereoPannerNodeData, type NoteNodeData, type InputNodeData } from './store';
+import { useAudioGraphStore, type AudioNodeData, type OscNodeData, type GainNodeData, type FilterNodeData, type DelayNodeData, type ReverbNodeData, type StereoPannerNodeData, type NoteNodeData, type InputNodeData, type ADSRNodeData, type VoiceNodeData } from './store';
 import { type Node, type Edge } from '@xyflow/react';
 
 export const CodeGenerator: React.FC = () => {
@@ -166,6 +166,17 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
             case 'noise':
                 // Noise component props?
                 break;
+            case 'adsr':
+                const adsr = data as ADSRNodeData;
+                if (adsr.attack !== undefined) props.push(`attack={${adsr.attack}}`);
+                if (adsr.decay !== undefined) props.push(`decay={${adsr.decay}}`);
+                if (adsr.sustain !== undefined) props.push(`sustain={${adsr.sustain}}`);
+                if (adsr.release !== undefined) props.push(`release={${adsr.release}}`);
+                break;
+            case 'voice':
+                const voice = data as VoiceNodeData;
+                if (voice.portamento !== undefined && voice.portamento > 0) props.push(`portamento={${voice.portamento}}`);
+                break;
         }
         return props.length > 0 ? ' ' + props.join(' ') : '';
     };
@@ -175,14 +186,20 @@ export function generateCode(nodes: Node<AudioNodeData>[], edges: Edge[], includ
         const componentName = getComponentName(node.data.type);
         if (!componentName) return ''; // Skip unknown
 
-        // Find sources connected TO this node
+        // Find sources connected TO this node (audio/modulation edges)
         const sources = audioEdges
             .filter(e => e.target === node.id)
             .map(e => nodes.find(n => n.id === e.source))
             .filter((n): n is Node<AudioNodeData> => !!n);
 
+        // ALSO find sequencers connected via trigger edges (targetHandle === 'trigger')
+        const triggerEdges = edges.filter(e => e.target === node.id && e.targetHandle === 'trigger');
+        const triggerSequencers = triggerEdges
+            .map(e => nodes.find(n => n.id === e.source))
+            .filter((n): n is Node<AudioNodeData> => !!n && n.data.type === 'sequencer');
+
         // Separate Sequencers from Audio Sources
-        const sequencers = sources.filter(n => n.data.type === 'sequencer');
+        const sequencers = [...sources.filter(n => n.data.type === 'sequencer'), ...triggerSequencers];
         const audioSources = sources.filter(n => n.data.type !== 'sequencer');
 
         const props = renderProps(node);
@@ -346,6 +363,8 @@ function getComponentName(type: string): string | null {
         case 'mixer': return 'Gain'; // Mixer is just a summing Gain
         case 'note': return 'ConstantSource'; // Assuming ConstantSource export
         case 'noise': return 'Noise';
+        case 'adsr': return 'ADSR';
+        case 'voice': return 'Voice';
         case 'sequencer': return null; // Logic handled in renderNode wrap
         case 'input': return null; // Input node is usually UI specific, skip for audio graph code
         case 'transport': return null; // Handled in provider/hook logic

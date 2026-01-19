@@ -29,6 +29,7 @@ import {
     TransportNode,
     SequencerNode,
     ADSRNode,
+    VoiceNode,
 } from './playground/nodes';
 import { generateCode } from './playground/CodeGenerator';
 
@@ -48,6 +49,7 @@ const nodeTypes: NodeTypes = {
     transportNode: TransportNode as NodeTypes[string],
     sequencerNode: SequencerNode as NodeTypes[string],
     adsrNode: ADSRNode as NodeTypes[string],
+    voiceNode: VoiceNode as NodeTypes[string],
 };
 
 // Node palette categories
@@ -58,6 +60,7 @@ const nodeCategories = [
             { type: 'input', label: 'Input', icon: '⏱️', color: '#dddddd' },
             { type: 'transport', label: 'Transport', icon: '⏯️', color: '#dddddd' },
             { type: 'sequencer', label: 'Sequencer', icon: '🎹', color: '#dddddd' },
+            { type: 'voice', label: 'Voice', icon: '🗣️', color: '#ff4466' },
             { type: 'adsr', label: 'ADSR', icon: '📈', color: '#dddddd' },
             { type: 'note', label: 'Note', icon: '🎵', color: '#ffcc00' },
             { type: 'osc', label: 'Oscillator', icon: '◐', color: '#ff8844' },
@@ -389,6 +392,11 @@ export const PlaygroundDemo: FC = () => {
                     font-weight: 600;
                     font-size: 11px;
                     color: #fff;
+                    cursor: grab;
+                }
+                
+                .node-header:active {
+                    cursor: grabbing;
                 }
 
                 .osc-node .node-header { background: #ff8844; }
@@ -534,6 +542,102 @@ export const PlaygroundDemo: FC = () => {
 
             <div className="sidebar">
                 <NodePalette />
+
+                <div className="templates-section" style={{ borderTop: '1px solid #2a2a3a', padding: '12px', flex: '0 0 auto' }}>
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '10px', textTransform: 'uppercase', color: '#555', letterSpacing: '1px' }}>Templates</h4>
+                    <button
+                        onClick={() => {
+                            const nodes: Node<AudioNodeData>[] = [
+                                { id: 'transport', type: 'transportNode', position: { x: 50, y: 50 }, data: { type: 'transport', bpm: 120, playing: false, label: 'Transport' } as any },
+                                { id: 'sequencer', type: 'sequencerNode', position: { x: 50, y: 200 }, data: { type: 'sequencer', steps: 16, pattern: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0], activeSteps: [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false], label: 'Sequencer' } as any },
+                                { id: 'voice', type: 'voiceNode', position: { x: 300, y: 200 }, data: { type: 'voice', portamento: 0, label: 'Voice' } as any },
+                                { id: 'osc', type: 'oscNode', position: { x: 550, y: 150 }, data: { type: 'osc', frequency: 0, waveform: 'sawtooth', detune: 0, label: 'Oscillator' } as any },
+                                { id: 'adsr', type: 'adsrNode', position: { x: 550, y: 300 }, data: { type: 'adsr', attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.5, label: 'ADSR' } as any },
+                                { id: 'gain', type: 'gainNode', position: { x: 800, y: 200 }, data: { type: 'gain', gain: 0, label: 'VCA' } as any },
+                                { id: 'output', type: 'outputNode', position: { x: 1000, y: 200 }, data: { type: 'output', masterGain: 0.5, playing: false, label: 'Output' } as any }
+                            ];
+                            const edges = [
+                                // Transport -> Sequencer
+                                { id: 'e_t_s', source: 'transport', target: 'sequencer', style: { stroke: '#4488ff', strokeDasharray: '5,5' }, animated: true },
+                                // Sequencer -> Voice (Trigger)
+                                { id: 'e_s_v', source: 'sequencer', target: 'voice', targetHandle: 'trigger', style: { stroke: '#ff4466' }, animated: true },
+                                // Voice (Note) -> Osc (Freq)
+                                { id: 'e_v_osc', source: 'voice', sourceHandle: 'note', target: 'osc', targetHandle: 'frequency', style: { stroke: '#ff8844' }, animated: true },
+                                // Voice (Gate) -> ADSR (simulated connection for visual, logic handled by engine loop if connected)
+                                { id: 'e_v_adsr', source: 'voice', sourceHandle: 'gate', target: 'adsr', style: { stroke: '#44cc44' }, animated: true },
+                                // Osc -> Gain
+                                { id: 'e_osc_gain', source: 'osc', target: 'gain', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
+                                // ADSR -> Gain (Mod)
+                                { id: 'e_adsr_gain', source: 'adsr', target: 'gain', targetHandle: 'gain', style: { stroke: '#4488ff' }, animated: true },
+                                // Gain -> Output
+                                { id: 'e_gain_out', source: 'gain', target: 'output', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false }
+                            ];
+
+                            useAudioGraphStore.getState().loadGraph(nodes, edges);
+                        }}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            width: '100%',
+                            padding: '10px',
+                            background: '#1e1e2e',
+                            border: '1px solid #2a2a3a',
+                            borderRadius: '4px',
+                            color: '#c0c0c0',
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                            textAlign: 'left'
+                        }}
+                    >
+                        <span style={{ fontSize: '14px' }}>🎹</span>
+                        <span>Voice Synth</span>
+                    </button>
+
+                    <button
+                        onClick={() => {
+                            const nodes: Node<AudioNodeData>[] = [
+                                { id: 'transport', type: 'transportNode', position: { x: 50, y: 50 }, data: { type: 'transport', bpm: 120, playing: false, label: 'Transport' } as any },
+                                { id: 'sequencer', type: 'sequencerNode', position: { x: 50, y: 200 }, data: { type: 'sequencer', steps: 16, pattern: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], activeSteps: [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false], label: 'Kick Seq' } as any },
+                                { id: 'noise', type: 'noiseNode', position: { x: 300, y: 200 }, data: { type: 'noise', noiseType: 'white', label: 'Noise' } as any },
+                                { id: 'adsr', type: 'adsrNode', position: { x: 500, y: 200 }, data: { type: 'adsr', attack: 0.001, decay: 0.1, sustain: 0, release: 0.1, label: 'Env' } as any },
+                                { id: 'gain', type: 'gainNode', position: { x: 700, y: 200 }, data: { type: 'gain', gain: 0, label: 'VCA' } as any },
+                                { id: 'output', type: 'outputNode', position: { x: 900, y: 200 }, data: { type: 'output', masterGain: 0.5, playing: false, label: 'Output' } as any }
+                            ];
+                            const edges = [
+                                { id: 'e_t_s', source: 'transport', target: 'sequencer', style: { stroke: '#4488ff', strokeDasharray: '5,5' }, animated: true },
+                                // Sequencer -> ADSR (Direct Trigger)
+                                { id: 'e_s_adsr', source: 'sequencer', target: 'adsr', style: { stroke: '#ff4466' }, animated: true },
+                                // Noise -> Gain
+                                { id: 'e_n_g', source: 'noise', target: 'gain', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
+                                // ADSR -> Gain (Mod)
+                                { id: 'e_a_g', source: 'adsr', target: 'gain', targetHandle: 'gain', style: { stroke: '#4488ff' }, animated: true },
+                                // Gain -> Out
+                                { id: 'e_g_o', source: 'gain', target: 'output', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false }
+                            ];
+                            useAudioGraphStore.getState().loadGraph(nodes, edges);
+                        }}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            width: '100%',
+                            padding: '10px',
+                            background: '#1e1e2e',
+                            border: '1px solid #2a2a3a',
+                            borderRadius: '4px',
+                            color: '#c0c0c0',
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            marginTop: '8px'
+                        }}
+                    >
+                        <span style={{ fontSize: '14px' }}>🥁</span>
+                        <span>Drum Synth</span>
+                    </button>
+                </div>
+
                 <CodePreview code={generatedCode} />
             </div>
 
