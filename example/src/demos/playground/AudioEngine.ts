@@ -30,6 +30,7 @@ interface AudioNodeInstance {
     pianoRollData?: any;
     adsrData?: any;
     voiceData?: any;
+    lfoOsc?: OscillatorNode; // For LFO waveform updates
 }
 
 /**
@@ -448,6 +449,11 @@ export class AudioEngine {
                 instance.node.start();
             }
 
+            // Start LFO oscillator if present
+            if (instance.lfoOsc) {
+                instance.lfoOsc.start();
+            }
+
             if (instance.outputs) {
                 instance.outputs.forEach(output => {
                     if (output instanceof ConstantSourceNode || output instanceof OscillatorNode) {
@@ -580,6 +586,31 @@ export class AudioEngine {
                         baseNote: prData.baseNote,
                         notes: prData.notes || []
                     }
+                };
+            }
+            case 'lfo': {
+                const lfoData = data as any; // LFONodeData
+                // Create oscillator for LFO
+                const lfo = ctx.createOscillator();
+                lfo.type = lfoData.waveform || 'sine';
+                lfo.frequency.value = lfoData.rate || 1;
+
+                // Create gain for depth control
+                const depthGain = ctx.createGain();
+                depthGain.gain.value = lfoData.depth || 500;
+
+                // Connect LFO -> depthGain
+                lfo.connect(depthGain);
+
+                const params = new Map<string, AudioParam>();
+                params.set('rate', lfo.frequency);
+                params.set('depth', depthGain.gain);
+
+                return {
+                    node: depthGain, // Output the depthGain so it can modulate other params
+                    type: 'lfo',
+                    params,
+                    lfoOsc: lfo // Store ref so we can update waveform
                 };
             }
             case 'transport': {
@@ -956,6 +987,22 @@ export class AudioEngine {
         } else if (instance.type === 'voice') {
             if ('portamento' in data && instance.voiceData) {
                 instance.voiceData.portamento = data.portamento;
+            }
+        } else if (instance.type === 'lfo') {
+            // Update LFO rate (frequency of oscillator)
+            if ('rate' in data && typeof data.rate === 'number' && instance.lfoOsc) {
+                instance.lfoOsc.frequency.setTargetAtTime(data.rate, currentTime, 0.01);
+            }
+            // Update LFO depth (gain)
+            if ('depth' in data && typeof data.depth === 'number' && instance.params) {
+                const depthParam = instance.params.get('depth');
+                if (depthParam) {
+                    depthParam.setTargetAtTime(data.depth, currentTime, 0.01);
+                }
+            }
+            // Update LFO waveform
+            if ('waveform' in data && typeof data.waveform === 'string' && instance.lfoOsc) {
+                instance.lfoOsc.type = data.waveform as OscillatorType;
             }
         }
     }

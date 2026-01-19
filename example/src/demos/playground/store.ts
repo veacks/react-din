@@ -106,6 +106,15 @@ export interface NoteNodeData {
     label: string;
 }
 
+export interface LFONodeData {
+    type: 'lfo';
+    rate: number;       // Hz (0.1 - 20)
+    depth: number;      // 0 - 1
+    waveform: 'sine' | 'square' | 'triangle' | 'sawtooth';
+    label: string;
+    [key: string]: unknown;
+}
+
 export interface ADSRNodeData {
     type: 'adsr';
     attack: number;
@@ -169,6 +178,7 @@ export type AudioNodeData = (
     | MixerNodeData
     | InputNodeData
     | NoteNodeData
+    | LFONodeData
     | TransportNodeData
     | StepSequencerNodeData
     | PianoRollNodeData
@@ -458,6 +468,22 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                         baseNote: 48, // C3
                         notes: [],
                         label: 'Piano Roll'
+                    } as AudioNodeData,
+                };
+                break;
+
+            case 'lfo':
+                newNode = {
+                    id,
+                    type: 'lfoNode',
+                    position,
+                    dragHandle: '.node-header',
+                    data: {
+                        type: 'lfo',
+                        rate: 1,
+                        depth: 500,
+                        waveform: 'sine',
+                        label: 'LFO'
                     } as AudioNodeData,
                 };
                 break;

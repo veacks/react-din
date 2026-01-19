@@ -12,5 +12,6 @@ export { default as NoteNode } from './NoteNode';
 export { TransportNode } from './TransportNode';
 export { StepSequencerNode } from './StepSequencerNode';
 export { PianoRollNode } from './PianoRollNode';
+export { LFONode } from './LFONode';
 export { ADSRNode } from './ADSRNode';
 export { VoiceNode } from './VoiceNode';

@@ -29,6 +29,7 @@ import {
     TransportNode,
     StepSequencerNode,
     PianoRollNode,
+    LFONode,
     ADSRNode,
     VoiceNode,
 } from './playground/nodes';
@@ -50,6 +51,7 @@ const nodeTypes: NodeTypes = {
     transportNode: TransportNode as NodeTypes[string],
     stepSequencerNode: StepSequencerNode as NodeTypes[string],
     pianoRollNode: PianoRollNode as NodeTypes[string],
+    lfoNode: LFONode as NodeTypes[string],
     adsrNode: ADSRNode as NodeTypes[string],
     voiceNode: VoiceNode as NodeTypes[string],
 };
@@ -63,6 +65,7 @@ const nodeCategories = [
             { type: 'transport', label: 'Transport', icon: '⏯️', color: '#dddddd' },
             { type: 'stepSequencer', label: 'Step Sequencer', icon: '🎹', color: '#dddddd' },
             { type: 'pianoRoll', label: 'Piano Roll', icon: '🎼', color: '#44ccff' },
+            { type: 'lfo', label: 'LFO', icon: '🌀', color: '#aa44ff' },
             { type: 'voice', label: 'Voice', icon: '🗣️', color: '#ff4466' },
             { type: 'adsr', label: 'ADSR', icon: '📈', color: '#dddddd' },
             { type: 'note', label: 'Note', icon: '🎵', color: '#ffcc00' },
@@ -697,6 +700,61 @@ export const PlaygroundDemo: FC = () => {
                     >
                         <span style={{ fontSize: '14px' }}>🎼</span>
                         <span>Piano Roll Synth</span>
+                    </button>
+
+                    <button
+                        onClick={() => {
+                            const nodes: Node<AudioNodeData>[] = [
+                                { id: 'transport', type: 'transportNode', dragHandle: '.node-header', position: { x: 50, y: 50 }, data: { type: 'transport', bpm: 140, playing: false, label: 'Transport' } as any },
+                                { id: 'sequencer', type: 'stepSequencerNode', dragHandle: '.node-header', position: { x: 50, y: 180 }, data: { type: 'stepSequencer', steps: 16, pattern: [1, 0.6, 0.8, 0.5, 1, 0.4, 0.9, 0.6, 1, 0.5, 0.7, 0.4, 1, 0.6, 0.8, 0.9], activeSteps: [true, true, true, false, true, true, true, false, true, false, true, true, true, true, false, true], label: 'Acid Seq' } as any },
+                                { id: 'voice', type: 'voiceNode', dragHandle: '.node-header', position: { x: 350, y: 180 }, data: { type: 'voice', portamento: 0.03, label: 'Voice' } as any },
+                                { id: 'osc', type: 'oscNode', dragHandle: '.node-header', position: { x: 550, y: 100 }, data: { type: 'osc', frequency: 0, waveform: 'sawtooth', detune: 0, label: 'VCO' } as any },
+                                { id: 'filter', type: 'filterNode', dragHandle: '.node-header', position: { x: 800, y: 150 }, data: { type: 'filter', frequency: 600, q: 15, filterType: 'lowpass', label: 'VCF' } as any },
+                                { id: 'lfo', type: 'lfoNode', dragHandle: '.node-header', position: { x: 550, y: 350 }, data: { type: 'lfo', rate: 0.5, depth: 400, waveform: 'sine', label: 'LFO' } as any },
+                                { id: 'adsr', type: 'adsrNode', dragHandle: '.node-header', position: { x: 550, y: 220 }, data: { type: 'adsr', attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.1, label: 'Filter Env' } as any },
+                                { id: 'vca', type: 'gainNode', dragHandle: '.node-header', position: { x: 1000, y: 150 }, data: { type: 'gain', gain: 0.7, label: 'VCA' } as any },
+                                { id: 'output', type: 'outputNode', dragHandle: '.node-header', position: { x: 1200, y: 150 }, data: { type: 'output', masterGain: 0.5, playing: false, label: 'Output' } as any }
+                            ];
+                            const edges = [
+                                // Transport -> Sequencer
+                                { id: 'e_t_s', source: 'transport', target: 'sequencer', style: { stroke: '#4488ff', strokeDasharray: '5,5' }, animated: true },
+                                // Sequencer -> Voice (Trigger)
+                                { id: 'e_s_v', source: 'sequencer', target: 'voice', targetHandle: 'trigger', style: { stroke: '#ff4466' }, animated: true },
+                                // Voice (Note) -> Osc (Freq)
+                                { id: 'e_v_osc', source: 'voice', sourceHandle: 'note', target: 'osc', targetHandle: 'frequency', style: { stroke: '#ff8844' }, animated: true },
+                                // Voice (Gate) -> ADSR
+                                { id: 'e_v_adsr', source: 'voice', sourceHandle: 'gate', target: 'adsr', style: { stroke: '#44cc44' }, animated: true },
+                                // Osc -> Filter
+                                { id: 'e_osc_filt', source: 'osc', target: 'filter', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
+                                // ADSR -> Filter (Frequency mod)
+                                { id: 'e_adsr_filt', source: 'adsr', target: 'filter', targetHandle: 'frequency', style: { stroke: '#aa44ff' }, animated: true },
+                                // LFO -> Filter (Frequency mod - wobble)
+                                { id: 'e_lfo_filt', source: 'lfo', sourceHandle: 'out', target: 'filter', targetHandle: 'frequency', style: { stroke: '#ff44aa' }, animated: true },
+                                // Filter -> VCA
+                                { id: 'e_filt_vca', source: 'filter', target: 'vca', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false },
+                                // VCA -> Output
+                                { id: 'e_vca_out', source: 'vca', target: 'output', sourceHandle: 'out', targetHandle: 'in', style: { stroke: '#44cc44', strokeWidth: 3 }, animated: false }
+                            ];
+                            useAudioGraphStore.getState().loadGraph(nodes, edges);
+                        }}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            width: '100%',
+                            padding: '10px',
+                            background: '#1e1e2e',
+                            border: '1px solid #aa44ff',
+                            borderRadius: '4px',
+                            color: '#aa44ff',
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            marginTop: '8px'
+                        }}
+                    >
+                        <span style={{ fontSize: '14px' }}>🧪</span>
+                        <span>Acid Synth</span>
                     </button>
                 </div>
 
