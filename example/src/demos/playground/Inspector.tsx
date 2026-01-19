@@ -1,6 +1,8 @@
 import React, { useCallback, useState } from 'react';
 import { useAudioGraphStore, type AudioNodeData, type InputNodeData, type InputParam } from './store';
 
+import { CodeGenerator } from './CodeGenerator';
+
 const Inspector: React.FC = () => {
     const nodes = useAudioGraphStore((s) => s.nodes);
     const selectedNodeId = useAudioGraphStore((s) => s.selectedNodeId);
@@ -59,12 +61,10 @@ const Inspector: React.FC = () => {
         updateNodeData(selectedNodeId, { params });
     };
 
+
+
     if (!selectedNode || !nodeData) {
-        return (
-            <div className="inspector empty">
-                <p>Select a node to inspect</p>
-            </div>
-        );
+        return <CodeGenerator />;
     }
 
     return (
@@ -175,6 +175,83 @@ const Inspector: React.FC = () => {
                             </div>
                         </div>
                     </>
+                )}
+
+                {/* Transport Node Specific Controls */}
+                {nodeData.type === 'transport' && (
+                    <div className="inspector-section">
+                        <h4>Transport Controls</h4>
+                        <div className="control-row">
+                            <label>Playing</label>
+                            <input
+                                type="checkbox"
+                                checked={(nodeData as any).playing}
+                                onChange={(e) => updateNodeData(selectedNodeId!, { playing: e.target.checked })}
+                            />
+                        </div>
+                        <div className="control-row">
+                            <label>BPM</label>
+                            <input
+                                type="number"
+                                value={(nodeData as any).bpm}
+                                onChange={(e) => updateNodeData(selectedNodeId!, { bpm: Number(e.target.value) })}
+                                min={40}
+                                max={240}
+                            />
+                        </div>
+                        <div className="control-row">
+                            <label>Beats / Bar</label>
+                            <input
+                                type="number"
+                                value={(nodeData as any).beatsPerBar ?? 4}
+                                onChange={(e) => updateNodeData(selectedNodeId!, { beatsPerBar: Number(e.target.value) })}
+                                min={1}
+                                max={16}
+                            />
+                        </div>
+                        <div className="control-row">
+                            <label>Beat Unit</label>
+                            <input
+                                type="number"
+                                value={(nodeData as any).beatUnit ?? 4}
+                                onChange={(e) => updateNodeData(selectedNodeId!, { beatUnit: Number(e.target.value) })}
+                                min={1}
+                                max={16}
+                            />
+                        </div>
+                        <div className="control-row">
+                            <label>Steps / Beat</label>
+                            <input
+                                type="number"
+                                value={(nodeData as any).stepsPerBeat ?? 4}
+                                onChange={(e) => updateNodeData(selectedNodeId!, { stepsPerBeat: Number(e.target.value) })}
+                                min={1}
+                                max={16}
+                            />
+                        </div>
+                        <div className="control-row">
+                            <label>Bars / Phrase</label>
+                            <input
+                                type="number"
+                                value={(nodeData as any).barsPerPhrase ?? 4}
+                                onChange={(e) => updateNodeData(selectedNodeId!, { barsPerPhrase: Number(e.target.value) })}
+                                min={1}
+                                max={16}
+                            />
+                        </div>
+                        <div className="control-row">
+                            <label>Swing</label>
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                value={(nodeData as any).swing ?? 0}
+                                onChange={(e) => updateNodeData(selectedNodeId!, { swing: Number(e.target.value) })}
+                            />
+                            <span className="value-display">{((nodeData as any).swing ?? 0).toFixed(2)}</span>
+                        </div>
+                    </div>
                 )}
 
                 {/* Common Properties */}

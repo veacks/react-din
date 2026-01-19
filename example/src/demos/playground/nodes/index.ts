@@ -9,3 +9,5 @@ export { default as StereoPannerNode } from './StereoPannerNode';
 export { default as MixerNode } from './MixerNode';
 export { default as InputNode } from './InputNode';
 export { default as NoteNode } from './NoteNode';
+export { TransportNode } from './TransportNode';
+export { SequencerNode } from './SequencerNode';

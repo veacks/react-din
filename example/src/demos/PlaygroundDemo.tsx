@@ -26,6 +26,8 @@ import {
     MixerNode,
     InputNode,
     NoteNode,
+    TransportNode,
+    SequencerNode,
 } from './playground/nodes';
 import { generateCode } from './playground/CodeGenerator';
 
@@ -42,6 +44,8 @@ const nodeTypes: NodeTypes = {
     mixerNode: MixerNode as NodeTypes[string],
     inputNode: InputNode as NodeTypes[string],
     noteNode: NoteNode as NodeTypes[string],
+    transportNode: TransportNode as NodeTypes[string],
+    sequencerNode: SequencerNode as NodeTypes[string],
 };
 
 // Node palette categories
@@ -50,6 +54,8 @@ const nodeCategories = [
         name: 'Sources',
         nodes: [
             { type: 'input', label: 'Input', icon: '⏱️', color: '#dddddd' },
+            { type: 'transport', label: 'Transport', icon: '⏯️', color: '#dddddd' },
+            { type: 'sequencer', label: 'Sequencer', icon: '🎹', color: '#dddddd' },
             { type: 'note', label: 'Note', icon: '🎵', color: '#ffcc00' },
             { type: 'osc', label: 'Oscillator', icon: '◐', color: '#ff8844' },
             { type: 'noise', label: 'Noise', icon: '〰️', color: '#888888' },

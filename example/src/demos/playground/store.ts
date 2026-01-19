@@ -106,6 +106,21 @@ export interface NoteNodeData {
     label: string;
 }
 
+export interface SequencerNodeData {
+    type: 'sequencer';
+    steps: number;
+    pattern: number[]; // Velocities (0-1)
+    activeSteps: boolean[]; // On/Off toggles
+    label: string;
+}
+
+export interface TransportNodeData {
+    type: 'transport';
+    bpm: number;
+    playing: boolean;
+    label: string;
+}
+
 export type AudioNodeData = (
     | OscNodeData
     | GainNodeData
@@ -118,7 +133,11 @@ export type AudioNodeData = (
     | MixerNodeData
     | InputNodeData
     | NoteNodeData
+    | TransportNodeData
+    | SequencerNodeData
 ) & Record<string, unknown>;
+
+
 
 // ============================================================================
 // Store State
@@ -353,6 +372,39 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                         frequency: 261.6,
                         language: 'en',
                         label: 'Note'
+                    } as AudioNodeData,
+                };
+                break;
+            case 'sequencer':
+                newNode = {
+                    id,
+                    type: 'sequencerNode',
+                    position,
+                    data: {
+                        type: 'sequencer',
+                        steps: 16,
+                        pattern: Array(16).fill(0.8), // Default velocity 0.8
+                        activeSteps: Array(16).fill(false), // Default all off
+                        label: 'Sequencer'
+                    } as AudioNodeData,
+                };
+                break;
+
+            case 'transport':
+                newNode = {
+                    id,
+                    type: 'transportNode',
+                    position,
+                    data: {
+                        type: 'transport',
+                        bpm: 120,
+                        playing: false,
+                        beatsPerBar: 4,
+                        beatUnit: 4,
+                        stepsPerBeat: 4,
+                        barsPerPhrase: 4,
+                        swing: 0,
+                        label: 'Transport'
                     } as AudioNodeData,
                 };
                 break;
