@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef, type FC } from 'react';
+import { useState, useCallback, useEffect, useRef, type FC } from 'react';
 import {
     ReactFlow,
     Background,
@@ -34,7 +34,6 @@ import {
     VoiceNode,
     SamplerNode,
 } from './playground/nodes';
-import { generateCode } from './playground/CodeGenerator';
 import { deleteGraph as deleteStoredGraph, loadActiveGraphId, loadGraphs, saveActiveGraphId, saveGraph } from './playground/graphStorage';
 import { deleteAudioFromCache, getAudioObjectUrl } from './playground/audioCache';
 import { sanitizeGraphForStorage, toPascalCase } from './playground/graphUtils';
@@ -127,33 +126,6 @@ const NodePalette: FC = () => {
                     </div>
                 </div>
             ))}
-        </div>
-    );
-};
-
-const CodePreview: FC<{ code: string }> = ({ code }) => {
-    const [copied, setCopied] = useState(false);
-
-    const handleCopy = async () => {
-        await navigator.clipboard.writeText(code);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
-    return (
-        <div className="code-preview">
-            <div className="code-header">
-                <h3>📄 Generated Code</h3>
-                <button
-                    className={`copy-btn ${copied ? 'copied' : ''}`}
-                    onClick={handleCopy}
-                >
-                    {copied ? '✓ Copied!' : '📋 Copy'}
-                </button>
-            </div>
-            <pre className="code-content">
-                <code>{code}</code>
-            </pre>
         </div>
     );
 };
@@ -327,8 +299,6 @@ export const PlaygroundDemo: FC = () => {
         });
     }, [graphs, removeGraph]);
 
-    const generatedCode = useMemo(() => generateCode(nodes, edges, false, activeGraphName), [nodes, edges, activeGraphName]);
-
     const onDrop = useCallback(
         (event: React.DragEvent) => {
             event.preventDefault();
@@ -395,14 +365,6 @@ export const PlaygroundDemo: FC = () => {
                     overflow-y: auto;
                     max-height: 50%;
                 }
-                
-                /* Code preview adjustment */
-                .code-preview {
-                   display: flex;
-                   flex-direction: column;
-                   flex: 1;
-                   min-height: 0;
-                }
 
                 .palette-category {
                     margin-bottom: 16px;
@@ -445,62 +407,6 @@ export const PlaygroundDemo: FC = () => {
 
                 .palette-node .icon {
                     font-size: 12px;
-                }
-
-                /* Code preview */
-                .code-preview {
-                    flex: 1;
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                    min-height: 0;
-                }
-
-                .code-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    padding: 10px 12px;
-                    background: #1a1a22;
-                    border-bottom: 1px solid #2a2a3a;
-                }
-
-                .code-header h3 {
-                    margin: 0;
-                    font-size: 11px;
-                    text-transform: uppercase;
-                    color: #555;
-                    letter-spacing: 1px;
-                }
-
-                .copy-btn {
-                    padding: 4px 8px;
-                    background: #2a2a3a;
-                    border: none;
-                    border-radius: 3px;
-                    color: #888;
-                    cursor: pointer;
-                    font-size: 10px;
-                    transition: all 0.2s;
-                }
-
-                .copy-btn:hover { background: #3a3a4a; color: #fff; }
-                .copy-btn.copied { background: #22aa44; color: #fff; }
-
-                .code-content {
-                    flex: 1;
-                    margin: 0;
-                    padding: 10px 12px;
-                    overflow: auto;
-                    font-family: 'JetBrains Mono', 'Fira Code', monospace;
-                    font-size: 10px;
-                    line-height: 1.4;
-                    color: #a0a0b0;
-                    background: #0e0e16;
-                }
-
-                .code-content code {
-                    white-space: pre;
                 }
 
                 /* Tabs */
@@ -989,7 +895,6 @@ export const PlaygroundDemo: FC = () => {
                     </button>
                 </div>
 
-                <CodePreview code={generatedCode} />
             </div>
 
             <div
