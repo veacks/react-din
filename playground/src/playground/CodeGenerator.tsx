@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
     useAudioGraphStore,
     type AudioNodeData,
@@ -21,6 +21,25 @@ import {
 } from './store';
 import { type Node, type Edge } from '@xyflow/react';
 import { toPascalCase } from './graphUtils';
+import {
+    ADSR,
+    AudioProvider,
+    Delay,
+    Envelope,
+    Filter,
+    Gain,
+    Noise,
+    Osc,
+    Reverb,
+    Sampler,
+    Sequencer,
+    StereoPanner,
+    Track,
+    TransportProvider,
+    Voice,
+    useLFO,
+} from 'react-din';
+import type { LFOOutput, VoiceRenderProps } from 'react-din';
 
 export const CodeGenerator: React.FC = () => {
     const nodes = useAudioGraphStore((s) => s.nodes);
@@ -30,6 +49,7 @@ export const CodeGenerator: React.FC = () => {
         return activeGraph?.name ?? 'AudioGraph';
     });
     const [includeProvider, setIncludeProvider] = useState(false);
+    const [showPreview, setShowPreview] = useState(false);
 
     const generatedCode = useMemo(() => {
         return generateCode(nodes, edges, includeProvider, graphName);
@@ -38,6 +58,10 @@ export const CodeGenerator: React.FC = () => {
     const handleCopy = () => {
         navigator.clipboard.writeText(generatedCode);
     };
+
+    const handleTogglePreview = useCallback(() => {
+        setShowPreview((prev) => !prev);
+    }, []);
 
     return (
         <div className="flex h-full flex-col bg-[var(--panel-bg)] text-[var(--text)]">
@@ -56,6 +80,16 @@ export const CodeGenerator: React.FC = () => {
                         Include Provider
                     </label>
                     <button
+                        onClick={handleTogglePreview}
+                        className={`rounded border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] transition ${
+                            showPreview
+                                ? 'border-[var(--accent)] text-[var(--accent)]'
+                                : 'border-[var(--panel-border)] text-[var(--text)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+                        }`}
+                    >
+                        {showPreview ? 'Stop' : 'Test'}
+                    </button>
+                    <button
                         onClick={handleCopy}
                         className="rounded border border-[var(--panel-border)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
                     >
@@ -63,6 +97,26 @@ export const CodeGenerator: React.FC = () => {
                     </button>
                 </div>
             </div>
+            {showPreview && (
+                <div className="border-b border-[var(--panel-border)] bg-[var(--panel-muted)]/60">
+                    <div className="flex items-center justify-between px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)]">
+                        Test Component
+                        <span className="text-[9px] font-normal tracking-[0.18em] text-[var(--text-muted)]">
+                            Audio Preview
+                        </span>
+                    </div>
+                    <div className="px-4 pb-4">
+                        <div className="rounded-md border border-[var(--panel-border)] bg-[var(--panel-bg)] p-3 text-[10px] text-[var(--text-muted)]">
+                            Preview running. Use your speakers or headphones.
+                            <PreviewErrorBoundary>
+                                <div className="sr-only">
+                                    <PreviewGraph nodes={nodes} edges={edges} includeProvider={includeProvider} />
+                                </div>
+                            </PreviewErrorBoundary>
+                        </div>
+                    </div>
+                </div>
+            )}
             <textarea
                 className="flex-1 resize-none bg-transparent p-4 font-mono text-[10px] text-[var(--text)] outline-none"
                 value={generatedCode}
@@ -338,6 +392,7 @@ export function generateCode(
         if (trackSource) {
             const trackInfo = getTrackInfo(trackSource);
             const trackProps = [
+                `id=${JSON.stringify(trackSource.id)}`,
                 `steps={${trackInfo.steps}}`,
                 `pattern={${trackInfo.pattern}}`,
             ];
@@ -495,6 +550,19 @@ const AUDIO_COMPONENTS: Record<string, string> = {
     mixer: 'Gain',
     noise: 'Noise',
     sampler: 'Sampler',
+};
+
+const AUDIO_NODE_COMPONENTS: Record<string, React.ComponentType<any>> = {
+    osc: Osc,
+    gain: Gain,
+    filter: Filter,
+    delay: Delay,
+    reverb: Reverb,
+    panner: StereoPanner,
+    output: Gain,
+    mixer: Gain,
+    noise: Noise,
+    sampler: Sampler,
 };
 
 function getAudioComponentName(type: string): string | null {
@@ -789,6 +857,601 @@ function buildNodeProps(
         }
         default:
             break;
+    }
+
+    return props;
+}
+
+type LfoValues = Record<string, LFOOutput | null>;
+
+const LfoContext = React.createContext<LfoValues>({});
+
+interface PreviewTrackInfo {
+    steps: number;
+    pattern: number[];
+    note?: number;
+}
+
+class PreviewErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
+    state: { error: Error | null } = { error: null };
+
+    static getDerivedStateFromError(error: Error) {
+        return { error };
+    }
+
+    render() {
+        if (this.state.error) {
+            return (
+                <div className="text-[10px] text-[var(--danger)]">
+                    Preview failed: {this.state.error.message}
+                </div>
+            );
+        }
+        return this.props.children;
+    }
+}
+
+interface PreviewGraphProps {
+    nodes: Node<AudioNodeData>[];
+    edges: Edge[];
+    includeProvider: boolean;
+}
+
+const PreviewGraph: React.FC<PreviewGraphProps> = ({ nodes, edges, includeProvider }) => {
+    const lfoNodes = useMemo(
+        () => nodes.filter((node) => node.data.type === 'lfo') as Node<LFONodeData>[],
+        [nodes]
+    );
+    const transportNode = useMemo(
+        () => nodes.find((node) => node.data.type === 'transport'),
+        [nodes]
+    );
+
+    const transportProps = useMemo(() => {
+        if (!transportNode) return {};
+        const data = transportNode.data as any;
+        return {
+            bpm: data.bpm,
+            beatsPerBar: data.beatsPerBar,
+            beatUnit: data.beatUnit,
+            stepsPerBeat: data.stepsPerBeat,
+            barsPerPhrase: data.barsPerPhrase,
+            swing: data.swing,
+        };
+    }, [transportNode]);
+
+    const graphData = useMemo(() => buildPreviewGraphData(nodes, edges), [nodes, edges]);
+
+    const sequencerBpm = useMemo(() => {
+        if (!transportNode) return undefined;
+        const bpm = (transportNode.data as { bpm?: number }).bpm;
+        return Number.isFinite(bpm) && bpm ? bpm : undefined;
+    }, [transportNode]);
+
+    const content = (
+        <LfoRegistry nodes={lfoNodes}>
+            <PreviewRenderer graph={graphData} sequencerBpm={sequencerBpm} />
+        </LfoRegistry>
+    );
+
+    return (
+        <AudioProvider>
+            {includeProvider && transportNode ? (
+                <TransportProvider {...transportProps}>
+                    {content}
+                </TransportProvider>
+            ) : (
+                content
+            )}
+        </AudioProvider>
+    );
+};
+
+interface PreviewGraphData {
+    nodeById: Map<string, Node<AudioNodeData>>;
+    audioEdgesByTarget: Map<string, Edge[]>;
+    controlEdgesByTarget: Map<string, Edge[]>;
+    adsrTargets: Map<string, Node<ADSRNodeData>>;
+    paramsByHandle: Map<string, number>;
+    rootNodes: Node<AudioNodeData>[];
+    trackSourcesUsed: Set<string>;
+}
+
+function buildPreviewGraphData(nodes: Node<AudioNodeData>[], edges: Edge[]): PreviewGraphData {
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const isAudioEdge = (edge: Edge) =>
+        edge.sourceHandle === 'out' &&
+        (edge.targetHandle === 'in' || edge.targetHandle?.startsWith('in'));
+
+    const audioEdges = edges.filter(isAudioEdge);
+    const controlEdges = edges.filter((edge) => !isAudioEdge(edge));
+
+    const audioEdgesByTarget = new Map<string, Edge[]>();
+    audioEdges.forEach((edge) => {
+        const list = audioEdgesByTarget.get(edge.target) ?? [];
+        list.push(edge);
+        audioEdgesByTarget.set(edge.target, list);
+    });
+
+    const controlEdgesByTarget = new Map<string, Edge[]>();
+    controlEdges.forEach((edge) => {
+        const list = controlEdgesByTarget.get(edge.target) ?? [];
+        list.push(edge);
+        controlEdgesByTarget.set(edge.target, list);
+    });
+
+    const adsrTargets = new Map<string, Node<ADSRNodeData>>();
+    controlEdges.forEach((edge) => {
+        const sourceNode = nodeById.get(edge.source);
+        if (sourceNode?.data.type === 'adsr' && edge.targetHandle === 'gain') {
+            adsrTargets.set(edge.target, sourceNode as Node<ADSRNodeData>);
+        }
+    });
+
+    const paramsByHandle = new Map<string, number>();
+    nodes.forEach((node) => {
+        if (node.data.type !== 'input') return;
+        const input = node.data as InputNodeData;
+        input.params?.forEach((param, index) => {
+            const value = Number.isFinite(param.value)
+                ? param.value
+                : Number.isFinite(param.defaultValue)
+                    ? param.defaultValue
+                    : 0;
+            paramsByHandle.set(`${node.id}:param_${index}`, value);
+        });
+    });
+
+    const renderableNodes = nodes.filter((node) => !!AUDIO_NODE_COMPONENTS[node.data.type]);
+    const nodesWithOutputs = new Set(audioEdges.map((edge) => edge.source));
+    const rootNodes = renderableNodes.filter((node) => !nodesWithOutputs.has(node.id));
+
+    const trackSourcesUsed = new Set<string>();
+    controlEdges.forEach((edge) => {
+        if (edge.targetHandle !== 'trigger' && edge.targetHandle !== 'gate') return;
+        const sourceNode = nodeById.get(edge.source);
+        if (sourceNode?.data.type === 'stepSequencer' || sourceNode?.data.type === 'pianoRoll') {
+            trackSourcesUsed.add(sourceNode.id);
+        }
+    });
+
+    return {
+        nodeById,
+        audioEdgesByTarget,
+        controlEdgesByTarget,
+        adsrTargets,
+        paramsByHandle,
+        rootNodes,
+        trackSourcesUsed,
+    };
+}
+
+const LfoRegistry: React.FC<{ nodes: Node<LFONodeData>[]; children: React.ReactNode }> = ({ nodes, children }) => {
+    const [values, setValues] = useState<LfoValues>({});
+
+    const register = useCallback((id: string, value: LFOOutput | null) => {
+        setValues((prev) => {
+            if (prev[id] === value) return prev;
+            return { ...prev, [id]: value };
+        });
+    }, []);
+
+    const unregister = useCallback((id: string) => {
+        setValues((prev) => {
+            if (!(id in prev)) return prev;
+            const next = { ...prev };
+            delete next[id];
+            return next;
+        });
+    }, []);
+
+    return (
+        <LfoContext.Provider value={values}>
+            {nodes.map((node) => (
+                <LfoInstance key={node.id} node={node} onReady={register} onCleanup={unregister} />
+            ))}
+            {children}
+        </LfoContext.Provider>
+    );
+};
+
+const LfoInstance: React.FC<{
+    node: Node<LFONodeData>;
+    onReady: (id: string, value: LFOOutput | null) => void;
+    onCleanup: (id: string) => void;
+}> = ({ node, onReady, onCleanup }) => {
+    const lfo = useLFO({
+        rate: node.data.rate,
+        depth: node.data.depth,
+        waveform: node.data.waveform,
+    });
+
+    useEffect(() => {
+        onReady(node.id, lfo);
+        return () => onCleanup(node.id);
+    }, [node.id, lfo, onReady, onCleanup]);
+
+    return null;
+};
+
+const PreviewRenderer: React.FC<{ graph: PreviewGraphData; sequencerBpm?: number }> = ({ graph, sequencerBpm }) => {
+    const lfoValues = useContext(LfoContext);
+    const trackInfoById = useMemo(() => new Map<string, PreviewTrackInfo>(), []);
+
+    const getSequencerSource = useCallback((nodeId: string) => {
+        const edgesForTarget = graph.controlEdgesByTarget.get(nodeId) ?? [];
+        const triggerEdge = edgesForTarget.find((edge) => edge.targetHandle === 'trigger' || edge.targetHandle === 'gate');
+        if (!triggerEdge) return null;
+        const sourceNode = graph.nodeById.get(triggerEdge.source);
+        if (!sourceNode) return null;
+        if (sourceNode.data.type === 'stepSequencer' || sourceNode.data.type === 'pianoRoll') {
+            return sourceNode;
+        }
+        return null;
+    }, [graph.controlEdgesByTarget, graph.nodeById]);
+
+    const getTrackInfo = useCallback((node: Node<AudioNodeData>): PreviewTrackInfo => {
+        if (trackInfoById.has(node.id)) {
+            return trackInfoById.get(node.id)!;
+        }
+
+        let info: PreviewTrackInfo = { steps: 16, pattern: [] };
+        if (node.data.type === 'stepSequencer') {
+            const seq = node.data as StepSequencerNodeData;
+            const steps = seq.steps || 16;
+            const activeSteps = seq.activeSteps || Array(steps).fill(false);
+            const velocities = seq.pattern || Array(steps).fill(0.8);
+            const pattern = activeSteps.map((on, i) => (on ? (velocities[i] ?? 1) : 0));
+            info = {
+                steps,
+                pattern,
+            };
+        } else if (node.data.type === 'pianoRoll') {
+            const piano = node.data as PianoRollNodeData;
+            const steps = piano.steps || 16;
+            const notes = piano.notes || [];
+            const pattern = Array.from({ length: steps }, () => 0);
+            notes.forEach((note) => {
+                const velocity = Math.max(0, Math.min(1, note.velocity ?? 0));
+                pattern[note.step] = Math.max(pattern[note.step], velocity);
+            });
+            const pitches = Array.from(new Set(notes.map((note) => note.pitch)));
+            info = {
+                steps,
+                pattern,
+                note: pitches.length === 1 ? pitches[0] : undefined,
+            };
+        }
+
+        trackInfoById.set(node.id, info);
+        return info;
+    }, [trackInfoById]);
+
+    const renderNodeElement = useCallback((
+        node: Node<AudioNodeData>,
+        visited: Set<string>,
+        voiceContext?: VoiceRenderProps
+    ): React.ReactNode => {
+        if (visited.has(node.id)) return null;
+        visited.add(node.id);
+
+        const Component = AUDIO_NODE_COMPONENTS[node.data.type];
+        if (!Component) return null;
+
+        const controlEdges = graph.controlEdgesByTarget.get(node.id) ?? [];
+        const voiceEdges = controlEdges.filter(
+            (edge) => graph.nodeById.get(edge.source)?.data.type === 'voice'
+        );
+        const adsrNode = graph.adsrTargets.get(node.id);
+        const adsrTrackSource = adsrNode ? getSequencerSource(adsrNode.id) : null;
+        const adsrVoiceEdge = adsrNode
+            ? (graph.controlEdgesByTarget.get(adsrNode.id) ?? []).find(
+                (edge) => graph.nodeById.get(edge.source)?.data.type === 'voice' && edge.targetHandle === 'gate'
+            )
+            : null;
+        const voiceNode = voiceEdges[0]
+            ? graph.nodeById.get(voiceEdges[0].source)
+            : adsrVoiceEdge
+                ? graph.nodeById.get(adsrVoiceEdge.source)
+                : null;
+
+        const renderBase = (context?: VoiceRenderProps) => {
+            const edgesForTarget = graph.audioEdgesByTarget.get(node.id) ?? [];
+            const children = edgesForTarget
+                .map((edge) => {
+                    const sourceNode = graph.nodeById.get(edge.source);
+                    if (!sourceNode) return null;
+                    const child = renderNodeElement(sourceNode, new Set(visited), context);
+                    if (!child) return null;
+                    return (
+                        <React.Fragment key={edge.id}>
+                            {child}
+                        </React.Fragment>
+                    );
+                })
+                .filter(Boolean);
+
+            const props = buildPreviewProps(node, voiceEdges, context, {
+                controlEdgesByTarget: graph.controlEdgesByTarget,
+                nodeById: graph.nodeById,
+                paramsByHandle: graph.paramsByHandle,
+                lfoValues,
+            });
+
+            let element = React.createElement(
+                Component,
+                { ...props, key: node.id },
+                children.length > 0 ? children : undefined
+            );
+
+            if (adsrNode) {
+                const adsrData = adsrNode.data as ADSRNodeData;
+                const adsrProps = buildPreviewAdsrProps(
+                    adsrData,
+                    context,
+                    adsrVoiceEdge,
+                    !!adsrTrackSource
+                );
+                element = React.createElement(
+                    adsrTrackSource ? Envelope : ADSR,
+                    adsrProps,
+                    element
+                );
+            }
+
+            return element;
+        };
+
+        let element: React.ReactNode = voiceNode && !voiceContext
+            ? (
+                <Voice portamento={(voiceNode.data as VoiceNodeData).portamento || 0}>
+                    {(context) => renderBase(context)}
+                </Voice>
+            )
+            : renderBase(voiceContext);
+
+        const trackSource = getSequencerSource(node.id)
+            || (voiceNode ? getSequencerSource(voiceNode.id) : null)
+            || adsrTrackSource;
+
+        if (trackSource) {
+            const trackInfo = getTrackInfo(trackSource);
+            element = (
+                <Track
+                    id={trackSource.id}
+                    steps={trackInfo.steps}
+                    pattern={trackInfo.pattern}
+                    note={trackInfo.note}
+                >
+                    {element}
+                </Track>
+            );
+        }
+
+        return element;
+    }, [graph, getSequencerSource, getTrackInfo, lfoValues]);
+
+    const rootElements = graph.rootNodes
+        .map((node) => {
+            const element = renderNodeElement(node, new Set());
+            if (!element) return null;
+            return (
+                <React.Fragment key={node.id}>
+                    {element}
+                </React.Fragment>
+            );
+        })
+        .filter(Boolean);
+
+    const sequencerSteps = graph.trackSourcesUsed.size > 0
+        ? Math.max(...Array.from(graph.trackSourcesUsed).map((id) => getTrackInfo(graph.nodeById.get(id)!).steps))
+        : 16;
+
+    let content: React.ReactNode = rootElements.length > 0
+        ? <>{rootElements}</>
+        : null;
+
+    if (graph.trackSourcesUsed.size > 0) {
+        content = (
+            <Sequencer steps={sequencerSteps} autoStart bpm={sequencerBpm}>
+                {content}
+            </Sequencer>
+        );
+    }
+
+    return <>{content}</>;
+};
+
+function buildPreviewProps(
+    node: Node<AudioNodeData>,
+    voiceEdges: Edge[],
+    voiceContext: VoiceRenderProps | undefined,
+    context: {
+        controlEdgesByTarget: Map<string, Edge[]>;
+        nodeById: Map<string, Node<AudioNodeData>>;
+        paramsByHandle: Map<string, number>;
+        lfoValues: LfoValues;
+    }
+): Record<string, any> {
+    const props: Record<string, any> = {};
+    const nodeData = node.data;
+    const controlEdges = context.controlEdgesByTarget.get(node.id) ?? [];
+
+    const resolveControlValue = (
+        handle: string,
+        options: {
+            baseValue?: number;
+            modulatable?: boolean;
+            numericGate?: boolean;
+        }
+    ) => {
+        const voiceEdge = voiceEdges.find((edge) => edge.targetHandle === handle);
+        if (voiceEdge && voiceContext) {
+            if (voiceEdge.sourceHandle === 'note') {
+                return { value: voiceContext.frequency };
+            }
+            if (voiceEdge.sourceHandle === 'velocity') {
+                return { value: voiceContext.velocity };
+            }
+            if (voiceEdge.sourceHandle === 'gate') {
+                return { value: options.numericGate ? (voiceContext.gate ? 1 : 0) : voiceContext.gate };
+            }
+        }
+
+        const edgesForHandle = controlEdges.filter((edge) => edge.targetHandle === handle);
+        const noteEdge = edgesForHandle.find(
+            (edge) => context.nodeById.get(edge.source)?.data.type === 'note'
+        );
+        if (noteEdge) {
+            const noteData = context.nodeById.get(noteEdge.source)?.data as NoteNodeData | undefined;
+            if (noteData?.frequency !== undefined) {
+                return { value: noteData.frequency };
+            }
+        }
+
+        const inputEdge = edgesForHandle.find(
+            (edge) => context.nodeById.get(edge.source)?.data.type === 'input'
+        );
+        const inputValue = inputEdge
+            ? context.paramsByHandle.get(`${inputEdge.source}:${inputEdge.sourceHandle}`)
+            : undefined;
+
+        const lfoEdge = edgesForHandle.find(
+            (edge) => context.nodeById.get(edge.source)?.data.type === 'lfo'
+        );
+        const lfoValue = lfoEdge ? context.lfoValues[lfoEdge.source] ?? undefined : undefined;
+
+        if (lfoValue && options.modulatable) {
+            return { value: lfoValue, base: inputValue ?? options.baseValue };
+        }
+
+        if (inputValue !== undefined) {
+            return { value: inputValue };
+        }
+
+        if (options.baseValue !== undefined) {
+            return { value: options.baseValue };
+        }
+
+        return {};
+    };
+
+    switch (nodeData.type) {
+        case 'osc': {
+            const osc = nodeData as OscNodeData;
+            props.type = osc.waveform;
+            props.autoStart = true;
+            const frequency = resolveControlValue('frequency', { baseValue: osc.frequency, modulatable: true });
+            if (frequency.value !== undefined) props.frequency = frequency.value;
+            if (frequency.base !== undefined) props.frequencyBase = frequency.base;
+            const detune = resolveControlValue('detune', { baseValue: osc.detune, modulatable: true });
+            if (detune.value !== undefined) props.detune = detune.value;
+            if (detune.base !== undefined) props.detuneBase = detune.base;
+            if (voiceEdges.some((edge) => edge.targetHandle === 'frequency') && voiceContext) {
+                props.nodeRef = voiceContext.oscRef;
+            }
+            break;
+        }
+        case 'gain': {
+            const gain = nodeData as GainNodeData;
+            const gainValue = resolveControlValue('gain', {
+                baseValue: gain.gain,
+                modulatable: true,
+                numericGate: true,
+            });
+            if (gainValue.value !== undefined) props.gain = gainValue.value;
+            if (gainValue.base !== undefined) props.gainBase = gainValue.base;
+            if (voiceEdges.some((edge) => edge.targetHandle === 'gain') && voiceContext) {
+                props.nodeRef = voiceContext.gainRef;
+            }
+            break;
+        }
+        case 'output': {
+            const output = nodeData as OutputNodeData;
+            props.gain = output.masterGain;
+            break;
+        }
+        case 'filter': {
+            const filter = nodeData as FilterNodeData;
+            props.type = filter.filterType;
+            const frequency = resolveControlValue('frequency', { baseValue: filter.frequency, modulatable: true });
+            if (frequency.value !== undefined) props.frequency = frequency.value;
+            if (frequency.base !== undefined) props.frequencyBase = frequency.base;
+            const qValue = resolveControlValue('q', { baseValue: filter.q, modulatable: true });
+            if (qValue.value !== undefined) props.Q = qValue.value;
+            if (qValue.base !== undefined) props.QBase = qValue.base;
+            const detune = resolveControlValue('detune', { baseValue: filter.detune });
+            if (detune.value !== undefined) props.detune = detune.value;
+            const gainValue = resolveControlValue('gain', { baseValue: filter.gain });
+            if (gainValue.value !== undefined) props.gain = gainValue.value;
+            if (voiceEdges.some((edge) => edge.targetHandle === 'frequency' || edge.targetHandle === 'q') && voiceContext) {
+                props.nodeRef = voiceContext.filterRef;
+            }
+            break;
+        }
+        case 'delay': {
+            const delay = nodeData as DelayNodeData;
+            props.delayTime = delay.delayTime;
+            break;
+        }
+        case 'reverb': {
+            const reverb = nodeData as ReverbNodeData;
+            props.decay = reverb.decay;
+            props.mix = reverb.mix;
+            break;
+        }
+        case 'panner': {
+            const pan = nodeData as StereoPannerNodeData;
+            props.pan = pan.pan;
+            break;
+        }
+        case 'noise': {
+            const noise = nodeData as NoiseNodeData;
+            props.type = noise.noiseType;
+            props.autoStart = true;
+            break;
+        }
+        case 'sampler': {
+            const sampler = nodeData as SamplerNodeData;
+            if (sampler.src) {
+                props.src = sampler.src;
+            }
+            if (sampler.loop) props.loop = sampler.loop;
+            if (sampler.playbackRate !== undefined && sampler.playbackRate !== 1) {
+                props.playbackRate = sampler.playbackRate;
+            }
+            if (sampler.detune !== undefined && sampler.detune !== 0) {
+                props.detune = sampler.detune;
+            }
+            const hasTrigger = controlEdges.some((edge) => edge.targetHandle === 'trigger');
+            if (!hasTrigger) {
+                props.autoStart = true;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+
+    return props;
+}
+
+function buildPreviewAdsrProps(
+    adsr: ADSRNodeData,
+    voiceContext: VoiceRenderProps | undefined,
+    voiceEdge: Edge | undefined,
+    usesEnvelope: boolean
+): Record<string, any> {
+    const props: Record<string, any> = {};
+    if (adsr.attack !== undefined) props.attack = adsr.attack;
+    if (adsr.decay !== undefined) props.decay = adsr.decay;
+    if (adsr.sustain !== undefined) props.sustain = adsr.sustain;
+    if (adsr.release !== undefined) props.release = adsr.release;
+
+    if (!usesEnvelope && voiceEdge && voiceContext) {
+        props.trigger = voiceContext.gate;
+        props.velocity = voiceContext.velocity;
+        props.duration = voiceContext.duration;
     }
 
     return props;
