@@ -16,7 +16,7 @@ import type {
     SamplerNodeData,
 } from './store';
 
-import type { TriggerEvent } from '../../../../src/sequencer/types';
+import type { TriggerEvent } from '../../../src/sequencer/types';
 
 interface AudioNodeInstance {
     node: AudioNode;

@@ -211,7 +211,7 @@ export const PlaygroundDemo: FC = () => {
                 .playground-demo {
                     display: grid;
                     grid-template-columns: 200px 1fr 300px;
-                    height: calc(100vh - 60px);
+                    height: 100vh;
                     gap: 0;
                     background: #0a0a12;
                 }

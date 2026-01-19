@@ -6,7 +6,8 @@
   "license": "MIT",
   "type": "module",
   "workspaces": [
-    "example"
+    "example",
+    "playground"
   ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -106,7 +107,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "prepublishOnly": "npm run build",
-    "example:dev": "npm -w example run dev"
+    "example:dev": "npm -w example run dev",
+    "playground:dev": "npm -w playground run dev"
   },
   "peerDependencies": {
     "react": ">=18.0.0",
