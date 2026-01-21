@@ -8,6 +8,11 @@ import {
     type GainNodeData,
     type InputNodeData,
     type LFONodeData,
+    type MathNodeData,
+    type CompareNodeData,
+    type MixNodeData,
+    type ClampNodeData,
+    type SwitchNodeData,
     type NoiseNodeData,
     type NoteNodeData,
     type OscNodeData,
@@ -28,12 +33,17 @@ import {
     Envelope,
     Filter,
     Gain,
+    clamp,
+    compare,
+    math,
+    mix,
     Noise,
     Osc,
     Reverb,
     Sampler,
     Sequencer,
     StereoPanner,
+    switchValue,
     Track,
     TransportProvider,
     Voice,
@@ -138,9 +148,12 @@ export function generateCode(
     const rootName = `${componentName}Root`;
 
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
-    const isAudioEdge = (edge: Edge) =>
-        edge.sourceHandle === 'out' &&
-        (edge.targetHandle === 'in' || edge.targetHandle?.startsWith('in'));
+    const isAudioEdge = (edge: Edge) => {
+        if (edge.sourceHandle !== 'out') return false;
+        if (edge.targetHandle !== 'in' && !edge.targetHandle?.startsWith('in')) return false;
+        const sourceNode = nodeById.get(edge.source);
+        return !!sourceNode && isAudioNodeType(sourceNode.data.type);
+    };
 
     const audioEdges = edges.filter(isAudioEdge);
     const controlEdges = edges.filter((edge) => !isAudioEdge(edge));
@@ -185,6 +198,115 @@ export function generateCode(
         });
 
         return { paramInfoByHandle, paramInfoByName };
+    })();
+
+    const dataState = (() => {
+        const dataVarsById = new Map<string, string>();
+        const dataDeclarations: string[] = [];
+        const dataImports = new Set<string>();
+        const usedNames = new Set<string>();
+        const visiting = new Set<string>();
+
+        const getSourceExpression = (edge: Edge): string | null => {
+            const sourceNode = nodeById.get(edge.source);
+            if (!sourceNode) return null;
+
+            if (sourceNode.data.type === 'input') {
+                const info = inputParamInfo.paramInfoByHandle.get(`${edge.source}:${edge.sourceHandle}`);
+                return info?.name ?? null;
+            }
+
+            if (sourceNode.data.type === 'note') {
+                const noteData = sourceNode.data as NoteNodeData;
+                return Number.isFinite(noteData.frequency) ? formatNumber(noteData.frequency) : '0';
+            }
+
+            if (isDataNodeType(sourceNode.data.type)) {
+                return getDataVar(edge.source) ?? null;
+            }
+
+            return null;
+        };
+
+        const getHandleExpression = (nodeId: string, handle: string, fallback: string) => {
+            const edgesForTarget = controlEdgesByTarget.get(nodeId) ?? [];
+            const edge = edgesForTarget.find((item) => item.targetHandle === handle);
+            if (!edge) return fallback;
+            const expr = getSourceExpression(edge);
+            return expr ?? fallback;
+        };
+
+        const buildExpression = (node: Node<AudioNodeData>) => {
+            switch (node.data.type) {
+                case 'math': {
+                    const data = node.data as MathNodeData;
+                    const a = getHandleExpression(node.id, 'a', formatNumber(data.a));
+                    const b = getHandleExpression(node.id, 'b', formatNumber(data.b));
+                    const c = getHandleExpression(node.id, 'c', formatNumber(data.c));
+                    dataImports.add('math');
+                    return `math(${JSON.stringify(data.operation)}, ${a}, ${b}, ${c})`;
+                }
+                case 'compare': {
+                    const data = node.data as CompareNodeData;
+                    const a = getHandleExpression(node.id, 'a', formatNumber(data.a));
+                    const b = getHandleExpression(node.id, 'b', formatNumber(data.b));
+                    dataImports.add('compare');
+                    return `compare(${JSON.stringify(data.operation)}, ${a}, ${b})`;
+                }
+                case 'mix': {
+                    const data = node.data as MixNodeData;
+                    const a = getHandleExpression(node.id, 'a', formatNumber(data.a));
+                    const b = getHandleExpression(node.id, 'b', formatNumber(data.b));
+                    const t = getHandleExpression(node.id, 't', formatNumber(data.t));
+                    dataImports.add('mix');
+                    return `mix(${a}, ${b}, ${t}, ${data.clamp ? 'true' : 'false'})`;
+                }
+                case 'clamp': {
+                    const data = node.data as ClampNodeData;
+                    const value = getHandleExpression(node.id, 'value', formatNumber(data.value));
+                    const min = getHandleExpression(node.id, 'min', formatNumber(data.min));
+                    const max = getHandleExpression(node.id, 'max', formatNumber(data.max));
+                    dataImports.add('clamp');
+                    return `clamp(${value}, ${min}, ${max}, ${JSON.stringify(data.mode)})`;
+                }
+                case 'switch': {
+                    const data = node.data as SwitchNodeData;
+                    const inputs = Math.max(1, data.inputs || data.values?.length || 1);
+                    const values = Array.from({ length: inputs }, (_, index) =>
+                        getHandleExpression(node.id, `in_${index}`, formatNumber(data.values?.[index] ?? 0))
+                    );
+                    const indexValue = getHandleExpression(node.id, 'index', formatNumber(data.selectedIndex));
+                    dataImports.add('switchValue');
+                    return `switchValue(${indexValue}, [${values.join(', ')}], ${values[0] ?? '0'})`;
+                }
+                default:
+                    return '0';
+            }
+        };
+
+        const getDataVar = (nodeId: string): string | undefined => {
+            if (dataVarsById.has(nodeId)) return dataVarsById.get(nodeId);
+            if (visiting.has(nodeId)) return '0';
+
+            const node = nodeById.get(nodeId);
+            if (!node || !isDataNodeType(node.data.type)) return undefined;
+
+            visiting.add(nodeId);
+
+            const label = (node.data as { label?: string }).label || node.data.type;
+            const baseName = toSafeIdentifier(label, node.data.type);
+            const varName = ensureUniqueName(baseName, usedNames);
+            usedNames.add(varName);
+
+            const expression = buildExpression(node);
+            dataDeclarations.push(`${indent(1)}const ${varName} = ${expression};`);
+            dataVarsById.set(nodeId, varName);
+
+            visiting.delete(nodeId);
+            return varName;
+        };
+
+        return { getDataVar, dataDeclarations, dataImports };
     })();
 
     const usedParamNames = new Set<string>();
@@ -236,6 +358,7 @@ export function generateCode(
         nodeById,
         inputParamInfo,
         lfoVarsById,
+        getDataVar: dataState.getDataVar,
     };
 
     const getAudioSources = (nodeId: string) => {
@@ -458,6 +581,8 @@ export function generateCode(
 
     const graphContent = renderGraphContent(1);
 
+    dataState.dataImports.forEach((value) => usedImports.add(value));
+
     if (includeProvider) {
         usedImports.add('AudioProvider');
         if (transportNode) {
@@ -533,6 +658,10 @@ export function generateCode(
         code += `${lfoDeclarations.join('\n')}\n\n`;
     }
 
+    if (dataState.dataDeclarations.length > 0) {
+        code += `${dataState.dataDeclarations.join('\n')}\n\n`;
+    }
+
     code += graphContent;
     code += `};\n`;
 
@@ -551,6 +680,18 @@ const AUDIO_COMPONENTS: Record<string, string> = {
     noise: 'Noise',
     sampler: 'Sampler',
 };
+
+const DATA_NODE_TYPES = new Set([
+    'math',
+    'compare',
+    'mix',
+    'clamp',
+    'switch',
+]);
+
+const isDataNodeType = (type: string) => DATA_NODE_TYPES.has(type);
+
+const isAudioNodeType = (type: string) => type in AUDIO_COMPONENTS;
 
 const AUDIO_NODE_COMPONENTS: Record<string, React.ComponentType<any>> = {
     osc: Osc,
@@ -675,6 +816,7 @@ function buildNodeProps(
         nodeById: Map<string, Node<AudioNodeData>>;
         inputParamInfo: { paramInfoByHandle: Map<string, ParamInfo> };
         lfoVarsById: Map<string, string>;
+        getDataVar: (nodeId: string) => string | undefined;
     }
 ): string[] {
     const props: string[] = [];
@@ -731,6 +873,12 @@ function buildNodeProps(
             }
         }
 
+        const dataEdge = edgesForHandle.find((edge) => {
+            const sourceNode = context.nodeById.get(edge.source);
+            return sourceNode ? isDataNodeType(sourceNode.data.type) : false;
+        });
+        const dataValue = dataEdge ? context.getDataVar(dataEdge.source) : undefined;
+
         const inputEdge = edgesForHandle.find(
             (edge) => context.nodeById.get(edge.source)?.data.type === 'input'
         );
@@ -744,8 +892,12 @@ function buildNodeProps(
         );
         const lfoVar = lfoEdge ? context.lfoVarsById.get(lfoEdge.source) : undefined;
         if (lfoVar && options.modulatable) {
-            const baseValue = inputValue ?? (options.baseValue !== undefined ? formatNumber(options.baseValue) : undefined);
+            const baseValue = dataValue ?? inputValue ?? (options.baseValue !== undefined ? formatNumber(options.baseValue) : undefined);
             return { value: lfoVar, base: baseValue };
+        }
+
+        if (dataValue !== undefined) {
+            return { value: dataValue };
         }
 
         if (inputValue) {
@@ -959,9 +1111,12 @@ interface PreviewGraphData {
 
 function buildPreviewGraphData(nodes: Node<AudioNodeData>[], edges: Edge[]): PreviewGraphData {
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
-    const isAudioEdge = (edge: Edge) =>
-        edge.sourceHandle === 'out' &&
-        (edge.targetHandle === 'in' || edge.targetHandle?.startsWith('in'));
+    const isAudioEdge = (edge: Edge) => {
+        if (edge.sourceHandle !== 'out') return false;
+        if (edge.targetHandle !== 'in' && !edge.targetHandle?.startsWith('in')) return false;
+        const sourceNode = nodeById.get(edge.source);
+        return !!sourceNode && isAudioNodeType(sourceNode.data.type);
+    };
 
     const audioEdges = edges.filter(isAudioEdge);
     const controlEdges = edges.filter((edge) => !isAudioEdge(edge));
@@ -1077,6 +1232,7 @@ const LfoInstance: React.FC<{
 const PreviewRenderer: React.FC<{ graph: PreviewGraphData; sequencerBpm?: number }> = ({ graph, sequencerBpm }) => {
     const lfoValues = useContext(LfoContext);
     const trackInfoById = useMemo(() => new Map<string, PreviewTrackInfo>(), []);
+    const dataValues = useMemo(() => new Map<string, number>(), [graph]);
 
     const getSequencerSource = useCallback((nodeId: string) => {
         const edgesForTarget = graph.controlEdgesByTarget.get(nodeId) ?? [];
@@ -1127,6 +1283,98 @@ const PreviewRenderer: React.FC<{ graph: PreviewGraphData; sequencerBpm?: number
         return info;
     }, [trackInfoById]);
 
+    const getDataValue = useCallback((
+        nodeId: string,
+        visiting: Set<string> = new Set()
+    ): number => {
+        if (dataValues.has(nodeId)) {
+            return dataValues.get(nodeId)!;
+        }
+
+        if (visiting.has(nodeId)) return 0;
+
+        const node = graph.nodeById.get(nodeId);
+        if (!node || !isDataNodeType(node.data.type)) return 0;
+
+        visiting.add(nodeId);
+
+        const getHandleValue = (handle: string, fallback: number) => {
+            const edgesForTarget = graph.controlEdgesByTarget.get(nodeId) ?? [];
+            const edge = edgesForTarget.find((item) => item.targetHandle === handle);
+            if (!edge) return fallback;
+
+            const sourceNode = graph.nodeById.get(edge.source);
+            if (!sourceNode) return fallback;
+
+            if (sourceNode.data.type === 'input') {
+                const value = graph.paramsByHandle.get(`${edge.source}:${edge.sourceHandle}`);
+                return value ?? fallback;
+            }
+
+            if (sourceNode.data.type === 'note') {
+                const noteData = sourceNode.data as NoteNodeData;
+                return Number.isFinite(noteData.frequency) ? noteData.frequency : fallback;
+            }
+
+            if (isDataNodeType(sourceNode.data.type)) {
+                return getDataValue(sourceNode.id, visiting);
+            }
+
+            return fallback;
+        };
+
+        let result = 0;
+        switch (node.data.type) {
+            case 'math': {
+                const data = node.data as MathNodeData;
+                const a = getHandleValue('a', data.a);
+                const b = getHandleValue('b', data.b);
+                const c = getHandleValue('c', data.c);
+                result = math(data.operation, a, b, c);
+                break;
+            }
+            case 'compare': {
+                const data = node.data as CompareNodeData;
+                const a = getHandleValue('a', data.a);
+                const b = getHandleValue('b', data.b);
+                result = compare(data.operation, a, b);
+                break;
+            }
+            case 'mix': {
+                const data = node.data as MixNodeData;
+                const a = getHandleValue('a', data.a);
+                const b = getHandleValue('b', data.b);
+                const t = getHandleValue('t', data.t);
+                result = mix(a, b, t, data.clamp);
+                break;
+            }
+            case 'clamp': {
+                const data = node.data as ClampNodeData;
+                const value = getHandleValue('value', data.value);
+                const min = getHandleValue('min', data.min);
+                const max = getHandleValue('max', data.max);
+                result = clamp(value, min, max, data.mode);
+                break;
+            }
+            case 'switch': {
+                const data = node.data as SwitchNodeData;
+                const inputs = Math.max(1, data.inputs || data.values?.length || 1);
+                const values = Array.from({ length: inputs }, (_, index) =>
+                    getHandleValue(`in_${index}`, data.values?.[index] ?? 0)
+                );
+                const indexValue = getHandleValue('index', data.selectedIndex);
+                result = switchValue(indexValue, values, values[0] ?? 0);
+                break;
+            }
+            default:
+                result = 0;
+        }
+
+        dataValues.set(nodeId, result);
+        visiting.delete(nodeId);
+        return result;
+    }, [dataValues, graph.controlEdgesByTarget, graph.nodeById, graph.paramsByHandle]);
+
     const renderNodeElement = useCallback((
         node: Node<AudioNodeData>,
         visited: Set<string>,
@@ -1176,6 +1424,7 @@ const PreviewRenderer: React.FC<{ graph: PreviewGraphData; sequencerBpm?: number
                 nodeById: graph.nodeById,
                 paramsByHandle: graph.paramsByHandle,
                 lfoValues,
+                getDataValue,
             });
 
             let element = React.createElement(
@@ -1229,7 +1478,7 @@ const PreviewRenderer: React.FC<{ graph: PreviewGraphData; sequencerBpm?: number
         }
 
         return element;
-    }, [graph, getSequencerSource, getTrackInfo, lfoValues]);
+    }, [graph, getSequencerSource, getTrackInfo, lfoValues, getDataValue]);
 
     const rootElements = graph.rootNodes
         .map((node) => {
@@ -1271,6 +1520,7 @@ function buildPreviewProps(
         nodeById: Map<string, Node<AudioNodeData>>;
         paramsByHandle: Map<string, number>;
         lfoValues: LfoValues;
+        getDataValue: (nodeId: string) => number;
     }
 ): Record<string, any> {
     const props: Record<string, any> = {};
@@ -1309,6 +1559,12 @@ function buildPreviewProps(
             }
         }
 
+        const dataEdge = edgesForHandle.find((edge) => {
+            const sourceNode = context.nodeById.get(edge.source);
+            return sourceNode ? isDataNodeType(sourceNode.data.type) : false;
+        });
+        const dataValue = dataEdge ? context.getDataValue(dataEdge.source) : undefined;
+
         const inputEdge = edgesForHandle.find(
             (edge) => context.nodeById.get(edge.source)?.data.type === 'input'
         );
@@ -1322,7 +1578,11 @@ function buildPreviewProps(
         const lfoValue = lfoEdge ? context.lfoValues[lfoEdge.source] ?? undefined : undefined;
 
         if (lfoValue && options.modulatable) {
-            return { value: lfoValue, base: inputValue ?? options.baseValue };
+            return { value: lfoValue, base: dataValue ?? inputValue ?? options.baseValue };
+        }
+
+        if (dataValue !== undefined) {
+            return { value: dataValue };
         }
 
         if (inputValue !== undefined) {

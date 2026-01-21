@@ -14,9 +14,15 @@ import type {
     NoteNodeData,
     VoiceNodeData,
     SamplerNodeData,
+    MathNodeData,
+    CompareNodeData,
+    MixNodeData,
+    ClampNodeData,
+    SwitchNodeData,
 } from './store';
 
 import type { TriggerEvent } from '../../../src/sequencer/types';
+import { math, compare, mix, clamp, switchValue } from '../../../src/data/values';
 
 interface AudioNodeInstance {
     node: AudioNode;
@@ -90,6 +96,34 @@ function createReverbImpulse(ctx: AudioContext, decay: number): AudioBuffer {
 
     return buffer;
 }
+
+const AUDIO_NODE_TYPES = new Set([
+    'osc',
+    'gain',
+    'filter',
+    'delay',
+    'reverb',
+    'panner',
+    'mixer',
+    'noise',
+    'sampler',
+    'output',
+]);
+
+const DATA_NODE_TYPES = new Set([
+    'math',
+    'compare',
+    'mix',
+    'clamp',
+    'switch',
+]);
+
+const isAudioEdge = (edge: Edge, nodeById: Map<string, Node<AudioNodeData>>) => {
+    if (edge.sourceHandle !== 'out') return false;
+    if (edge.targetHandle !== 'in' && !edge.targetHandle?.startsWith('in')) return false;
+    const sourceNode = nodeById.get(edge.source);
+    return !!sourceNode && AUDIO_NODE_TYPES.has(sourceNode.data.type);
+};
 
 /**
  * Audio Engine - Manages the actual Web Audio API graph
@@ -538,6 +572,8 @@ export class AudioEngine {
             }
         });
 
+        const nodeById = new Map(nodes.map((node) => [node.id, node]));
+
         // Connect nodes based on edges
         edges.forEach((edge) => {
             const sourceInstance = this.audioNodes.get(edge.source);
@@ -554,6 +590,8 @@ export class AudioEngine {
                         }
                     }
 
+                    const audioEdge = isAudioEdge(edge, nodeById);
+
                     // Connect to target AudioParam or AudioNode
                     if (targetInstance.params && edge.targetHandle && targetInstance.params.has(edge.targetHandle)) {
                         // Connect to AudioParam (modulation)
@@ -566,7 +604,7 @@ export class AudioEngine {
                                 param.value = 0;
                             }
                         }
-                    } else {
+                    } else if (audioEdge) {
                         // Standard Audio to Audio connection
                         sourceNode.connect(targetInstance.node);
                     }
@@ -609,6 +647,8 @@ export class AudioEngine {
                 });
             }
         });
+
+        this.updateDataValues(nodes, edges);
 
         this.isPlaying = true;
         this.startScheduler();
@@ -904,9 +944,148 @@ export class AudioEngine {
 
                 return samplerInstance;
             }
+            case 'math':
+            case 'compare':
+            case 'mix':
+            case 'clamp':
+            case 'switch': {
+                const source = ctx.createConstantSource();
+                source.offset.value = 0;
+                return { node: source, type: data.type };
+            }
             default:
                 return null;
         }
+    }
+
+    private updateDataValues(nodes: Node<AudioNodeData>[], edges: Edge[]): void {
+        if (!this.audioContext) return;
+
+        const nodeById = new Map(nodes.map((node) => [node.id, node]));
+        const controlEdgesByTarget = new Map<string, Edge[]>();
+
+        edges.forEach((edge) => {
+            if (isAudioEdge(edge, nodeById)) return;
+            const list = controlEdgesByTarget.get(edge.target) ?? [];
+            list.push(edge);
+            controlEdgesByTarget.set(edge.target, list);
+        });
+
+        const cache = new Map<string, number>();
+        const visiting = new Set<string>();
+        const now = this.audioContext.currentTime;
+
+        const getSourceValue = (edge: Edge): number | null => {
+            const sourceNode = nodeById.get(edge.source);
+            if (!sourceNode) return null;
+
+            switch (sourceNode.data.type) {
+                case 'input': {
+                    const inputData = sourceNode.data as InputNodeData;
+                    const handle = edge.sourceHandle ?? '';
+                    const match = handle.match(/param_(\d+)/);
+                    const index = match ? Number(match[1]) : -1;
+                    const param = inputData.params?.[index];
+                    return param ? param.value : null;
+                }
+                case 'note': {
+                    const noteData = sourceNode.data as NoteNodeData;
+                    return Number.isFinite(noteData.frequency) ? noteData.frequency : null;
+                }
+                case 'math':
+                case 'compare':
+                case 'mix':
+                case 'clamp':
+                case 'switch':
+                    return evaluateDataNode(sourceNode.id);
+                default:
+                    return null;
+            }
+        };
+
+        const getHandleValue = (nodeId: string, handle: string, fallback: number) => {
+            const edgesForTarget = controlEdgesByTarget.get(nodeId) ?? [];
+            const edge = edgesForTarget.find((item) => item.targetHandle === handle);
+            if (!edge) return fallback;
+            const value = getSourceValue(edge);
+            return value ?? fallback;
+        };
+
+        const evaluateDataNode = (nodeId: string): number => {
+            if (cache.has(nodeId)) return cache.get(nodeId)!;
+            if (visiting.has(nodeId)) return 0;
+            const node = nodeById.get(nodeId);
+            if (!node || !DATA_NODE_TYPES.has(node.data.type)) return 0;
+
+            visiting.add(nodeId);
+
+            let result = 0;
+            switch (node.data.type) {
+                case 'math': {
+                    const data = node.data as MathNodeData;
+                    const a = getHandleValue(nodeId, 'a', data.a);
+                    const b = getHandleValue(nodeId, 'b', data.b);
+                    const c = getHandleValue(nodeId, 'c', data.c);
+                    result = math(data.operation, a, b, c);
+                    break;
+                }
+                case 'compare': {
+                    const data = node.data as CompareNodeData;
+                    const a = getHandleValue(nodeId, 'a', data.a);
+                    const b = getHandleValue(nodeId, 'b', data.b);
+                    result = compare(data.operation, a, b);
+                    break;
+                }
+                case 'mix': {
+                    const data = node.data as MixNodeData;
+                    const a = getHandleValue(nodeId, 'a', data.a);
+                    const b = getHandleValue(nodeId, 'b', data.b);
+                    const t = getHandleValue(nodeId, 't', data.t);
+                    result = mix(a, b, t, data.clamp);
+                    break;
+                }
+                case 'clamp': {
+                    const data = node.data as ClampNodeData;
+                    const value = getHandleValue(nodeId, 'value', data.value);
+                    const min = getHandleValue(nodeId, 'min', data.min);
+                    const max = getHandleValue(nodeId, 'max', data.max);
+                    result = clamp(value, min, max, data.mode);
+                    break;
+                }
+                case 'switch': {
+                    const data = node.data as SwitchNodeData;
+                    const inputs = Math.max(1, data.inputs || data.values?.length || 1);
+                    const values = Array.from({ length: inputs }, (_, index) => {
+                        const fallback = data.values?.[index] ?? 0;
+                        return getHandleValue(nodeId, `in_${index}`, fallback);
+                    });
+                    const indexValue = getHandleValue(nodeId, 'index', data.selectedIndex);
+                    result = switchValue(indexValue, values, values[0] ?? 0);
+                    break;
+                }
+                default:
+                    result = 0;
+            }
+
+            cache.set(nodeId, result);
+            visiting.delete(nodeId);
+            return result;
+        };
+
+        nodes.forEach((node) => {
+            if (!DATA_NODE_TYPES.has(node.data.type)) return;
+            const value = evaluateDataNode(node.id);
+            const instance = this.audioNodes.get(node.id);
+            const output = instance?.node;
+            if (output instanceof ConstantSourceNode) {
+                output.offset.setTargetAtTime(value, now, 0.01);
+            }
+        });
+    }
+
+    refreshDataValues(nodes: Node<AudioNodeData>[], edges: Edge[]): void {
+        if (!this.isPlaying || !this.audioContext) return;
+        this.updateDataValues(nodes, edges);
     }
 
     /**
@@ -917,6 +1096,7 @@ export class AudioEngine {
 
         this.edges = edges;
         const ctx = this.audioContext;
+        const nodeById = new Map(nodes.map((node) => [node.id, node]));
 
         // 0. Sync Nodes: Create new ones, Remove deleted ones
         const activeIds = new Set(nodes.map(n => n.id));
@@ -1011,6 +1191,8 @@ export class AudioEngine {
                         }
                     }
 
+                    const audioEdge = isAudioEdge(edge, nodeById);
+
                     // Connect to target AudioParam or AudioNode
                     if (targetInstance.params && edge.targetHandle && targetInstance.params.has(edge.targetHandle)) {
                         // Connect to AudioParam (modulation)
@@ -1023,7 +1205,7 @@ export class AudioEngine {
                                 param.value = 0;
                             }
                         }
-                    } else {
+                    } else if (audioEdge) {
                         // Standard Audio to Audio connection
                         sourceNode.connect(targetInstance.node);
                     }
@@ -1041,6 +1223,8 @@ export class AudioEngine {
                 outputInstance.node.connect(this.audioContext.destination);
             }
         }
+
+        this.updateDataValues(nodes, edges);
     }
 
     /**

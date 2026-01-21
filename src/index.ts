@@ -202,6 +202,23 @@ export {
 } from './utils';
 
 // -----------------------------------------------------------------------------
+// Data
+// -----------------------------------------------------------------------------
+export {
+    math,
+    compare,
+    mix,
+    clamp,
+    switchValue,
+} from './data';
+
+export type {
+    MathOperation,
+    CompareOperation,
+    ClampMode,
+} from './data';
+
+// -----------------------------------------------------------------------------
 // Notes
 // -----------------------------------------------------------------------------
 export {
@@ -262,4 +279,3 @@ export type {
     VoiceRenderProps,
     PolyVoiceProps,
 } from './synths';
-

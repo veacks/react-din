@@ -54,7 +54,7 @@ const OscNode = memo(({ id, data, selected }: NodeProps) => {
 
     return (
         <div className={`audio-node osc-node ${selected ? 'selected' : ''}`}>
-            <div className="node-header">
+            <div className="node-header" style={{ justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span className="node-icon">◐</span>
                     <span className="node-title">Oscillator</span>
@@ -62,7 +62,7 @@ const OscNode = memo(({ id, data, selected }: NodeProps) => {
                 {/* Audio Out aligned with header/top */}
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                     <span className="handle-label-static" style={{ fontSize: '9px', color: '#888', marginRight: '8px', textTransform: 'uppercase' }}>Audio Out</span>
-                    <Handle type="source" position={Position.Right} id="out" className="handle handle-out handle-audio" style={{ right: '-17px' }} />
+                    <Handle type="source" position={Position.Right} id="out" className="handle handle-out handle-audio" style={{ right: '0px' }} />
                 </div>
             </div>
             <div className="node-content">
@@ -100,7 +100,6 @@ const OscNode = memo(({ id, data, selected }: NodeProps) => {
                         position={Position.Left}
                         id="frequency"
                         className="handle handle-in handle-param"
-                        style={{ top: '50%', transform: 'translateY(-50%)' }}
                     />
                 </div>
                 <div className="node-control">
@@ -120,7 +119,6 @@ const OscNode = memo(({ id, data, selected }: NodeProps) => {
                         position={Position.Left}
                         id="detune"
                         className="handle handle-in handle-param"
-                        style={{ top: '50%', transform: 'translateY(-50%)' }}
                     />
                 </div>
             </div>

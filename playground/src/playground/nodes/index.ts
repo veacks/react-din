@@ -16,4 +16,8 @@ export { LFONode } from './LFONode';
 export { ADSRNode } from './ADSRNode';
 export { VoiceNode } from './VoiceNode';
 export { SamplerNode } from './SamplerNode';
-
+export { default as MathNode } from './MathNode';
+export { default as CompareNode } from './CompareNode';
+export { default as MixNode } from './MixNode';
+export { default as ClampNode } from './ClampNode';
+export { default as SwitchNode } from './SwitchNode';

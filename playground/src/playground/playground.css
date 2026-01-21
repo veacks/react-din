@@ -26,7 +26,7 @@
 .audio-node {
     display: flex;
     flex-direction: column;
-    /* overflow: hidden;  <-- Removed to allow handles (left: -10px) to be visible */
+    /* overflow: hidden;  <-- Removed to allow handles with negative offsets to be visible */
     background: var(--node-bg);
     border: 1px solid var(--node-border);
     border-radius: 8px;
@@ -55,16 +55,55 @@
     cursor: grabbing;
 }
 
-.osc-node .node-header { background: #ff8844; color: #fff; }
-.gain-node .node-header { background: #44cc44; color: #fff; }
-.filter-node .node-header { background: #aa44ff; color: #fff; }
-.output-node .node-header { background: #ff4466; color: #fff; }
-.noise-node .node-header { background: #666666; color: #fff; }
-.delay-node .node-header { background: #4488ff; color: #fff; }
-.reverb-node .node-header { background: #8844ff; color: #fff; }
-.panner-node .node-header { background: #44cccc; color: #042222; }
-.mixer-node .node-header { background: #ffaa44; color: #2b1b00; }
-.input-node .node-header { background: #555555; color: #fff; }
+.osc-node .node-header {
+    background: #ff8844;
+    color: #fff;
+}
+
+.gain-node .node-header {
+    background: #44cc44;
+    color: #fff;
+}
+
+.filter-node .node-header {
+    background: #aa44ff;
+    color: #fff;
+}
+
+.output-node .node-header {
+    background: #ff4466;
+    color: #fff;
+}
+
+.noise-node .node-header {
+    background: #666666;
+    color: #fff;
+}
+
+.delay-node .node-header {
+    background: #4488ff;
+    color: #fff;
+}
+
+.reverb-node .node-header {
+    background: #8844ff;
+    color: #fff;
+}
+
+.panner-node .node-header {
+    background: #44cccc;
+    color: #042222;
+}
+
+.mixer-node .node-header {
+    background: #ffaa44;
+    color: #2b1b00;
+}
+
+.input-node .node-header {
+    background: #555555;
+    color: #fff;
+}
 
 .node-icon {
     font-size: 14px;
@@ -127,6 +166,16 @@
     font-size: 11px;
 }
 
+.node-control input[type="number"] {
+    background: var(--control-bg);
+    color: var(--text);
+    border: 1px solid var(--control-border);
+    padding: 4px;
+    border-radius: 4px;
+    font-size: 11px;
+    width: 100%;
+}
+
 .node-control .value {
     font-size: 10px;
     color: var(--accent);
@@ -138,9 +187,11 @@
     width: 10px;
     height: 10px;
     border: 2px solid var(--node-bg);
+    border-radius: 50%;
     transition: all 0.2s;
     z-index: 10;
     background: var(--control-border);
+    transform-origin: center;
 }
 
 /* Audio Handles (Green) */
@@ -154,7 +205,6 @@
 .handle-param {
     background: var(--accent) !important;
     /* Bright Blue */
-    left: -6px !important;
 }
 
 .handle-in {
@@ -163,6 +213,14 @@
 
 .handle-out {
     border-radius: 50%;
+}
+
+.node-control .react-flow__handle-left {
+    left: -12px;
+}
+
+.node-control .react-flow__handle-right {
+    right: -12px;
 }
 
 /* Handle Hover */
@@ -220,8 +278,15 @@
 }
 
 @keyframes output-pulse {
-    0%, 100% { box-shadow: var(--node-shadow); }
-    50% { box-shadow: 0 0 18px rgba(239, 68, 68, 0.35); }
+
+    0%,
+    100% {
+        box-shadow: var(--node-shadow);
+    }
+
+    50% {
+        box-shadow: 0 0 18px rgba(239, 68, 68, 0.35);
+    }
 }
 
 /* Node Palette */
@@ -441,11 +506,6 @@
     font-size: 10px;
 }
 
-.socket-fix {
-    position: relative;
-    transform: none;
-    right: -14px;
-}
 
 .react-flow__minimap {
     background: var(--minimap-bg);
@@ -616,6 +676,7 @@
 .sequencer-pad.active+.velocity-bar-container .velocity-bar {
     opacity: 1;
 }
+
 /* Piano Roll Node Styles */
 .piano-roll-node {
     min-width: 400px;

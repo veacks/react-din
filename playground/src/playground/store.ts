@@ -96,6 +96,99 @@ export interface InputNodeData {
     label: string;
 }
 
+export type MathOperation =
+    | 'add'
+    | 'subtract'
+    | 'multiply'
+    | 'divide'
+    | 'multiplyAdd'
+    | 'power'
+    | 'logarithm'
+    | 'sqrt'
+    | 'invSqrt'
+    | 'abs'
+    | 'exp'
+    | 'min'
+    | 'max'
+    | 'lessThan'
+    | 'greaterThan'
+    | 'sign'
+    | 'compare'
+    | 'smoothMin'
+    | 'smoothMax'
+    | 'round'
+    | 'floor'
+    | 'ceil'
+    | 'truncate'
+    | 'fraction'
+    | 'truncModulo'
+    | 'floorModulo'
+    | 'wrap'
+    | 'snap'
+    | 'pingPong'
+    | 'sin'
+    | 'cos'
+    | 'tan'
+    | 'asin'
+    | 'acos'
+    | 'atan'
+    | 'atan2'
+    | 'sinh'
+    | 'cosh'
+    | 'tanh';
+
+export type CompareOperation = 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'neq';
+
+export type ClampMode = 'minmax' | 'range';
+
+export interface MathNodeData {
+    type: 'math';
+    operation: MathOperation;
+    a: number;
+    b: number;
+    c: number;
+    label: string;
+    [key: string]: unknown;
+}
+
+export interface CompareNodeData {
+    type: 'compare';
+    operation: CompareOperation;
+    a: number;
+    b: number;
+    label: string;
+    [key: string]: unknown;
+}
+
+export interface MixNodeData {
+    type: 'mix';
+    a: number;
+    b: number;
+    t: number;
+    clamp: boolean;
+    label: string;
+    [key: string]: unknown;
+}
+
+export interface ClampNodeData {
+    type: 'clamp';
+    mode: ClampMode;
+    value: number;
+    min: number;
+    max: number;
+    label: string;
+    [key: string]: unknown;
+}
+
+export interface SwitchNodeData {
+    type: 'switch';
+    inputs: number;
+    selectedIndex: number;
+    values: number[];
+    label: string;
+    [key: string]: unknown;
+}
+
 export interface NoteNodeData {
     type: 'note';
     note: string;
@@ -197,6 +290,11 @@ export type AudioNodeData = (
     | ADSRNodeData
     | VoiceNodeData
     | SamplerNodeData
+    | MathNodeData
+    | CompareNodeData
+    | MixNodeData
+    | ClampNodeData
+    | SwitchNodeData
 ) & Record<string, unknown>;
 
 export interface GraphDocument {
@@ -290,6 +388,19 @@ const syncNodeIdCounter = (nodes: Node<AudioNodeData>[]) => {
         nodeIdCounter = maxId;
     }
 };
+
+const AUDIO_NODE_TYPES = new Set([
+    'osc',
+    'gain',
+    'filter',
+    'delay',
+    'reverb',
+    'panner',
+    'mixer',
+    'noise',
+    'sampler',
+    'output',
+]);
 
 // Initial nodes - Horizontal layout
 const initialNodes: Node<AudioNodeData>[] = [
@@ -609,7 +720,11 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
     },
 
     onConnect: (connection) => {
+        const nodeById = new Map(get().nodes.map((node) => [node.id, node]));
+        const sourceNode = connection.source ? nodeById.get(connection.source) : null;
         const isAudioConnection =
+            !!sourceNode &&
+            AUDIO_NODE_TYPES.has(sourceNode.data.type) &&
             connection.sourceHandle === 'out' &&
             (connection.targetHandle === 'in' || connection.targetHandle?.startsWith('in'));
 
@@ -875,6 +990,84 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     } as AudioNodeData,
                 };
                 break;
+            case 'math':
+                newNode = {
+                    id,
+                    type: 'mathNode',
+                    position,
+                    dragHandle: '.node-header',
+                    data: {
+                        type: 'math',
+                        operation: 'add',
+                        a: 0,
+                        b: 0,
+                        c: 0,
+                        label: 'Math'
+                    } as AudioNodeData,
+                };
+                break;
+            case 'compare':
+                newNode = {
+                    id,
+                    type: 'compareNode',
+                    position,
+                    dragHandle: '.node-header',
+                    data: {
+                        type: 'compare',
+                        operation: 'gt',
+                        a: 0,
+                        b: 0,
+                        label: 'Compare'
+                    } as AudioNodeData,
+                };
+                break;
+            case 'mix':
+                newNode = {
+                    id,
+                    type: 'mixNode',
+                    position,
+                    dragHandle: '.node-header',
+                    data: {
+                        type: 'mix',
+                        a: 0,
+                        b: 1,
+                        t: 0.5,
+                        clamp: true,
+                        label: 'Mix'
+                    } as AudioNodeData,
+                };
+                break;
+            case 'clamp':
+                newNode = {
+                    id,
+                    type: 'clampNode',
+                    position,
+                    dragHandle: '.node-header',
+                    data: {
+                        type: 'clamp',
+                        mode: 'range',
+                        value: 0,
+                        min: 0,
+                        max: 1,
+                        label: 'Clamp'
+                    } as AudioNodeData,
+                };
+                break;
+            case 'switch':
+                newNode = {
+                    id,
+                    type: 'switchNode',
+                    position,
+                    dragHandle: '.node-header',
+                    data: {
+                        type: 'switch',
+                        inputs: 3,
+                        selectedIndex: 0,
+                        values: [0, 0, 0],
+                        label: 'Switch'
+                    } as AudioNodeData,
+                };
+                break;
             default:
                 return;
         }
@@ -914,6 +1107,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
         }));
 
         audioEngine.updateNode(nodeId, data);
+        audioEngine.refreshDataValues(nextNodes, get().edges);
     },
 
     removeNode: (nodeId) => {

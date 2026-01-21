@@ -23,7 +23,7 @@ const NoiseNode = memo(({ id, data, selected }: NodeProps) => {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                     <span className="handle-label-static" style={{ fontSize: '9px', color: '#888', marginRight: '8px', textTransform: 'uppercase' }}>Out</span>
-                    <Handle type="source" position={Position.Right} id="out" className="handle handle-out handle-audio" style={{ right: '-10px' }} />
+                    <Handle type="source" position={Position.Right} id="out" className="handle handle-out handle-audio" style={{ right: '0px' }} />
                 </div>
             </div>
             <div className="node-content">

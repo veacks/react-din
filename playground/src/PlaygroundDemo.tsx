@@ -33,6 +33,11 @@ import {
     ADSRNode,
     VoiceNode,
     SamplerNode,
+    MathNode,
+    CompareNode,
+    MixNode,
+    ClampNode,
+    SwitchNode,
 } from './playground/nodes';
 import { deleteGraph as deleteStoredGraph, loadActiveGraphId, loadGraphs, saveActiveGraphId, saveGraph } from './playground/graphStorage';
 import { deleteAudioFromCache, getAudioObjectUrl } from './playground/audioCache';
@@ -58,6 +63,11 @@ const nodeTypes: NodeTypes = {
     adsrNode: ADSRNode as NodeTypes[string],
     voiceNode: VoiceNode as NodeTypes[string],
     samplerNode: SamplerNode as NodeTypes[string],
+    mathNode: MathNode as NodeTypes[string],
+    compareNode: CompareNode as NodeTypes[string],
+    mixNode: MixNode as NodeTypes[string],
+    clampNode: ClampNode as NodeTypes[string],
+    switchNode: SwitchNode as NodeTypes[string],
 };
 
 const nodeCategories = [
@@ -92,6 +102,16 @@ const nodeCategories = [
         nodes: [
             { type: 'mixer', label: 'Mixer', icon: '⊕', color: '#ffaa44' },
             { type: 'output', label: 'Output', icon: '🔊', color: '#ff4466' },
+        ],
+    },
+    {
+        name: 'Math',
+        nodes: [
+            { type: 'math', label: 'Math', icon: 'fx', color: '#7bd1ff' },
+            { type: 'compare', label: 'Compare', icon: '>=', color: '#7bd1ff' },
+            { type: 'mix', label: 'Mix', icon: 'mix', color: '#7bd1ff' },
+            { type: 'clamp', label: 'Clamp', icon: '[]', color: '#7bd1ff' },
+            { type: 'switch', label: 'Switch', icon: 'sw', color: '#7bd1ff' },
         ],
     },
 ];

@@ -97,14 +97,14 @@ export const SamplerNode: React.FC<NodeProps<Node<SamplerNodeData>>> = memo(({ i
 
     return (
         <div className={`audio-node sampler-node ${selected ? 'selected' : ''}`}>
-            <div className="node-header" style={{ background: '#44ccff' }}>
+            <div className="node-header" style={{ background: '#44ccff', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span className="node-icon">🎹</span>
                     <span className="node-title">{data.label}</span>
                 </div>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                     <span className="handle-label-static" style={{ fontSize: '9px', color: '#fff', marginRight: '8px', textTransform: 'uppercase' }}>Out</span>
-                    <Handle type="source" position={Position.Right} id="out" className="handle handle-out handle-audio" style={{ right: '-17px' }} />
+                    <Handle type="source" position={Position.Right} id="out" className="handle handle-out handle-audio" style={{ right: '0px' }} />
                 </div>
             </div>
 

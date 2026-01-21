@@ -34,7 +34,7 @@ const OutputNode = memo(({ id, data, selected }: NodeProps) => {
         <div className={`audio-node output-node ${selected ? 'selected' : ''} ${outputData.playing ? 'playing' : ''}`}>
             <div className="node-header" style={{ justifyContent: 'space-between', position: 'relative' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Handle type="target" position={Position.Left} id="in" className="handle handle-in handle-audio" style={{ left: '-10px' }} />
+                    <Handle type="target" position={Position.Left} id="in" className="handle handle-in handle-audio" style={{ left: '0px' }} />
                     <span className="node-icon">🔊</span>
                     <span className="node-title">Output</span>
                 </div>

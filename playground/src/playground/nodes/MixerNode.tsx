@@ -14,7 +14,7 @@ const MixerNode = memo(({ id, data, selected }: NodeProps) => {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                     <span className="handle-label-static" style={{ fontSize: '9px', color: '#888', marginRight: '8px', textTransform: 'uppercase' }}>Out</span>
-                    <Handle type="source" position={Position.Right} id="out" className="handle handle-out handle-audio" style={{ right: '-10px' }} />
+                    <Handle type="source" position={Position.Right} id="out" className="handle handle-out handle-audio" style={{ right: '0px' }} />
                 </div>
             </div>
             <div className="node-content">
@@ -25,7 +25,6 @@ const MixerNode = memo(({ id, data, selected }: NodeProps) => {
                         position={Position.Left}
                         id="in1"
                         className="handle handle-in handle-audio"
-                        style={{ top: '50%', transform: 'translateY(-50%)' }}
                     />
                 </div>
                 <div className="node-control" style={{ minHeight: '30px' }}>
@@ -35,7 +34,6 @@ const MixerNode = memo(({ id, data, selected }: NodeProps) => {
                         position={Position.Left}
                         id="in2"
                         className="handle handle-in handle-audio"
-                        style={{ top: '50%', transform: 'translateY(-50%)' }}
                     />
                 </div>
                 <div className="node-control" style={{ minHeight: '30px' }}>
@@ -45,7 +43,6 @@ const MixerNode = memo(({ id, data, selected }: NodeProps) => {
                         position={Position.Left}
                         id="in3"
                         className="handle handle-in handle-audio"
-                        style={{ top: '50%', transform: 'translateY(-50%)' }}
                     />
                 </div>
             </div>

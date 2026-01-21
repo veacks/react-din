@@ -24,7 +24,7 @@ const InputNode = memo(({ data, selected }: NodeProps) => {
                                 type="source"
                                 position={Position.Right}
                                 id={`param_${index}`}
-                                className="handle handle-out handle-param socket-fix"
+                                className="handle handle-out handle-param"
                             />
                         </div>
                     </div>
