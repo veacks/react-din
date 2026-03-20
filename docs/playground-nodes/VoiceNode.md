@@ -5,18 +5,18 @@ Translate trigger streams into note and gate outputs for synth-style graphs.
 
 ## Props / Handles
 - Data fields: `portamento`, `label`.
-- Handles: trigger input plus note and gate outputs.
+- Handles: trigger input plus `note`, `gate`, and `velocity` outputs.
 
 ## Defaults
 - Added from the store with `portamento 0` and label `Voice`.
 
 ## Integration Notes
-- Keep note/gate handle IDs and generated-code output aligned with engine voice behavior.
+- Keep note/gate/velocity handle IDs and generated-code output aligned with engine voice behavior.
 - Typical downstream targets are `OscNode` frequency and `ADSRNode` trigger.
 
 ## Failure Modes
 - Gate or note handle drift breaks common synth templates immediately.
-- Portamento changes need alignment between UI defaults and engine updates.
+- Portamento changes need alignment between UI defaults, engine updates, and preview/export voice wrappers.
 
 ## Example
 ```tsx

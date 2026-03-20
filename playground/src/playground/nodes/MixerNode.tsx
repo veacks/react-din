@@ -1,10 +1,8 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { useAudioGraphStore, type MixerNodeData } from '../store';
+import { type MixerNodeData } from '../store';
 
-const MixerNode = memo(({ id, data, selected }: NodeProps) => {
-    const mixerData = data as MixerNodeData;
-
+const MixerNode = memo(({ selected }: NodeProps) => {
     return (
         <div className={`audio-node mixer-node ${selected ? 'selected' : ''}`}>
             <div className="node-header" style={{ justifyContent: 'space-between', position: 'relative' }}>

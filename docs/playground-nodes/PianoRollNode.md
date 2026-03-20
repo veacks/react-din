@@ -11,11 +11,12 @@ Edit note events over time with a piano-roll style interface.
 - Added from the store with `steps 16`, `octaves 2`, `baseNote 48`, `notes []`, and label `Piano Roll`.
 
 ## Integration Notes
-- Keep note-event serialization aligned across UI editing, storage, and code generation.
+- Keep note-event serialization aligned across UI editing, storage, transport wiring, and code generation.
 - Use with `VoiceNode` for pitch-aware trigger flows.
 
 ## Failure Modes
 - Broken drag or overlap logic can corrupt note-event data.
+- Disconnected piano rolls do not schedule note events until linked to `TransportNode`.
 - Base-note or octave drift makes saved graphs hard to trust.
 
 ## Example

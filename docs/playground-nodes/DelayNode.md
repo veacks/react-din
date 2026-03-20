@@ -5,13 +5,13 @@ Expose a simple delay effect in the visual graph editor.
 
 ## Props / Handles
 - Data fields: `delayTime`, `feedback`, `label`.
-- Handles: audio `in` and `out`, plus delay parameter controls.
+- Handles: audio `in` and `out`, plus parameter targets for `delayTime` and `feedback`.
 
 ## Defaults
 - Added from the store with `delayTime 0.3`, `feedback 0.4`, and label `Delay`.
 
 ## Integration Notes
-- Keep parameter labels, defaults, and code generation props synchronized.
+- Keep parameter labels, defaults, runtime feedback wiring, and code generation props synchronized.
 - Route it between a source chain and `OutputNode`.
 
 ## Failure Modes

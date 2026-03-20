@@ -11,12 +11,14 @@ Trigger step-based patterns from the transport inside the playground.
 - Added from the store with `steps 16`, `pattern` filled with `0.8`, `activeSteps` filled with `false`, and label `Step Sequencer`.
 
 ## Integration Notes
-- Keep step array lengths, trigger semantics, and code generation aligned.
+- Keep step array lengths, trigger semantics, transport wiring, and code generation aligned.
+- The node exposes a live playhead readout so the currently scheduled step is visible while the transport runs.
 - Integration coverage should include transport-driven voice or drum graphs.
 
 ## Failure Modes
 - Array-length drift can break rendering or trigger timing.
-- Current-step feedback can desync from engine timing if subscriptions change.
+- Disconnected sequencers do not run; missing `TransportNode` links leave the pattern visually editable but silent.
+- Current-step feedback must use the effective step count or 32/64-step patterns drift visually.
 
 ## Example
 ```tsx

@@ -1,6 +1,8 @@
 import type { Node, Edge } from '@xyflow/react';
 import type {
     AudioNodeData,
+    ADSRNodeData,
+    PianoRollNodeData,
     OscNodeData,
     GainNodeData,
     FilterNodeData,
@@ -9,9 +11,10 @@ import type {
     DelayNodeData,
     ReverbNodeData,
     StereoPannerNodeData,
-    MixerNodeData,
     InputNodeData,
     NoteNodeData,
+    StepSequencerNodeData,
+    TransportNodeData,
     VoiceNodeData,
     SamplerNodeData,
     MathNodeData,
@@ -20,24 +23,42 @@ import type {
     ClampNodeData,
     SwitchNodeData,
 } from './store';
-
-import type { TriggerEvent } from '../../../src/sequencer/types';
 import { math, compare, mix, clamp, switchValue } from '../../../src/data/values';
+import {
+    getInputParamHandleId,
+    getTransportConnections,
+    isAudioConnection,
+    isDataNodeType,
+    resolveInputParamByHandle,
+} from './nodeHelpers';
 
 interface AudioNodeInstance {
     node: AudioNode;
-    type: string;
-    feedbackGain?: GainNode; // For delay feedback
+    type: AudioNodeData['type'];
+    inputNode?: AudioNode;
+    internalNodes?: AudioNode[];
+    feedbackGain?: GainNode;
+    reverbConvolver?: ConvolverNode;
+    reverbDryGain?: GainNode;
+    reverbWetGain?: GainNode;
     // Map handle ID (e.g., 'frequency') to AudioParam
     params?: Map<string, AudioParam>;
     // Map output handle ID to AudioNode (for InputNode multiple outputs)
     outputs?: Map<string, AudioNode>;
     // Custom data
-    sequencerData?: any;
-    pianoRollData?: any;
-    adsrData?: any;
-    voiceData?: any;
+    sequencerData?: Pick<StepSequencerNodeData, 'steps' | 'pattern' | 'activeSteps'>;
+    pianoRollData?: Pick<PianoRollNodeData, 'steps' | 'octaves' | 'baseNote' | 'notes'>;
+    adsrData?: Pick<ADSRNodeData, 'attack' | 'decay' | 'sustain' | 'release'>;
+    voiceData?: Pick<VoiceNodeData, 'portamento'>;
+    samplerData?: {
+        src: string;
+        loop: boolean;
+        playbackRate: number;
+        detune: number;
+        buffer: AudioBuffer | null;
+    };
     lfoOsc?: OscillatorNode; // For LFO waveform updates
+    lastTriggerValue?: number;
 }
 
 /**
@@ -97,46 +118,221 @@ function createReverbImpulse(ctx: AudioContext, decay: number): AudioBuffer {
     return buffer;
 }
 
-const AUDIO_NODE_TYPES = new Set([
-    'osc',
-    'gain',
-    'filter',
-    'delay',
-    'reverb',
-    'panner',
-    'mixer',
-    'noise',
-    'sampler',
-    'output',
-]);
-
-const DATA_NODE_TYPES = new Set([
-    'math',
-    'compare',
-    'mix',
-    'clamp',
-    'switch',
-]);
-
-const isAudioEdge = (edge: Edge, nodeById: Map<string, Node<AudioNodeData>>) => {
-    if (edge.sourceHandle !== 'out') return false;
-    if (edge.targetHandle !== 'in' && !edge.targetHandle?.startsWith('in')) return false;
-    const sourceNode = nodeById.get(edge.source);
-    return !!sourceNode && AUDIO_NODE_TYPES.has(sourceNode.data.type);
-};
-
 /**
  * Audio Engine - Manages the actual Web Audio API graph
  */
 export class AudioEngine {
     private audioContext: AudioContext | null = null;
     private audioNodes: Map<string, AudioNodeInstance> = new Map();
+    private visualNodes: Node<AudioNodeData>[] = [];
+    private nodeById: Map<string, Node<AudioNodeData>> = new Map();
     private isPlaying = false;
     private edges: Edge[] = [];
     private sampleBufferCache: Map<string, AudioBuffer> = new Map();
 
     constructor() {
         this.audioContext = null;
+    }
+
+    private syncVisualGraph(nodes: Node<AudioNodeData>[], edges: Edge[]) {
+        this.visualNodes = nodes;
+        this.nodeById = new Map(nodes.map((node) => [node.id, node]));
+        this.edges = edges;
+    }
+
+    private getTransportData(): TransportNodeData | null {
+        const transportNode = this.visualNodes.find((node) => node.data.type === 'transport');
+        return transportNode ? transportNode.data as TransportNodeData : null;
+    }
+
+    private isTransportRunning(): boolean {
+        const transport = this.getTransportData();
+        return transport ? transport.playing : false;
+    }
+
+    private getStepDuration(): number {
+        const transport = this.getTransportData();
+        const beatUnit = transport?.beatUnit ?? 4;
+        const stepsPerBeat = transport?.stepsPerBeat ?? 4;
+        const secondsPerBeat = (60 / this.bpm) * (4 / beatUnit);
+        return secondsPerBeat / stepsPerBeat;
+    }
+
+    private getSwingOffset(stepIndex: number): number {
+        const swing = Math.max(0, Math.min(1, this.getTransportData()?.swing ?? 0));
+        return stepIndex % 2 === 1 ? this.getStepDuration() * swing * 0.5 : 0;
+    }
+
+    private getTransportConnectedIds(): Set<string> {
+        return getTransportConnections(this.edges, this.nodeById);
+    }
+
+    private getSequencerLoopLength(): number {
+        const connectedIds = this.getTransportConnectedIds();
+        let maxSteps = 0;
+
+        connectedIds.forEach((id) => {
+            const node = this.nodeById.get(id);
+            if (!node) return;
+            if (node.data.type === 'stepSequencer') {
+                maxSteps = Math.max(maxSteps, Math.max(1, node.data.steps || 16));
+            }
+            if (node.data.type === 'pianoRoll') {
+                maxSteps = Math.max(maxSteps, Math.max(1, node.data.steps || 16));
+            }
+        });
+
+        return Math.max(maxSteps, 16);
+    }
+
+    private getInputNode(instance: AudioNodeInstance): AudioNode {
+        return instance.inputNode ?? instance.node;
+    }
+
+    private startInstance(instance: AudioNodeInstance) {
+        if (instance.node instanceof OscillatorNode) {
+            instance.node.start();
+        } else if (instance.node instanceof AudioBufferSourceNode) {
+            instance.node.loop = true;
+            instance.node.start();
+        } else if (instance.node instanceof ConstantSourceNode) {
+            instance.node.start();
+        }
+
+        if (instance.lfoOsc) {
+            instance.lfoOsc.start();
+        }
+
+        if (instance.outputs) {
+            instance.outputs.forEach((output) => {
+                if (output instanceof ConstantSourceNode || output instanceof OscillatorNode) {
+                    output.start();
+                }
+            });
+        }
+    }
+
+    private disconnectInstance(instance: AudioNodeInstance) {
+        try {
+            instance.node.disconnect();
+        } catch {
+            // Ignore disconnect errors during graph rewiring.
+        }
+
+        instance.internalNodes?.forEach((node) => {
+            try {
+                node.disconnect();
+            } catch {
+                // Ignore disconnect errors during graph rewiring.
+            }
+        });
+    }
+
+    private restoreInternalConnections(instance: AudioNodeInstance) {
+        if (instance.type === 'delay' && instance.feedbackGain) {
+            instance.node.connect(instance.feedbackGain);
+            instance.feedbackGain.connect(instance.node);
+        }
+
+        if (
+            instance.type === 'reverb'
+            && instance.inputNode
+            && instance.reverbConvolver
+            && instance.reverbDryGain
+            && instance.reverbWetGain
+        ) {
+            instance.inputNode.connect(instance.reverbDryGain);
+            instance.inputNode.connect(instance.reverbConvolver);
+            instance.reverbConvolver.connect(instance.reverbWetGain);
+            instance.reverbDryGain.connect(instance.node);
+            instance.reverbWetGain.connect(instance.node);
+        }
+    }
+
+    private connectGraph(nodes: Node<AudioNodeData>[], edges: Edge[]) {
+        const nodeById = new Map(nodes.map((node) => [node.id, node]));
+
+        this.audioNodes.forEach((instance) => {
+            this.disconnectInstance(instance);
+        });
+
+        this.audioNodes.forEach((instance) => {
+            this.restoreInternalConnections(instance);
+        });
+
+        edges.forEach((edge) => {
+            const sourceInstance = this.audioNodes.get(edge.source);
+            const targetInstance = this.audioNodes.get(edge.target);
+
+            if (!sourceInstance || !targetInstance) return;
+
+            try {
+                let sourceNode: AudioNode = sourceInstance.node;
+                if (edge.sourceHandle && sourceInstance.outputs) {
+                    const specificOutput = sourceInstance.outputs.get(edge.sourceHandle);
+                    if (specificOutput) {
+                        sourceNode = specificOutput;
+                    }
+                }
+
+                if (targetInstance.params && edge.targetHandle && targetInstance.params.has(edge.targetHandle)) {
+                    const param = targetInstance.params.get(edge.targetHandle);
+                    if (param) {
+                        sourceNode.connect(param);
+                        if ((sourceInstance.type === 'note' || sourceInstance.type === 'voice') && edge.targetHandle === 'frequency') {
+                            param.value = 0;
+                        }
+                    }
+                } else if (isAudioConnection(edge, nodeById)) {
+                    sourceNode.connect(this.getInputNode(targetInstance));
+                }
+            } catch (error) {
+                console.warn('Failed to connect nodes:', error);
+            }
+        });
+
+        const outputNode = nodes.find((node) => node.data.type === 'output');
+        if (outputNode) {
+            const outputInstance = this.audioNodes.get(outputNode.id);
+            if (outputInstance && this.audioContext) {
+                outputInstance.node.connect(this.audioContext.destination);
+            }
+        }
+    }
+
+    private triggerSampler(nodeId: string, time: number, duration: number) {
+        const instance = this.audioNodes.get(nodeId);
+        if (!instance?.samplerData) return;
+
+        this.playSampler(nodeId, instance.samplerData);
+
+        if (instance.samplerData.loop) {
+            const delay = Math.max(0, time + duration - (this.audioContext?.currentTime ?? 0)) * 1000;
+            window.setTimeout(() => {
+                this.stopSampler(nodeId);
+            }, delay);
+        }
+    }
+
+    private triggerSequencerTargets(sourceId: string, time: number, velocity: number, duration: number, midiPitch?: number) {
+        const connectedEdges = this.edges.filter((edge) => edge.source === sourceId);
+
+        connectedEdges.forEach((edge) => {
+            const targetInstance = this.audioNodes.get(edge.target);
+            if (!targetInstance) return;
+
+            if (targetInstance.type === 'adsr' && edge.targetHandle === 'gate') {
+                this.triggerAdsr(edge.target, time, velocity, duration);
+            } else if (targetInstance.type === 'voice' && edge.targetHandle === 'trigger') {
+                if (typeof midiPitch === 'number') {
+                    this.triggerVoiceWithPitch(edge.target, time, midiPitch, velocity, duration);
+                } else {
+                    this.triggerVoice(edge.target, time, velocity, duration);
+                }
+            } else if (targetInstance.type === 'sampler' && edge.targetHandle === 'trigger') {
+                this.triggerSampler(edge.target, time, duration);
+            }
+        });
     }
 
     /**
@@ -173,6 +369,7 @@ export class AudioEngine {
      * Play a sampler (one-shot or looped)
      */
     playSampler(nodeId: string, data: { src: string; loop: boolean; playbackRate: number; detune: number }): void {
+        if (!data.src) return;
         if (!this.audioContext) {
             this.init();
         }
@@ -239,6 +436,10 @@ export class AudioEngine {
         }
     }
 
+    private stopSamplerPlayback(): void {
+        Array.from(this.activeSamplerSources.keys()).forEach((nodeId) => this.stopSampler(nodeId));
+    }
+
     /**
      * Update sampler parameter in real-time
      */
@@ -299,7 +500,7 @@ export class AudioEngine {
 
     // Scheduler
     private nextNoteTime: number = 0.0;
-    private current16thNote: number = 0;
+    private currentStep: number = 0;
 
     // Callbacks
     private stepCallbacks: Set<(step: number) => void> = new Set();
@@ -321,147 +522,123 @@ export class AudioEngine {
         if (this.timerID) return;
 
         const nextNote = () => {
-            const secondsPerBeat = 60.0 / this.bpm;
-            // 16th note = 0.25 of a beat
-            this.nextNoteTime += 0.25 * secondsPerBeat;
-            this.current16thNote++;
-            if (this.current16thNote === 16) {
-                this.current16thNote = 0;
-            }
+            this.nextNoteTime += this.getStepDuration();
+            this.currentStep = (this.currentStep + 1) % this.getSequencerLoopLength();
         };
 
-        const scheduleNote = (beatNumber: number, time: number) => {
-            // Notify UI (sync with audio time)
+        const scheduleNote = (stepNumber: number, time: number) => {
+            const connectedIds = this.getTransportConnectedIds();
+            const eventTime = time + this.getSwingOffset(stepNumber);
+            const stepDuration = this.getStepDuration();
+
             if (this.audioContext) {
-                const delay = (time - this.audioContext.currentTime) * 1000;
+                const delay = (eventTime - this.audioContext.currentTime) * 1000;
                 if (delay >= 0) {
-                    setTimeout(() => {
-                        this.stepCallbacks.forEach(cb => cb(beatNumber));
+                    window.setTimeout(() => {
+                        this.stepCallbacks.forEach((cb) => cb(stepNumber));
                     }, delay);
                 }
             }
 
-            // Find all sequencer nodes
             this.audioNodes.forEach((instance, id) => {
-                if (instance.type === 'stepSequencer') {
-                    const seqInstance = instance as any;
-                    if (seqInstance.sequencerData) {
-                        const { steps, pattern, activeSteps } = seqInstance.sequencerData;
+                if (instance.type === 'stepSequencer' && instance.sequencerData && connectedIds.has(id)) {
+                    const { steps, pattern, activeSteps } = instance.sequencerData;
+                    const stepIndex = stepNumber % (steps || 16);
 
-                        // Modulo beatNumber to steps count
-                        const stepIndex = beatNumber % (steps || 16);
+                    if (activeSteps[stepIndex]) {
+                        const velocity = pattern[stepIndex] || 0.8;
+                        const node = instance.node as ConstantSourceNode;
 
-                        if (activeSteps[stepIndex]) {
-                            const velocity = pattern[stepIndex] || 0.8;
-                            const node = instance.node as ConstantSourceNode;
-
-                            const secondsPerBeat = 60.0 / this.bpm;
-                            const stepDuration = 0.25 * secondsPerBeat;
-
-                            // 1. Direct Gate Output
-                            node.offset.setValueAtTime(velocity, time);
-                            node.offset.setValueAtTime(0, time + (stepDuration * 0.8)); // Release at 80%
-
-                            // 2. Trigger connected ADSRs
-                            const connectedEdges = this.edges.filter(e => e.source === id);
-                            connectedEdges.forEach(edge => {
-                                const targetInstance = this.audioNodes.get(edge.target);
-                                if (targetInstance) {
-                                    if (targetInstance.type === 'adsr') {
-                                        this.triggerAdsr(edge.target, time, velocity, stepDuration * 0.8);
-                                    } else if (targetInstance.type === 'voice') {
-                                        this.triggerVoice(edge.target, time, velocity, stepDuration * 0.8);
-                                    }
-                                }
-                            });
-                        }
+                        node.offset.setValueAtTime(velocity, eventTime);
+                        node.offset.setValueAtTime(0, eventTime + (stepDuration * 0.8));
+                        this.triggerSequencerTargets(id, eventTime, velocity, stepDuration * 0.8);
                     }
                 }
 
-                // Piano Roll handling
-                if (instance.type === 'pianoRoll') {
-                    const prInstance = instance as any;
-                    if (prInstance.pianoRollData) {
-                        const { steps, notes } = prInstance.pianoRollData;
-                        const stepIndex = beatNumber % (steps || 16);
+                if (instance.type === 'pianoRoll' && instance.pianoRollData && connectedIds.has(id)) {
+                    const { steps, notes } = instance.pianoRollData;
+                    const stepIndex = stepNumber % (steps || 16);
+                    const notesAtStep = notes.filter((note) => note.step === stepIndex);
 
-                        // Find notes that start at this step
-                        const notesAtStep = notes.filter((n: any) => n.step === stepIndex);
-
-                        if (notesAtStep.length > 0) {
-                            const secondsPerBeat = 60.0 / this.bpm;
-                            const stepDuration = 0.25 * secondsPerBeat;
-
-                            notesAtStep.forEach((noteEvent: any) => {
-                                const { pitch, duration, velocity } = noteEvent;
-                                const noteDuration = duration * stepDuration;
-
-                                // Trigger connected Voice nodes with pitch info
-                                const connectedEdges = this.edges.filter(e => e.source === id);
-                                connectedEdges.forEach(edge => {
-                                    const targetInstance = this.audioNodes.get(edge.target);
-                                    if (targetInstance && targetInstance.type === 'voice') {
-                                        this.triggerVoiceWithPitch(edge.target, time, pitch, velocity, noteDuration * 0.9);
-                                    }
-                                });
-                            });
-                        }
-                    }
+                    notesAtStep.forEach((noteEvent) => {
+                        const noteDuration = noteEvent.duration * stepDuration;
+                        this.triggerSequencerTargets(
+                            id,
+                            eventTime,
+                            noteEvent.velocity,
+                            noteDuration * 0.9,
+                            noteEvent.pitch
+                        );
+                    });
                 }
             });
         };
 
         const scheduler = () => {
             if (!this.audioContext) return;
+            if (!this.isTransportRunning()) {
+                this.timerID = window.setTimeout(scheduler, this.lookahead);
+                return;
+            }
 
-            // while there are notes that will need to play before the next interval, 
-            // schedule them and advance the pointer.
             while (this.nextNoteTime < this.audioContext.currentTime + this.scheduleAheadTime) {
-                scheduleNote(this.current16thNote, this.nextNoteTime);
+                scheduleNote(this.currentStep, this.nextNoteTime);
                 nextNote();
             }
             this.timerID = window.setTimeout(scheduler, this.lookahead);
         };
 
-        this.current16thNote = 0;
+        this.currentStep = 0;
         this.nextNoteTime = this.audioContext?.currentTime || 0;
         scheduler();
+    }
+
+    private applyVoicePitch(
+        freqSource: ConstantSourceNode | undefined,
+        frequency: number,
+        time: number,
+        portamento: number
+    ) {
+        if (!freqSource) return;
+        freqSource.offset.cancelScheduledValues(time);
+        if (portamento > 0) {
+            freqSource.offset.setTargetAtTime(frequency, time, portamento);
+        } else {
+            freqSource.offset.setValueAtTime(frequency, time);
+        }
+    }
+
+    private triggerVoiceGateTargets(voiceId: string, time: number, velocity: number, duration: number) {
+        const connectedEdges = this.edges.filter((edge) => edge.source === voiceId && edge.sourceHandle === 'gate');
+        connectedEdges.forEach((edge) => {
+            const targetInstance = this.audioNodes.get(edge.target);
+            if (!targetInstance) return;
+
+            if (targetInstance.type === 'adsr' && edge.targetHandle === 'gate') {
+                this.triggerAdsr(edge.target, time, velocity, duration);
+            } else if (targetInstance.type === 'voice' && edge.targetHandle === 'trigger') {
+                this.triggerVoice(edge.target, time, velocity, duration);
+            } else if (targetInstance.type === 'sampler' && edge.targetHandle === 'trigger') {
+                this.triggerSampler(edge.target, time, duration);
+            }
+        });
     }
 
     private triggerVoice(voiceId: string, time: number, velocity: number, duration: number) {
         const instance = this.audioNodes.get(voiceId);
         if (!instance || !instance.outputs) return;
 
-        const freqSource = instance.outputs.get('note') as ConstantSourceNode;
-        const gateSource = instance.outputs.get('gate') as ConstantSourceNode;
-        const velocitySource = instance.outputs.get('velocity') as ConstantSourceNode;
+        const freqSource = instance.outputs.get('note') as ConstantSourceNode | undefined;
+        const gateSource = instance.outputs.get('gate') as ConstantSourceNode | undefined;
+        const velocitySource = instance.outputs.get('velocity') as ConstantSourceNode | undefined;
+        const portamento = instance.voiceData?.portamento ?? 0;
 
-        // 1. Frequency (Note)
-        // Default to C4 (261.63 Hz) for now since Sequencer doesn't provide pitch
-        if (freqSource) {
-            // We can set a fixed note or random, but for consistency let's use C4
-            // User can modulate this later if we add Pitch inputs to Voice
-            freqSource.offset.setValueAtTime(261.63, time);
-        }
+        this.applyVoicePitch(freqSource, 261.63, time, portamento);
 
-        // 2. Gate
         if (gateSource) {
             gateSource.offset.setValueAtTime(1, time);
             gateSource.offset.setValueAtTime(0, time + duration);
-
-            // Propagate Trigger to connected nodes (e.g. ADSR) via Gate handle
-            // This simulates CV triggering for the scheduler-driven nodes
-            const connectedEdges = this.edges.filter(e => e.source === voiceId && e.sourceHandle === 'gate');
-            connectedEdges.forEach(edge => {
-                const targetInstance = this.audioNodes.get(edge.target);
-                if (targetInstance) {
-                    if (targetInstance.type === 'adsr') {
-                        this.triggerAdsr(edge.target, time, velocity, duration);
-                    } else if (targetInstance.type === 'voice') {
-                        this.triggerVoice(edge.target, time, velocity, duration);
-                    }
-                }
-            });
+            this.triggerVoiceGateTargets(voiceId, time, velocity, duration);
         }
 
         if (velocitySource) {
@@ -469,43 +646,24 @@ export class AudioEngine {
         }
     }
 
-    /**
-     * Trigger a Voice node with a specific MIDI pitch
-     */
     private triggerVoiceWithPitch(voiceId: string, time: number, midiPitch: number, velocity: number, duration: number) {
         const instance = this.audioNodes.get(voiceId);
         if (!instance || !instance.outputs) return;
 
-        const freqSource = instance.outputs.get('note') as ConstantSourceNode;
-        const gateSource = instance.outputs.get('gate') as ConstantSourceNode;
-        const velocitySource = instance.outputs.get('velocity') as ConstantSourceNode;
-
-        // Convert MIDI pitch to frequency: f = 440 * 2^((n-69)/12)
+        const freqSource = instance.outputs.get('note') as ConstantSourceNode | undefined;
+        const gateSource = instance.outputs.get('gate') as ConstantSourceNode | undefined;
+        const velocitySource = instance.outputs.get('velocity') as ConstantSourceNode | undefined;
+        const portamento = instance.voiceData?.portamento ?? 0;
         const frequency = 440 * Math.pow(2, (midiPitch - 69) / 12);
 
-        // 1. Frequency (Note)
-        if (freqSource) {
-            freqSource.offset.setValueAtTime(frequency, time);
-        }
+        this.applyVoicePitch(freqSource, frequency, time, portamento);
 
-        // 2. Gate
         if (gateSource) {
             gateSource.offset.setValueAtTime(1, time);
             gateSource.offset.setValueAtTime(0, time + duration);
-
-            // Propagate Trigger to connected nodes (e.g. ADSR) via Gate handle
-            const connectedEdges = this.edges.filter(e => e.source === voiceId && e.sourceHandle === 'gate');
-            connectedEdges.forEach(edge => {
-                const targetInstance = this.audioNodes.get(edge.target);
-                if (targetInstance) {
-                    if (targetInstance.type === 'adsr') {
-                        this.triggerAdsr(edge.target, time, velocity, duration);
-                    }
-                }
-            });
+            this.triggerVoiceGateTargets(voiceId, time, velocity, duration);
         }
 
-        // 3. Velocity
         if (velocitySource) {
             velocitySource.offset.setValueAtTime(velocity, time);
         }
@@ -545,6 +703,8 @@ export class AudioEngine {
             window.clearTimeout(this.timerID);
             this.timerID = undefined;
         }
+        this.currentStep = 0;
+        this.stepCallbacks.forEach((cb) => cb(-1));
     }
 
     /**
@@ -553,18 +713,16 @@ export class AudioEngine {
     start(nodes: Node<AudioNodeData>[], edges: Edge[]): void {
         if (this.isPlaying) return;
 
-        this.edges = edges;
+        this.syncVisualGraph(nodes, edges);
 
         const ctx = this.init();
         this.cleanup();
 
-        // Check for Transport node to set initial BPM
-        const transportNode = nodes.find(n => n.data.type === 'transport');
+        const transportNode = nodes.find((node) => node.data.type === 'transport');
         if (transportNode) {
-            this.bpm = (transportNode.data as any).bpm || 120;
+            this.bpm = (transportNode.data as TransportNodeData).bpm || 120;
         }
 
-        // Create audio nodes for each visual node
         nodes.forEach((node) => {
             const audioNode = this.createAudioNode(ctx, node);
             if (audioNode) {
@@ -572,86 +730,15 @@ export class AudioEngine {
             }
         });
 
-        const nodeById = new Map(nodes.map((node) => [node.id, node]));
-
-        // Connect nodes based on edges
-        edges.forEach((edge) => {
-            const sourceInstance = this.audioNodes.get(edge.source);
-            const targetInstance = this.audioNodes.get(edge.target);
-
-            if (sourceInstance && targetInstance) {
-                try {
-                    // Determine source node (handle output)
-                    let sourceNode: AudioNode = sourceInstance.node;
-                    if (edge.sourceHandle && sourceInstance.outputs) {
-                        const specificOutput = sourceInstance.outputs.get(edge.sourceHandle);
-                        if (specificOutput) {
-                            sourceNode = specificOutput;
-                        }
-                    }
-
-                    const audioEdge = isAudioEdge(edge, nodeById);
-
-                    // Connect to target AudioParam or AudioNode
-                    if (targetInstance.params && edge.targetHandle && targetInstance.params.has(edge.targetHandle)) {
-                        // Connect to AudioParam (modulation)
-                        const param = targetInstance.params.get(edge.targetHandle);
-                        if (param) {
-                            sourceNode.connect(param);
-
-                            // If connecting a Note node (absolute Hz) or Voice node (outputs Hz) to frequency, zero out the base frequency
-                            if ((sourceInstance.type === 'note' || sourceInstance.type === 'voice') && edge.targetHandle === 'frequency') {
-                                param.value = 0;
-                            }
-                        }
-                    } else if (audioEdge) {
-                        // Standard Audio to Audio connection
-                        sourceNode.connect(targetInstance.node);
-                    }
-                } catch (e) {
-                    console.warn('Failed to connect nodes:', e);
-                }
-            }
-        });
-
-        // Connect output node ...
-        const outputNode = nodes.find((n) => n.data.type === 'output');
-        if (outputNode) {
-            const outputInstance = this.audioNodes.get(outputNode.id);
-            if (outputInstance) {
-                outputInstance.node.connect(ctx.destination);
-            }
-        }
-
-        // Start oscillators...
-        this.audioNodes.forEach((instance) => {
-            if (instance.node instanceof OscillatorNode) {
-                instance.node.start();
-            } else if (instance.node instanceof AudioBufferSourceNode) {
-                instance.node.loop = true;
-                instance.node.start();
-            } else if (instance.node instanceof ConstantSourceNode) {
-                instance.node.start();
-            }
-
-            // Start LFO oscillator if present
-            if (instance.lfoOsc) {
-                instance.lfoOsc.start();
-            }
-
-            if (instance.outputs) {
-                instance.outputs.forEach(output => {
-                    if (output instanceof ConstantSourceNode || output instanceof OscillatorNode) {
-                        output.start();
-                    }
-                });
-            }
-        });
+        this.connectGraph(nodes, edges);
+        this.audioNodes.forEach((instance) => this.startInstance(instance));
 
         this.updateDataValues(nodes, edges);
 
         this.isPlaying = true;
-        this.startScheduler();
+        if (this.isTransportRunning()) {
+            this.startScheduler();
+        }
     }
 
     /**
@@ -684,11 +771,16 @@ export class AudioEngine {
                     });
                 }
 
-                instance.node.disconnect();
+                if (instance.lfoOsc) {
+                    try { instance.lfoOsc.stop(); } catch (e) { }
+                }
+
+                this.disconnectInstance(instance);
             } catch (e) {
                 // Ignore errors during cleanup
             }
         });
+        this.stopSamplerPlayback();
         this.audioNodes.clear();
     }
 
@@ -700,7 +792,7 @@ export class AudioEngine {
 
         switch (data.type) {
             case 'adsr': {
-                const adsrData = data as any;
+                const adsrData = data as ADSRNodeData;
                 const source = ctx.createConstantSource();
                 source.offset.value = 0;
                 return {
@@ -742,12 +834,10 @@ export class AudioEngine {
                 };
             }
             case 'stepSequencer': {
-                const seqData = data as any; // SequencerNodeData
-                // Output is a ConstantSourceNode acting as a Control Signal (Trigger/Gate)
+                const seqData = data as StepSequencerNodeData;
                 const source = ctx.createConstantSource();
-                source.offset.value = 0; // Default 0
+                source.offset.value = 0;
 
-                // Store data on instance for scheduler
                 return {
                     node: source,
                     type: 'stepSequencer',
@@ -759,8 +849,7 @@ export class AudioEngine {
                 };
             }
             case 'pianoRoll': {
-                const prData = data as any; // PianoRollNodeData
-                // Piano Roll also uses a ConstantSourceNode for output
+                const prData = data as PianoRollNodeData;
                 const source = ctx.createConstantSource();
                 source.offset.value = 0;
 
@@ -776,17 +865,14 @@ export class AudioEngine {
                 };
             }
             case 'lfo': {
-                const lfoData = data as any; // LFONodeData
-                // Create oscillator for LFO
+                const lfoData = data;
                 const lfo = ctx.createOscillator();
                 lfo.type = lfoData.waveform || 'sine';
                 lfo.frequency.value = lfoData.rate || 1;
 
-                // Create gain for depth control
                 const depthGain = ctx.createGain();
                 depthGain.gain.value = lfoData.depth || 500;
 
-                // Connect LFO -> depthGain
                 lfo.connect(depthGain);
 
                 const params = new Map<string, AudioParam>();
@@ -808,9 +894,11 @@ export class AudioEngine {
                 const osc = ctx.createOscillator();
                 osc.type = oscData.waveform;
                 osc.frequency.value = oscData.frequency;
+                osc.detune.value = oscData.detune;
 
                 const params = new Map<string, AudioParam>();
                 params.set('frequency', osc.frequency);
+                params.set('detune', osc.detune);
 
                 return { node: osc, type: 'osc', params };
             }
@@ -830,10 +918,14 @@ export class AudioEngine {
                 filter.type = filterData.filterType;
                 filter.frequency.value = filterData.frequency;
                 filter.Q.value = filterData.q;
+                filter.detune.value = filterData.detune;
+                filter.gain.value = filterData.gain;
 
                 const params = new Map<string, AudioParam>();
                 params.set('frequency', filter.frequency);
                 params.set('q', filter.Q);
+                params.set('detune', filter.detune);
+                params.set('gain', filter.gain);
 
                 return { node: filter, type: 'filter', params };
             }
@@ -855,31 +947,55 @@ export class AudioEngine {
                 const delay = ctx.createDelay(5);
                 delay.delayTime.value = delayData.delayTime;
 
-                // Create feedback loop with gain
                 const feedbackGain = ctx.createGain();
                 feedbackGain.gain.value = delayData.feedback;
                 delay.connect(feedbackGain);
                 feedbackGain.connect(delay);
 
-                return { node: delay, type: 'delay', feedbackGain };
+                const params = new Map<string, AudioParam>();
+                params.set('delayTime', delay.delayTime);
+                params.set('feedback', feedbackGain.gain);
+
+                return { node: delay, type: 'delay', feedbackGain, params };
             }
             case 'reverb': {
                 const reverbData = data as ReverbNodeData;
+                const inputGain = ctx.createGain();
+                const outputGain = ctx.createGain();
                 const convolver = ctx.createConvolver();
                 convolver.buffer = createReverbImpulse(ctx, reverbData.decay);
-
-                // Simple wet/dry mix using gains
+                const dryGain = ctx.createGain();
                 const wetGain = ctx.createGain();
+                dryGain.gain.value = 1 - reverbData.mix;
                 wetGain.gain.value = reverbData.mix;
-                convolver.connect(wetGain);
 
-                return { node: wetGain, type: 'reverb' };
+                inputGain.connect(dryGain);
+                inputGain.connect(convolver);
+                convolver.connect(wetGain);
+                dryGain.connect(outputGain);
+                wetGain.connect(outputGain);
+
+                const params = new Map<string, AudioParam>();
+                params.set('mix', wetGain.gain);
+
+                return {
+                    node: outputGain,
+                    inputNode: inputGain,
+                    internalNodes: [inputGain, convolver, dryGain, wetGain],
+                    type: 'reverb',
+                    reverbConvolver: convolver,
+                    reverbDryGain: dryGain,
+                    reverbWetGain: wetGain,
+                    params,
+                };
             }
             case 'panner': {
                 const pannerData = data as StereoPannerNodeData;
                 const panner = ctx.createStereoPanner();
                 panner.pan.value = pannerData.pan;
-                return { node: panner, type: 'panner' };
+                const params = new Map<string, AudioParam>();
+                params.set('pan', panner.pan);
+                return { node: panner, type: 'panner', params };
             }
             case 'mixer': {
                 // Mixer is just a gain node that sums inputs
@@ -889,17 +1005,15 @@ export class AudioEngine {
             }
             case 'input': {
                 const inputData = data as InputNodeData;
-                // Main dummy node to hold reference (InputNode doesn't process audio itself usually, but holds params)
                 const dummy = ctx.createGain();
 
                 const outputs = new Map<string, AudioNode>();
 
-                // Create custom params as ConstantSourceNodes
                 if (inputData.params) {
-                    inputData.params.forEach((param, index) => {
+                    inputData.params.forEach((param) => {
                         const paramSource = ctx.createConstantSource();
                         paramSource.offset.value = param.value;
-                        outputs.set(`param_${index}`, paramSource);
+                        outputs.set(getInputParamHandleId(param), paramSource);
                     });
                 }
 
@@ -907,7 +1021,6 @@ export class AudioEngine {
             }
             case 'note': {
                 const noteData = data as NoteNodeData;
-                // NoteNode basically outputs frequency signal
                 const freqSource = ctx.createConstantSource();
                 freqSource.offset.value = noteData.frequency;
 
@@ -915,13 +1028,10 @@ export class AudioEngine {
             }
             case 'sampler': {
                 const samplerData = data as SamplerNodeData;
-                // Create a gain node as the main output
-                // The actual sample playback will be handled via triggers
                 const samplerOutput = ctx.createGain();
                 samplerOutput.gain.value = 1;
 
-                // Store sampler configuration for triggering
-                const samplerInstance = {
+                const samplerInstance: AudioNodeInstance = {
                     node: samplerOutput,
                     type: 'sampler',
                     samplerData: {
@@ -933,7 +1043,6 @@ export class AudioEngine {
                     }
                 };
 
-                // Load the sample if src is provided
                 if (samplerData.src) {
                     this.loadSamplerBuffer(samplerData.src, samplerData.src).then(buffer => {
                         if (buffer && samplerInstance.samplerData) {
@@ -965,7 +1074,7 @@ export class AudioEngine {
         const controlEdgesByTarget = new Map<string, Edge[]>();
 
         edges.forEach((edge) => {
-            if (isAudioEdge(edge, nodeById)) return;
+            if (isAudioConnection(edge, nodeById)) return;
             const list = controlEdgesByTarget.get(edge.target) ?? [];
             list.push(edge);
             controlEdgesByTarget.set(edge.target, list);
@@ -982,11 +1091,8 @@ export class AudioEngine {
             switch (sourceNode.data.type) {
                 case 'input': {
                     const inputData = sourceNode.data as InputNodeData;
-                    const handle = edge.sourceHandle ?? '';
-                    const match = handle.match(/param_(\d+)/);
-                    const index = match ? Number(match[1]) : -1;
-                    const param = inputData.params?.[index];
-                    return param ? param.value : null;
+                    const resolved = resolveInputParamByHandle(inputData.params, edge.sourceHandle);
+                    return resolved?.param.value ?? null;
                 }
                 case 'note': {
                     const noteData = sourceNode.data as NoteNodeData;
@@ -998,6 +1104,15 @@ export class AudioEngine {
                 case 'clamp':
                 case 'switch':
                     return evaluateDataNode(sourceNode.id);
+                case 'voice': {
+                    const instance = this.audioNodes.get(sourceNode.id);
+                    if (!instance?.outputs) return null;
+                    const output = instance.outputs.get(edge.sourceHandle ?? '');
+                    if (output instanceof ConstantSourceNode) {
+                        return output.offset.value;
+                    }
+                    return null;
+                }
                 default:
                     return null;
             }
@@ -1015,7 +1130,7 @@ export class AudioEngine {
             if (cache.has(nodeId)) return cache.get(nodeId)!;
             if (visiting.has(nodeId)) return 0;
             const node = nodeById.get(nodeId);
-            if (!node || !DATA_NODE_TYPES.has(node.data.type)) return 0;
+            if (!node || !isDataNodeType(node.data.type)) return 0;
 
             visiting.add(nodeId);
 
@@ -1073,7 +1188,7 @@ export class AudioEngine {
         };
 
         nodes.forEach((node) => {
-            if (!DATA_NODE_TYPES.has(node.data.type)) return;
+            if (!isDataNodeType(node.data.type)) return;
             const value = evaluateDataNode(node.id);
             const instance = this.audioNodes.get(node.id);
             const output = instance?.node;
@@ -1094,18 +1209,14 @@ export class AudioEngine {
     refreshConnections(nodes: Node<AudioNodeData>[], edges: Edge[]): void {
         if (!this.isPlaying || !this.audioContext) return;
 
-        this.edges = edges;
+        this.syncVisualGraph(nodes, edges);
         const ctx = this.audioContext;
-        const nodeById = new Map(nodes.map((node) => [node.id, node]));
 
-        // 0. Sync Nodes: Create new ones, Remove deleted ones
-        const activeIds = new Set(nodes.map(n => n.id));
+        const activeIds = new Set(nodes.map((node) => node.id));
 
-        // Detect and remove deleted nodes
         for (const [id, instance] of this.audioNodes.entries()) {
             if (!activeIds.has(id)) {
                 try {
-                    // Stop sources
                     if (instance.node instanceof OscillatorNode ||
                         instance.node instanceof AudioBufferSourceNode ||
                         instance.node instanceof ConstantSourceNode) {
@@ -1118,124 +1229,59 @@ export class AudioEngine {
                             }
                         });
                     }
-                    instance.node.disconnect();
-                    // Disconnect special internals
-                    if (instance.type === 'delay' && instance.feedbackGain) {
-                        instance.feedbackGain.disconnect();
-                    }
-                } catch (e) { }
+                    this.disconnectInstance(instance);
+                } catch {
+                    // Ignore cleanup failures while removing nodes.
+                }
                 this.audioNodes.delete(id);
             }
         }
 
-        // Detect and create new nodes
-        nodes.forEach(node => {
+        nodes.forEach((node) => {
             if (!this.audioNodes.has(node.id)) {
                 const instance = this.createAudioNode(ctx, node);
                 if (instance) {
                     this.audioNodes.set(node.id, instance);
-
-                    // Start if it's a source
-                    if (instance.node instanceof OscillatorNode) {
-                        instance.node.start();
-                    } else if (instance.node instanceof AudioBufferSourceNode) {
-                        instance.node.loop = true;
-                        instance.node.start();
-                    } else if (instance.node instanceof ConstantSourceNode) {
-                        instance.node.start();
-                    }
-
-                    // Start outputs (params)
-                    if (instance.outputs) {
-                        instance.outputs.forEach(output => {
-                            if (output instanceof ConstantSourceNode || output instanceof OscillatorNode) {
-                                output.start();
-                            }
-                        });
-                    }
+                    this.startInstance(instance);
                 }
             }
         });
 
-        // 1. Disconnect all nodes to clear graph wiring (so we can re-wire freshly)
-        this.audioNodes.forEach((instance) => {
-            try {
-                instance.node.disconnect();
-                if (instance.type === 'delay' && instance.feedbackGain) {
-                    instance.feedbackGain.disconnect();
-                }
-            } catch (e) { }
-        });
-
-        // 2. Re-establish internal paths
-        this.audioNodes.forEach((instance) => {
-            if (instance.type === 'delay' && instance.feedbackGain) {
-                instance.node.connect(instance.feedbackGain);
-                instance.feedbackGain.connect(instance.node as AudioNode);
-            }
-        });
-
-        // 3. Re-connect edges
-        edges.forEach((edge) => {
-            const sourceInstance = this.audioNodes.get(edge.source);
-            const targetInstance = this.audioNodes.get(edge.target);
-
-            if (sourceInstance && targetInstance) {
-                try {
-                    // Determine source node (handle output)
-                    let sourceNode: AudioNode = sourceInstance.node;
-                    if (edge.sourceHandle && sourceInstance.outputs) {
-                        const specificOutput = sourceInstance.outputs.get(edge.sourceHandle);
-                        if (specificOutput) {
-                            sourceNode = specificOutput;
-                        }
-                    }
-
-                    const audioEdge = isAudioEdge(edge, nodeById);
-
-                    // Connect to target AudioParam or AudioNode
-                    if (targetInstance.params && edge.targetHandle && targetInstance.params.has(edge.targetHandle)) {
-                        // Connect to AudioParam (modulation)
-                        const param = targetInstance.params.get(edge.targetHandle);
-                        if (param) {
-                            sourceNode.connect(param);
-
-                            // If connecting a Note node (absolute Hz) or Voice node (outputs Hz) to frequency, zero out the base frequency
-                            if ((sourceInstance.type === 'note' || sourceInstance.type === 'voice') && edge.targetHandle === 'frequency') {
-                                param.value = 0;
-                            }
-                        }
-                    } else if (audioEdge) {
-                        // Standard Audio to Audio connection
-                        sourceNode.connect(targetInstance.node);
-                    }
-                } catch (e) {
-                    console.warn('Failed to reconnect nodes:', e);
-                }
-            }
-        });
-
-        // 4. Re-connect output to destination
-        const outputNode = nodes.find((n) => n.data.type === 'output');
-        if (outputNode) {
-            const outputInstance = this.audioNodes.get(outputNode.id);
-            if (outputInstance) {
-                outputInstance.node.connect(this.audioContext.destination);
-            }
-        }
-
+        this.connectGraph(nodes, edges);
         this.updateDataValues(nodes, edges);
+        if (this.isTransportRunning() && !this.timerID) {
+            this.startScheduler();
+        } else if (!this.isTransportRunning() && this.timerID) {
+            this.stopScheduler();
+        }
     }
 
     /**
      * Update a specific parameter in real-time
      */
     updateNode(nodeId: string, data: Partial<AudioNodeData>): void {
+        const visualNode = this.nodeById.get(nodeId);
+        if (visualNode) {
+            const nextNode = { ...visualNode, data: { ...visualNode.data, ...data } as AudioNodeData };
+            this.nodeById.set(nodeId, nextNode);
+            this.visualNodes = this.visualNodes.map((node) => node.id === nodeId ? nextNode : node);
+        }
+
         const instance = this.audioNodes.get(nodeId);
 
-        // Update BPM global if transport update
         if ('bpm' in data && typeof data.bpm === 'number') {
             this.bpm = data.bpm;
+        }
+
+        if (visualNode?.data.type === 'transport') {
+            if (this.isPlaying) {
+                if (this.isTransportRunning() && !this.timerID) {
+                    this.startScheduler();
+                } else if (!this.isTransportRunning() && this.timerID) {
+                    this.stopScheduler();
+                }
+            }
+            if (!instance || !this.audioContext) return;
         }
 
         if (!instance || !this.audioContext) return;
@@ -1277,12 +1323,12 @@ export class AudioEngine {
             }
         } else if (instance.type === 'input') {
             const inputData = data as InputNodeData;
-            // Update params
             if ('params' in inputData && instance.outputs) {
-                inputData.params.forEach((param, index) => {
-                    const paramId = `param_${index}`;
-                    if (instance.outputs!.has(paramId)) {
-                        const paramNode = instance.outputs!.get(paramId) as ConstantSourceNode;
+                const outputs = instance.outputs;
+                inputData.params.forEach((param) => {
+                    const paramId = getInputParamHandleId(param);
+                    if (outputs.has(paramId)) {
+                        const paramNode = outputs.get(paramId) as ConstantSourceNode;
                         paramNode.offset.setTargetAtTime(param.value, currentTime, 0.01);
                     }
                 });
@@ -1302,9 +1348,14 @@ export class AudioEngine {
                 instance.feedbackGain.gain.setTargetAtTime(data.feedback, currentTime, 0.01);
             }
         } else if (instance.type === 'reverb') {
-            const node = instance.node as GainNode; // We return wetGain as the node
+            const wetNode = instance.reverbWetGain;
+            const dryNode = instance.reverbDryGain;
             if ('mix' in data && typeof data.mix === 'number') {
-                node.gain.setTargetAtTime(data.mix, currentTime, 0.01);
+                wetNode?.gain.setTargetAtTime(data.mix, currentTime, 0.01);
+                dryNode?.gain.setTargetAtTime(1 - data.mix, currentTime, 0.01);
+            }
+            if ('decay' in data && typeof data.decay === 'number' && instance.reverbConvolver) {
+                instance.reverbConvolver.buffer = createReverbImpulse(this.audioContext, data.decay);
             }
         } else if (instance.type === 'panner') {
             const node = instance.node as StereoPannerNode;
@@ -1317,45 +1368,47 @@ export class AudioEngine {
                 node.gain.setTargetAtTime(data.masterGain, currentTime, 0.01);
             }
         } else if (instance.type === 'stepSequencer') {
-            const seqInstance = instance as any;
-            if (seqInstance.sequencerData) {
-                if ('pattern' in data) seqInstance.sequencerData.pattern = data.pattern;
-                if ('activeSteps' in data) seqInstance.sequencerData.activeSteps = data.activeSteps;
+            if (instance.sequencerData) {
+                if ('pattern' in data) instance.sequencerData.pattern = data.pattern as number[];
+                if ('activeSteps' in data) instance.sequencerData.activeSteps = data.activeSteps as boolean[];
+                if ('steps' in data && typeof data.steps === 'number') instance.sequencerData.steps = data.steps;
             }
         } else if (instance.type === 'pianoRoll') {
-            const prInstance = instance as any;
-            if (prInstance.pianoRollData) {
-                if ('notes' in data) prInstance.pianoRollData.notes = data.notes;
-                if ('steps' in data) prInstance.pianoRollData.steps = data.steps;
+            if (instance.pianoRollData) {
+                if ('notes' in data) instance.pianoRollData.notes = data.notes as PianoRollNodeData['notes'];
+                if ('steps' in data && typeof data.steps === 'number') instance.pianoRollData.steps = data.steps;
+                if ('octaves' in data && typeof data.octaves === 'number') instance.pianoRollData.octaves = data.octaves;
+                if ('baseNote' in data && typeof data.baseNote === 'number') instance.pianoRollData.baseNote = data.baseNote;
             }
         } else if (instance.type === 'adsr') {
-            const adsrInstance = instance as any;
-            if (adsrInstance.adsrData) {
-                if ('attack' in data) adsrInstance.adsrData.attack = data.attack;
-                if ('decay' in data) adsrInstance.adsrData.decay = data.decay;
-                if ('sustain' in data) adsrInstance.adsrData.sustain = data.sustain;
-                if ('release' in data) adsrInstance.adsrData.release = data.release;
+            if (instance.adsrData) {
+                if ('attack' in data && typeof data.attack === 'number') instance.adsrData.attack = data.attack;
+                if ('decay' in data && typeof data.decay === 'number') instance.adsrData.decay = data.decay;
+                if ('sustain' in data && typeof data.sustain === 'number') instance.adsrData.sustain = data.sustain;
+                if ('release' in data && typeof data.release === 'number') instance.adsrData.release = data.release;
             }
         } else if (instance.type === 'voice') {
-            if ('portamento' in data && instance.voiceData) {
+            if ('portamento' in data && typeof data.portamento === 'number' && instance.voiceData) {
                 instance.voiceData.portamento = data.portamento;
             }
         } else if (instance.type === 'lfo') {
-            // Update LFO rate (frequency of oscillator)
             if ('rate' in data && typeof data.rate === 'number' && instance.lfoOsc) {
                 instance.lfoOsc.frequency.setTargetAtTime(data.rate, currentTime, 0.01);
             }
-            // Update LFO depth (gain)
             if ('depth' in data && typeof data.depth === 'number' && instance.params) {
                 const depthParam = instance.params.get('depth');
                 if (depthParam) {
                     depthParam.setTargetAtTime(data.depth, currentTime, 0.01);
                 }
             }
-            // Update LFO waveform
             if ('waveform' in data && typeof data.waveform === 'string' && instance.lfoOsc) {
                 instance.lfoOsc.type = data.waveform as OscillatorType;
             }
+        } else if (instance.type === 'sampler' && instance.samplerData) {
+            if ('src' in data && typeof data.src === 'string') instance.samplerData.src = data.src;
+            if ('loop' in data && typeof data.loop === 'boolean') instance.samplerData.loop = data.loop;
+            if ('playbackRate' in data && typeof data.playbackRate === 'number') instance.samplerData.playbackRate = data.playbackRate;
+            if ('detune' in data && typeof data.detune === 'number') instance.samplerData.detune = data.detune;
         }
     }
 

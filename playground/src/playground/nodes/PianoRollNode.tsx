@@ -151,6 +151,27 @@ export const PianoRollNode: React.FC<NodeProps<Node<PianoRollNodeData>>> = memo(
         return step >= minStep && step <= maxStep;
     }, [dragState]);
 
+    const updateSteps = useCallback((nextSteps: number) => {
+        const clampedSteps = Math.max(1, nextSteps);
+        updateNodeData(id, {
+            steps: clampedSteps,
+            notes: notes
+                .filter((note) => note.step < clampedSteps)
+                .map((note) => ({
+                    ...note,
+                    duration: Math.max(1, Math.min(note.duration, clampedSteps - note.step)),
+                })),
+        });
+    }, [id, notes, updateNodeData]);
+
+    const updateOctaves = useCallback((nextOctaves: number) => {
+        updateNodeData(id, { octaves: Math.max(1, nextOctaves) });
+    }, [id, updateNodeData]);
+
+    const updateBaseNote = useCallback((nextBaseNote: number) => {
+        updateNodeData(id, { baseNote: nextBaseNote });
+    }, [id, updateNodeData]);
+
     return (
         <div className={`audio-node piano-roll-node ${selected ? 'selected' : ''}`}>
             <div className="node-header">
@@ -159,6 +180,41 @@ export const PianoRollNode: React.FC<NodeProps<Node<PianoRollNodeData>>> = memo(
             </div>
 
             <div className="node-content">
+                <div className="grid grid-cols-3 gap-2 pb-3">
+                    <div className="node-control">
+                        <label>Steps</label>
+                        <select
+                            value={steps}
+                            onChange={(e) => updateSteps(Number(e.target.value))}
+                        >
+                            {[16, 32, 64].map((value) => (
+                                <option key={value} value={value}>{value}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="node-control">
+                        <label>Octaves</label>
+                        <select
+                            value={octaves}
+                            onChange={(e) => updateOctaves(Number(e.target.value))}
+                        >
+                            {[1, 2, 3, 4].map((value) => (
+                                <option key={value} value={value}>{value}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="node-control">
+                        <label>Base</label>
+                        <select
+                            value={baseNote}
+                            onChange={(e) => updateBaseNote(Number(e.target.value))}
+                        >
+                            {[36, 48, 60, 72].map((value) => (
+                                <option key={value} value={value}>{midiToNoteName(value)}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
                 <div className="piano-roll-grid" ref={gridRef}>
                     {/* Piano keys column */}
                     <div className="piano-keys">

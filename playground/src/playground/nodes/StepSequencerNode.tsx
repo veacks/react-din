@@ -18,6 +18,7 @@ export const StepSequencerNode: React.FC<NodeProps<Node<StepSequencerNodeData>>>
     const steps = data.steps || 16;
     const velocities = data.pattern || Array(steps).fill(0.8);
     const activeSteps = data.activeSteps || Array(steps).fill(false);
+    const playingStep = currentStep >= 0 ? currentStep % steps : -1;
 
     const toggleStep = (index: number) => {
         const newActive = [...activeSteps];
@@ -31,6 +32,23 @@ export const StepSequencerNode: React.FC<NodeProps<Node<StepSequencerNodeData>>>
         updateNodeData(id, { pattern: newVelocities });
     };
 
+    const updateSteps = (nextSteps: number) => {
+        const clampedSteps = Math.max(1, nextSteps);
+        const nextPattern = Array.from(
+            { length: clampedSteps },
+            (_, index) => velocities[index] ?? 0.8
+        );
+        const nextActiveSteps = Array.from(
+            { length: clampedSteps },
+            (_, index) => activeSteps[index] ?? false
+        );
+        updateNodeData(id, {
+            steps: clampedSteps,
+            pattern: nextPattern,
+            activeSteps: nextActiveSteps,
+        });
+    };
+
     return (
         <div className={`audio-node sequencer-node ${selected ? 'selected' : ''}`}>
             <div className="node-header">
@@ -39,11 +57,31 @@ export const StepSequencerNode: React.FC<NodeProps<Node<StepSequencerNodeData>>>
             </div>
 
             <div className="node-content">
+                <div className="node-control">
+                    <label>Steps</label>
+                    <select
+                        value={steps}
+                        onChange={(e) => updateSteps(Number(e.target.value))}
+                    >
+                        {[16, 32, 64].map((value) => (
+                            <option key={value} value={value}>{value}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="sequencer-status" aria-live="polite">
+                    <span className={`sequencer-status-dot ${playingStep >= 0 ? 'active' : ''}`} />
+                    <span className="sequencer-status-text">
+                        {playingStep >= 0 ? `Playing step ${playingStep + 1} / ${steps}` : 'Waiting for transport'}
+                    </span>
+                </div>
                 <div className="sequencer-steps-row">
                     {Array.from({ length: steps }).map((_, i) => (
-                        <div key={`step-${i}`} className="step-column">
+                        <div
+                            key={`step-${i}`}
+                            className={`step-column ${playingStep === i ? 'current-step-column' : ''} ${activeSteps[i] ? 'active-step-column' : ''}`}
+                        >
                             <button
-                                className={`sequencer-pad ${activeSteps[i] ? 'active' : ''} ${currentStep === i ? 'current-step' : ''}`}
+                                className={`sequencer-pad ${activeSteps[i] ? 'active' : ''} ${playingStep === i ? 'current-step' : ''}`}
                                 onClick={() => toggleStep(i)}
                                 title={`Step ${i + 1}`}
                             />

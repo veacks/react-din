@@ -11,11 +11,12 @@ Load and trigger audio files directly from the playground.
 - Added from the store with empty `src`, `loop false`, `playbackRate 1`, `detune 0`, `loaded false`, and label `Sampler`.
 
 ## Integration Notes
-- Keep cache IDs, object URLs, and generated code semantics aligned across UI, storage, and engine loading.
+- Keep cache IDs, object URLs, trigger semantics, and generated code semantics aligned across UI, storage, and engine loading.
 - Use after a trigger-capable source or with manual playback from the node UI.
 
 ## Failure Modes
 - File-cache drift can leave orphaned object URLs or stale `loaded` state.
+- Rising-edge retrigger and loop-stop behavior must stay aligned between runtime and preview/export helpers.
 - Engine load failures make the node appear configured while staying silent.
 
 ## Example

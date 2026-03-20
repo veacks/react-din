@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import {
     type Edge,
+    type Connection,
     type Node,
     type OnNodesChange,
     type OnEdgesChange,
@@ -11,6 +12,15 @@ import {
 } from '@xyflow/react';
 import { audioEngine } from './AudioEngine';
 import { normalizeGraphName } from './graphUtils';
+import {
+    canConnect,
+    isAudioConnection,
+    migrateGraphEdges,
+    migrateGraphNodes,
+    normalizeInputNodeData,
+    normalizeTransportNodeData,
+    getSingletonNodeTypes,
+} from './nodeHelpers';
 
 // ============================================================================
 // Audio Node Data Types
@@ -22,12 +32,14 @@ export interface OscNodeData {
     detune: number;
     waveform: OscillatorType;
     label: string;
+    [key: string]: unknown;
 }
 
 export interface GainNodeData {
     type: 'gain';
     gain: number;
     label: string;
+    [key: string]: unknown;
 }
 
 export interface FilterNodeData {
@@ -38,6 +50,7 @@ export interface FilterNodeData {
     q: number;
     gain: number; // For peaking, lowshelf, highshelf
     label: string;
+    [key: string]: unknown;
 }
 
 export interface OutputNodeData {
@@ -45,12 +58,14 @@ export interface OutputNodeData {
     playing: boolean;
     masterGain: number;
     label: string;
+    [key: string]: unknown;
 }
 
 export interface NoiseNodeData {
     type: 'noise';
     noiseType: 'white' | 'pink' | 'brown';
     label: string;
+    [key: string]: unknown;
 }
 
 export interface DelayNodeData {
@@ -58,6 +73,7 @@ export interface DelayNodeData {
     delayTime: number;
     feedback: number;
     label: string;
+    [key: string]: unknown;
 }
 
 export interface ReverbNodeData {
@@ -65,18 +81,21 @@ export interface ReverbNodeData {
     decay: number;
     mix: number;
     label: string;
+    [key: string]: unknown;
 }
 
 export interface StereoPannerNodeData {
     type: 'panner';
     pan: number;
     label: string;
+    [key: string]: unknown;
 }
 
 export interface MixerNodeData {
     type: 'mixer';
     inputs: number;
     label: string;
+    [key: string]: unknown;
 }
 
 export interface InputParam {
@@ -94,6 +113,7 @@ export interface InputNodeData {
     type: 'input';
     params: InputParam[];
     label: string;
+    [key: string]: unknown;
 }
 
 export type MathOperation =
@@ -196,6 +216,7 @@ export interface NoteNodeData {
     frequency: number;
     language: 'en' | 'fr';
     label: string;
+    [key: string]: unknown;
 }
 
 export interface LFONodeData {
@@ -247,7 +268,13 @@ export interface TransportNodeData {
     type: 'transport';
     bpm: number;
     playing: boolean;
+    beatsPerBar: number;
+    beatUnit: number;
+    stepsPerBeat: number;
+    barsPerPhrase: number;
+    swing: number;
     label: string;
+    [key: string]: unknown;
 }
 
 export interface VoiceNodeData {
@@ -362,13 +389,13 @@ const createGraphId = () => {
 
 const stopOutputNodes = (nodes: Node<AudioNodeData>[]) =>
     nodes.map((node) => {
-        if (node.data.type !== 'output') return node;
+        if (node.data.type !== 'output' && node.data.type !== 'transport') return node;
         return {
             ...node,
             data: {
                 ...node.data,
                 playing: false,
-            } as OutputNodeData,
+            } as AudioNodeData,
         };
     });
 
@@ -389,18 +416,31 @@ const syncNodeIdCounter = (nodes: Node<AudioNodeData>[]) => {
     }
 };
 
-const AUDIO_NODE_TYPES = new Set([
-    'osc',
-    'gain',
-    'filter',
-    'delay',
-    'reverb',
-    'panner',
-    'mixer',
-    'noise',
-    'sampler',
-    'output',
-]);
+const createDefaultOutputData = (): OutputNodeData => ({
+    type: 'output',
+    playing: false,
+    masterGain: 0.5,
+    label: 'Output',
+});
+
+const createDefaultTransportData = (): TransportNodeData => ({
+    type: 'transport',
+    bpm: 120,
+    playing: false,
+    beatsPerBar: 4,
+    beatUnit: 4,
+    stepsPerBeat: 4,
+    barsPerPhrase: 4,
+    swing: 0,
+    label: 'Transport',
+});
+
+const createDefaultInputData = (nodeId: string): InputNodeData =>
+    normalizeInputNodeData(nodeId, {
+        type: 'input',
+        params: [],
+        label: 'Params',
+    });
 
 // Initial nodes - Horizontal layout
 const initialNodes: Node<AudioNodeData>[] = [
@@ -423,7 +463,7 @@ const initialNodes: Node<AudioNodeData>[] = [
         type: 'outputNode',
         position: { x: 520, y: 150 },
         dragHandle: '.node-header',
-        data: { type: 'output', playing: false, masterGain: 0.5, label: 'Output' } as AudioNodeData,
+        data: createDefaultOutputData() as AudioNodeData,
     },
 ];
 
@@ -442,6 +482,34 @@ const initialGraph: GraphDocument = {
     order: 0,
 };
 
+const normalizeGraphDocument = (graph: GraphDocument, index: number, now: number): GraphDocument => {
+    const nodes = migrateGraphNodes(graph.nodes);
+    const edges = migrateGraphEdges(nodes, graph.edges);
+
+    return {
+        ...graph,
+        nodes,
+        edges,
+        name: normalizeGraphName(graph.name),
+        createdAt: graph.createdAt ?? now,
+        updatedAt: graph.updatedAt ?? now,
+        order: graph.order ?? index,
+    };
+};
+
+const hasSingletonNode = (nodes: Node<AudioNodeData>[], type: AudioNodeData['type']) =>
+    nodes.some((node) => node.data.type === type);
+
+const requiresConnectionRefresh = (
+    node: Node<AudioNodeData> | undefined,
+    data: Partial<AudioNodeData>
+) => {
+    if (!node) return false;
+    if (node.data.type === 'input' && 'params' in data) return true;
+    if (node.data.type === 'switch' && 'inputs' in data) return true;
+    return false;
+};
+
 export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
     nodes: initialGraph.nodes,
     edges: initialGraph.edges,
@@ -455,43 +523,8 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
 
     setGraphs: (graphs, activeGraphId) => {
         const now = Date.now();
-        const normalizedGraphs = (graphs.length ? graphs : get().graphs).map((graph, index) => {
-            const nodes = graph.nodes.map((node) => {
-                if (node.data.type !== 'input') return node;
-
-                const inputData = node.data as InputNodeData & { transportEnabled?: boolean; bpm?: number };
-                const nextLabel = !inputData.label || inputData.label === 'Input'
-                    ? 'Params'
-                    : inputData.label;
-
-                const nextParams = Array.isArray(inputData.params) ? inputData.params : [];
-
-                return {
-                    ...node,
-                    data: {
-                        type: 'input',
-                        params: nextParams,
-                        label: nextLabel,
-                    },
-                };
-            });
-
-            const inputNodeIds = new Set(nodes.filter((node) => node.data.type === 'input').map((node) => node.id));
-            const edges = graph.edges.filter((edge) => {
-                if (!inputNodeIds.has(edge.source)) return true;
-                return edge.sourceHandle !== 'bpm' && edge.sourceHandle !== 'beat';
-            });
-
-            return {
-                ...graph,
-                nodes,
-                edges,
-                name: normalizeGraphName(graph.name),
-                createdAt: graph.createdAt ?? now,
-                updatedAt: graph.updatedAt ?? now,
-                order: graph.order ?? index,
-            };
-        });
+        const normalizedGraphs = (graphs.length ? graphs : get().graphs)
+            .map((graph, index) => normalizeGraphDocument(graph, index, now));
 
         const orderedGraphs = [...normalizedGraphs].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
         const fallbackGraph = orderedGraphs[0];
@@ -562,6 +595,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
             updatedAt: now,
             order,
         };
+        const normalizedGraph = normalizeGraphDocument(graph, order, now);
 
         const stoppedNodes = stopOutputNodes(state.nodes);
         const updatedGraphs = state.graphs.map((existing) =>
@@ -570,19 +604,19 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                 : existing
         );
 
-        syncNodeIdCounter(graph.nodes);
+        syncNodeIdCounter(normalizedGraph.nodes);
         audioEngine.stop();
 
         set({
-            graphs: [...updatedGraphs, graph],
-            activeGraphId: graph.id,
-            nodes: graph.nodes,
-            edges: graph.edges,
+            graphs: [...updatedGraphs, normalizedGraph],
+            activeGraphId: normalizedGraph.id,
+            nodes: normalizedGraph.nodes,
+            edges: normalizedGraph.edges,
             selectedNodeId: null,
         });
 
-        audioEngine.refreshConnections(graph.nodes, graph.edges);
-        return graph;
+        audioEngine.refreshConnections(normalizedGraph.nodes, normalizedGraph.edges);
+        return normalizedGraph;
     },
 
     renameGraph: (graphId, name) => {
@@ -614,19 +648,20 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                 updatedAt: now,
                 order: 0,
             };
+            const normalizedFallbackGraph = normalizeGraphDocument(fallbackGraph, 0, now);
 
-            syncNodeIdCounter(fallbackGraph.nodes);
+            syncNodeIdCounter(normalizedFallbackGraph.nodes);
             audioEngine.stop();
 
             set({
-                graphs: [fallbackGraph],
-                activeGraphId: fallbackGraph.id,
-                nodes: fallbackGraph.nodes,
-                edges: fallbackGraph.edges,
+                graphs: [normalizedFallbackGraph],
+                activeGraphId: normalizedFallbackGraph.id,
+                nodes: normalizedFallbackGraph.nodes,
+                edges: normalizedFallbackGraph.edges,
                 selectedNodeId: null,
             });
 
-            audioEngine.refreshConnections(fallbackGraph.nodes, fallbackGraph.edges);
+            audioEngine.refreshConnections(normalizedFallbackGraph.nodes, normalizedFallbackGraph.edges);
             return targetGraph;
         }
 
@@ -721,18 +756,15 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
 
     onConnect: (connection) => {
         const nodeById = new Map(get().nodes.map((node) => [node.id, node]));
-        const sourceNode = connection.source ? nodeById.get(connection.source) : null;
-        const isAudioConnection =
-            !!sourceNode &&
-            AUDIO_NODE_TYPES.has(sourceNode.data.type) &&
-            connection.sourceHandle === 'out' &&
-            (connection.targetHandle === 'in' || connection.targetHandle?.startsWith('in'));
+        if (!canConnect(connection as Connection, nodeById)) return;
 
-        const edgeStyle = isAudioConnection
+        const isAudioConnectionValue = isAudioConnection(connection as Connection, nodeById);
+
+        const edgeStyle = isAudioConnectionValue
             ? { stroke: '#44cc44', strokeWidth: 3 } // Green for audio
             : { stroke: '#4488ff', strokeWidth: 2, strokeDasharray: '5,5' }; // Blue dashed for control
 
-        const newEdges = addEdge({ ...connection, style: edgeStyle, animated: !isAudioConnection }, get().edges);
+        const newEdges = addEdge({ ...connection, style: edgeStyle, animated: !isAudioConnectionValue }, get().edges);
         set({ edges: newEdges });
 
         set((state) => {
@@ -751,6 +783,10 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
     },
 
     addNode: (type, position = { x: 300, y: 200 }) => {
+        if (getSingletonNodeTypes().has(type) && hasSingletonNode(get().nodes, type)) {
+            return;
+        }
+
         const id = getNodeId();
         let newNode: Node<AudioNodeData>;
 
@@ -796,7 +832,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     type: 'outputNode',
                     position,
                     dragHandle: '.node-header',
-                    data: { type: 'output', playing: false, masterGain: 0.5, label: 'Output' } as AudioNodeData,
+                    data: createDefaultOutputData() as AudioNodeData,
                 };
                 break;
             case 'noise':
@@ -850,11 +886,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     type: 'inputNode',
                     position,
                     dragHandle: '.node-header',
-                    data: {
-                        type: 'input',
-                        params: [],
-                        label: 'Params'
-                    } as AudioNodeData,
+                    data: createDefaultInputData(id) as AudioNodeData,
                 };
                 break;
             case 'note':
@@ -945,17 +977,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                     type: 'transportNode',
                     position,
                     dragHandle: '.node-header',
-                    data: {
-                        type: 'transport',
-                        bpm: 120,
-                        playing: false,
-                        beatsPerBar: 4,
-                        beatUnit: 4,
-                        stepsPerBeat: 4,
-                        barsPerPhrase: 4,
-                        swing: 0,
-                        label: 'Transport'
-                    } as AudioNodeData,
+                    data: createDefaultTransportData() as AudioNodeData,
                 };
                 break;
 
@@ -1089,9 +1111,26 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
     },
 
     updateNodeData: (nodeId, data) => {
+        const currentNode = get().nodes.find((node) => node.id === nodeId);
+        const refreshConnections = requiresConnectionRefresh(currentNode, data);
         const nextNodes = get().nodes.map((node) =>
             node.id === nodeId
-                ? { ...node, data: { ...node.data, ...data } }
+                ? (() => {
+                    const nextData = { ...node.data, ...data } as AudioNodeData;
+                    if (nextData.type === 'input') {
+                        return {
+                            ...node,
+                            data: normalizeInputNodeData(node.id, nextData as InputNodeData),
+                        };
+                    }
+                    if (nextData.type === 'transport') {
+                        return {
+                            ...node,
+                            data: normalizeTransportNodeData(nextData as TransportNodeData),
+                        };
+                    }
+                    return { ...node, data: nextData };
+                })()
                 : node
         );
 
@@ -1107,7 +1146,24 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
         }));
 
         audioEngine.updateNode(nodeId, data);
-        audioEngine.refreshDataValues(nextNodes, get().edges);
+        if (refreshConnections) {
+            const migratedEdges = migrateGraphEdges(nextNodes, get().edges);
+            if (migratedEdges !== get().edges) {
+                set((state) => ({
+                    edges: migratedEdges,
+                    graphs: state.activeGraphId
+                        ? state.graphs.map((graph) =>
+                            graph.id === state.activeGraphId
+                                ? { ...graph, nodes: nextNodes, edges: migratedEdges, updatedAt: Date.now() }
+                                : graph
+                        )
+                        : state.graphs,
+                }));
+            }
+            audioEngine.refreshConnections(nextNodes, migratedEdges);
+        } else {
+            audioEngine.refreshDataValues(nextNodes, get().edges);
+        }
     },
 
     removeNode: (nodeId) => {
@@ -1130,23 +1186,25 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
     },
 
     loadGraph: (nodes, edges) => {
-        syncNodeIdCounter(nodes);
+        const normalizedNodes = migrateGraphNodes(nodes);
+        const normalizedEdges = migrateGraphEdges(normalizedNodes, edges);
+        syncNodeIdCounter(normalizedNodes);
         audioEngine.stop();
 
         set((state) => ({
-            nodes,
-            edges,
+            nodes: normalizedNodes,
+            edges: normalizedEdges,
             selectedNodeId: null,
             graphs: state.activeGraphId
                 ? state.graphs.map((graph) =>
                     graph.id === state.activeGraphId
-                        ? { ...graph, nodes, edges, updatedAt: Date.now() }
+                        ? { ...graph, nodes: normalizedNodes, edges: normalizedEdges, updatedAt: Date.now() }
                         : graph
                 )
                 : state.graphs,
         }));
 
-        audioEngine.refreshConnections(nodes, edges);
+        audioEngine.refreshConnections(normalizedNodes, normalizedEdges);
     },
 
     setPlaying: (playing) => {

@@ -124,13 +124,23 @@ export interface FilterProps extends AudioNodeProps {
      * Gain in dB (for peaking and shelf filters).
      * @default 0
      */
-    gain?: number;
+    gain?: ModulatableValue;
+
+    /**
+     * Base gain in dB when using modulation.
+     */
+    gainBase?: number;
 
     /**
      * Detune in cents.
      * @default 0
      */
-    detune?: number;
+    detune?: ModulatableValue;
+
+    /**
+     * Base detune in cents when using modulation.
+     */
+    detuneBase?: number;
 }
 
 // =============================================================================

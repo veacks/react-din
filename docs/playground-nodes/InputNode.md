@@ -5,16 +5,17 @@ Expose named numeric parameters that can drive data or control edges in the grap
 
 ## Props / Handles
 - Data fields: `params`, `label`.
-- Handles: one source handle per configured parameter.
+- Handles: one source handle per configured parameter, keyed as `param:<param.id>` for stable persistence and code generation.
 
 ## Defaults
 - Added from the store with an empty `params` array and label `Params`.
 
 ## Integration Notes
-- Keep parameter serialization, inspector editing, and code generation aligned.
+- Keep parameter serialization, inspector editing, handle IDs, and code generation aligned.
 - Use to drive note, math, clamp, switch, or audio-parameter targets.
 
 ## Failure Modes
+- Legacy `param_<index>` edges must be migrated or downstream links break after reload.
 - Stale parameter names break generated prop identifiers.
 - Invalid min/max/value ranges make inspector sliders misleading.
 

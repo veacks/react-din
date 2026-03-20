@@ -14,6 +14,11 @@ test('persists graph edits and refreshes generated code', async ({ page }) => {
     await page.getByRole('button', { name: 'Voice Synth' }).click();
     await expect(page.getByText('Transport').first()).toBeVisible();
     await expect(page.getByText('Step Sequencer').first()).toBeVisible();
+    await expect(page.locator('textarea')).toContainText('Sequencer');
+    await expect(page.locator('textarea')).toContainText('Track');
+
+    await page.getByLabel('Include Provider').check();
+    await expect(page.locator('textarea')).toContainText('TransportProvider');
 
     await page.waitForTimeout(500);
     await page.reload();

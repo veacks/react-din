@@ -43,6 +43,7 @@ import { deleteGraph as deleteStoredGraph, loadActiveGraphId, loadGraphs, saveAc
 import { deleteAudioFromCache, getAudioObjectUrl } from './playground/audioCache';
 import { sanitizeGraphForStorage, toPascalCase } from './playground/graphUtils';
 import { audioEngine } from './playground/AudioEngine';
+import { canConnect } from './playground/nodeHelpers';
 
 const nodeTypes: NodeTypes = {
     oscNode: OscNode as NodeTypes[string],
@@ -369,6 +370,10 @@ export const PlaygroundDemo: FC = () => {
         setSelectedNode(null);
     }, [setSelectedNode]);
 
+    const isValidConnection = useCallback((connection: Parameters<typeof canConnect>[0]) => {
+        return canConnect(connection, new Map(nodes.map((node) => [node.id, node])));
+    }, [nodes]);
+
     const tabBase =
         'rounded-full border px-3 py-1 text-[11px] font-medium transition';
     const templateButtonBase =
@@ -595,6 +600,7 @@ export const PlaygroundDemo: FC = () => {
                         onNodesChange={onNodesChange as unknown as OnNodesChange}
                         onEdgesChange={onEdgesChange}
                         onConnect={onConnect}
+                        isValidConnection={isValidConnection}
                         onNodeClick={onNodeClick}
                         onPaneClick={onPaneClick}
                         nodeTypes={nodeTypes}

@@ -5,7 +5,7 @@ Emit note-derived control data such as pitch frequency from a note selector.
 
 ## Props / Handles
 - Data fields: `note`, `octave`, `frequency`, `language`, `label`.
-- Handles: data/control output for downstream pitch targets.
+- Handles: `freq` output only for downstream pitch targets. `trigger` is intentionally not part of the node contract.
 
 ## Defaults
 - Added from the store with `note "C"`, `octave 4`, `frequency 261.6`, `language "en"`, and label `Note`.
@@ -16,7 +16,7 @@ Emit note-derived control data such as pitch frequency from a note selector.
 
 ## Failure Modes
 - Language or note conversion drift makes the displayed note disagree with generated frequency.
-- Missing output-handle updates break pitch routing.
+- Legacy graphs that still target `Note.trigger` should be migrated away from that removed handle.
 
 ## Example
 ```tsx

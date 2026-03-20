@@ -4,8 +4,8 @@
 Shape the frequency content of child audio with a declarative `BiquadFilterNode`.
 
 ## Props / Handles
-- Key props: `type`, `frequency`, `frequencyBase`, `Q`, `QBase`, `gain`, `detune`, `bypass`.
-- Accepts modulatable values for cutoff and resonance.
+- Key props: `type`, `frequency`, `frequencyBase`, `Q`, `QBase`, `gain`, `gainBase`, `detune`, `detuneBase`, `bypass`.
+- Accepts modulatable values for cutoff, resonance, gain, and detune.
 
 ## Defaults
 - `type` defaults to `lowpass`.
@@ -13,7 +13,7 @@ Shape the frequency content of child audio with a declarative `BiquadFilterNode`
 
 ## Integration Notes
 - Place `Filter` around oscillators, samplers, or effects returns.
-- LFOs and envelopes can modulate `frequency` and `Q`.
+- LFOs and envelopes can modulate `frequency`, `Q`, `gain`, and `detune`.
 
 ## Failure Modes
 - Unsupported parameter values can produce muted or unstable filtering.
@@ -21,7 +21,9 @@ Shape the frequency content of child audio with a declarative `BiquadFilterNode`
 
 ## Example
 ```tsx
-<Filter type="lowpass" frequency={1200}>
+const lfo = useLFO({ rate: 0.5, depth: 24 });
+
+<Filter type="lowpass" frequency={1200} gain={lfo} gainBase={3}>
   <Osc autoStart />
 </Filter>
 ```

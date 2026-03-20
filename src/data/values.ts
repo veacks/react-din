@@ -43,7 +43,9 @@ export type CompareOperation = 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'neq';
 
 export type ClampMode = 'minmax' | 'range';
 
-const safeNumber = (value: number | undefined) => (Number.isFinite(value) ? value : 0);
+const safeNumber = (value: number | undefined): number => (
+    typeof value === 'number' && Number.isFinite(value) ? value : 0
+);
 
 const truncate = (value: number) => {
     if (Number.isNaN(value)) return 0;

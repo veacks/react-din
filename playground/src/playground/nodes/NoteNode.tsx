@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { useAudioGraphStore, type NoteNodeData } from '../store';
 import { audioEngine } from '../AudioEngine';
 
@@ -17,8 +17,8 @@ const noteToFreq = (note: string, octave: number): number => {
     return 440 * Math.pow(2, (midiNote - 69) / 12);
 };
 
-const NoteNode = memo(({ id, data, selected }: NodeProps) => {
-    const noteData = data as NoteNodeData;
+const NoteNode = memo(({ id, data, selected }: NodeProps<Node<NoteNodeData>>) => {
+    const noteData = data;
     const updateNodeData = useAudioGraphStore((s) => s.updateNodeData);
 
     const notes = noteData.language === 'fr' ? NOTES_FR : NOTES_EN;
@@ -92,7 +92,6 @@ const NoteNode = memo(({ id, data, selected }: NodeProps) => {
                     <span className="freq">{noteData.frequency.toFixed(1)} Hz</span>
                 </div>
             </div>
-            <Handle type="target" position={Position.Left} id="trigger" className="handle handle-in" style={{ top: '50%' }} />
             <Handle type="source" position={Position.Right} id="freq" className="handle handle-out" title="Frequency output" />
         </div>
     );

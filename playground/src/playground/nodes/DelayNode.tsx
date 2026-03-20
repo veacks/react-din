@@ -1,10 +1,10 @@
 import { memo } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { useAudioGraphStore, type DelayNodeData } from '../store';
 import { audioEngine } from '../AudioEngine';
 
-const DelayNode = memo(({ id, data, selected }: NodeProps) => {
-    const delayData = data as DelayNodeData;
+const DelayNode = memo(({ id, data, selected }: NodeProps<Node<DelayNodeData>>) => {
+    const delayData = data;
     const updateNodeData = useAudioGraphStore((s) => s.updateNodeData);
 
     const handleDelayChange = (value: number) => {
@@ -43,6 +43,12 @@ const DelayNode = memo(({ id, data, selected }: NodeProps) => {
                         title="Delay time in seconds"
                     />
                     <span className="value">{(delayData.delayTime * 1000).toFixed(0)} ms</span>
+                    <Handle
+                        type="target"
+                        position={Position.Left}
+                        id="delayTime"
+                        className="handle handle-in handle-param"
+                    />
                 </div>
                 <div className="node-control">
                     <label>Feedback</label>
@@ -56,6 +62,12 @@ const DelayNode = memo(({ id, data, selected }: NodeProps) => {
                         title="Feedback amount"
                     />
                     <span className="value">{Math.round(delayData.feedback * 100)}%</span>
+                    <Handle
+                        type="target"
+                        position={Position.Left}
+                        id="feedback"
+                        className="handle handle-in handle-param"
+                    />
                 </div>
             </div>
         </div>

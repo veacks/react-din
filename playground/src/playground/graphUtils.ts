@@ -47,6 +47,13 @@ export function sanitizeGraphForStorage(graph: GraphDocument): GraphDocument {
             } as AudioNodeData;
         }
 
+        if (data.type === 'transport') {
+            data = {
+                ...data,
+                playing: false,
+            } as AudioNodeData;
+        }
+
         return {
             ...node,
             data,

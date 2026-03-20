@@ -4,18 +4,18 @@
 Combine multiple audio inputs into one routed output.
 
 ## Props / Handles
-- Data fields: `inputs`, `label`.
-- Handles: multiple audio inputs and one audio `out`.
+- Data fields: `label`.
+- Handles: fixed audio inputs `in1`, `in2`, `in3` and one audio `out`.
 
 ## Defaults
-- Added from the store with `inputs 3` and label `Mixer`.
+- Added from the store with three fixed inputs and label `Mixer`.
 
 ## Integration Notes
-- Keep input-count semantics synchronized across UI rendering, store defaults, and engine wiring.
+- Keep the fixed three-input contract synchronized across UI rendering, store defaults, and engine wiring.
 - Use when multiple sources need a shared downstream chain.
 
 ## Failure Modes
-- Changing the number of inputs without matching handle updates breaks connections.
+- Treating the mixer as dynamically sizable without matching handle changes breaks connections.
 - Missing code generation updates can drop mixer branches in exported code.
 
 ## Example

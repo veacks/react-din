@@ -1,9 +1,10 @@
 import { memo } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { type InputNodeData } from '../store';
+import { getInputParamHandleId } from '../nodeHelpers';
 
-const InputNode = memo(({ data, selected }: NodeProps) => {
-    const inputData = data as InputNodeData;
+const InputNode = memo(({ data, selected }: NodeProps<Node<InputNodeData>>) => {
+    const inputData = data;
 
     return (
         <div className={`audio-node input-node ${selected ? 'selected' : ''}`}>
@@ -23,7 +24,7 @@ const InputNode = memo(({ data, selected }: NodeProps) => {
                             <Handle
                                 type="source"
                                 position={Position.Right}
-                                id={`param_${index}`}
+                                id={getInputParamHandleId(param)}
                                 className="handle handle-out handle-param"
                             />
                         </div>

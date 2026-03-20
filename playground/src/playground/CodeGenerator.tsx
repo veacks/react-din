@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
     useAudioGraphStore,
     type AudioNodeData,
@@ -28,6 +28,7 @@ import { type Node, type Edge } from '@xyflow/react';
 import { toPascalCase } from './graphUtils';
 import {
     ADSR,
+    AudioOutProvider,
     AudioProvider,
     Delay,
     Envelope,
@@ -47,9 +48,19 @@ import {
     Track,
     TransportProvider,
     Voice,
+    useAudio,
+    useAudioOut,
     useLFO,
+    useTrigger,
 } from 'react-din';
 import type { LFOOutput, VoiceRenderProps } from 'react-din';
+import {
+    getInputParamHandleId,
+    getTransportConnections,
+    isAudioConnection,
+    isAudioNodeType,
+    isDataNodeType,
+} from './nodeHelpers';
 
 export const CodeGenerator: React.FC = () => {
     const nodes = useAudioGraphStore((s) => s.nodes);
@@ -148,12 +159,8 @@ export function generateCode(
     const rootName = `${componentName}Root`;
 
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
-    const isAudioEdge = (edge: Edge) => {
-        if (edge.sourceHandle !== 'out') return false;
-        if (edge.targetHandle !== 'in' && !edge.targetHandle?.startsWith('in')) return false;
-        const sourceNode = nodeById.get(edge.source);
-        return !!sourceNode && isAudioNodeType(sourceNode.data.type);
-    };
+    const transportConnectedIds = getTransportConnections(edges, nodeById);
+    const isAudioEdge = (edge: Edge) => isAudioConnection(edge, nodeById);
 
     const audioEdges = edges.filter(isAudioEdge);
     const controlEdges = edges.filter((edge) => !isAudioEdge(edge));
@@ -192,7 +199,7 @@ export function generateCode(
                         : 0;
 
                 const info = { name, defaultValue };
-                paramInfoByHandle.set(`${node.id}:param_${index}`, info);
+                paramInfoByHandle.set(`${node.id}:${getInputParamHandleId(param)}`, info);
                 paramInfoByName.set(name, info);
             });
         });
@@ -353,6 +360,8 @@ export function generateCode(
     const usedImports = new Set<string>();
     const trackSourcesUsed = new Set<string>();
     const trackInfoById = new Map<string, TrackInfo>();
+    let usesFeedbackDelay = false;
+    let usesTriggeredSampler = false;
     const buildContext = {
         controlEdgesByTarget,
         nodeById,
@@ -375,7 +384,7 @@ export function generateCode(
         const sourceNode = nodeById.get(triggerEdge.source);
         if (!sourceNode) return null;
         if (sourceNode.data.type === 'stepSequencer' || sourceNode.data.type === 'pianoRoll') {
-            return sourceNode;
+            return transportConnectedIds.has(sourceNode.id) ? sourceNode : null;
         }
         return null;
     };
@@ -421,12 +430,20 @@ export function generateCode(
         if (visited.has(node.id)) return '';
         visited.add(node.id);
 
-        const componentName = getAudioComponentName(node.data.type);
+        const indentation = indent(level);
+        const controlEdges = controlEdgesByTarget.get(node.id) ?? [];
+        const componentName = getGeneratedComponentName(node, controlEdges);
         if (!componentName) return '';
 
-        usedImports.add(componentName);
+        const importedComponentName = getAudioComponentName(node.data.type);
+        if (componentName === 'FeedbackDelay') {
+            usesFeedbackDelay = true;
+        } else if (componentName === 'TriggeredSampler') {
+            usesTriggeredSampler = true;
+        } else if (importedComponentName) {
+            usedImports.add(importedComponentName);
+        }
 
-        const indentation = indent(level);
         const directVoiceEdges = (controlEdgesByTarget.get(node.id) ?? []).filter(
             (edge) => nodeById.get(edge.source)?.data.type === 'voice'
         );
@@ -598,10 +615,23 @@ export function generateCode(
         usedImports.add('useLFO');
     }
 
+    if (usesFeedbackDelay || usesTriggeredSampler) {
+        usedImports.add('AudioOutProvider');
+        usedImports.add('useAudio');
+        usedImports.add('useAudioOut');
+    }
+    if (usesTriggeredSampler) {
+        usedImports.add('useTrigger');
+    }
+
     const importList = Array.from(usedImports).sort();
-    let code = importList.length > 0
-        ? `import { ${importList.join(', ')} } from 'react-din';\n\n`
+    const usesReactHelpers = usesFeedbackDelay || usesTriggeredSampler;
+    let code = usesReactHelpers
+        ? `import { useEffect, useRef, useState, type ReactNode } from 'react';\n`
         : '';
+    code += importList.length > 0
+        ? `import { ${importList.join(', ')} } from 'react-din';\n\n`
+        : '\n';
 
     if (usedParamInfo.length > 0) {
         code += `export interface ${componentName}Props {\n`;
@@ -609,6 +639,14 @@ export function generateCode(
             code += `${indent(1)}${param.name}?: number;\n`;
         });
         code += `}\n\n`;
+    }
+
+    if (usesFeedbackDelay) {
+        code += `${generateFeedbackDelayHelper()}\n\n`;
+    }
+
+    if (usesTriggeredSampler) {
+        code += `${generateTriggeredSamplerHelper()}\n\n`;
     }
 
     const lfoDeclarations = Array.from(lfoVarsById.entries()).map(([id, varName]) => {
@@ -681,18 +719,6 @@ const AUDIO_COMPONENTS: Record<string, string> = {
     sampler: 'Sampler',
 };
 
-const DATA_NODE_TYPES = new Set([
-    'math',
-    'compare',
-    'mix',
-    'clamp',
-    'switch',
-]);
-
-const isDataNodeType = (type: string) => DATA_NODE_TYPES.has(type);
-
-const isAudioNodeType = (type: string) => type in AUDIO_COMPONENTS;
-
 const AUDIO_NODE_COMPONENTS: Record<string, React.ComponentType<any>> = {
     osc: Osc,
     gain: Gain,
@@ -708,6 +734,26 @@ const AUDIO_NODE_COMPONENTS: Record<string, React.ComponentType<any>> = {
 
 function getAudioComponentName(type: string): string | null {
     return AUDIO_COMPONENTS[type] ?? null;
+}
+
+function shouldUseFeedbackDelay(node: Node<AudioNodeData>): boolean {
+    return node.data.type === 'delay' && ((node.data as DelayNodeData).feedback ?? 0) > 0;
+}
+
+function shouldUseTriggeredSampler(node: Node<AudioNodeData>, controlEdges: Edge[]): boolean {
+    return node.data.type === 'sampler' && controlEdges.some((edge) => edge.targetHandle === 'trigger');
+}
+
+function getGeneratedComponentName(node: Node<AudioNodeData>, controlEdges: Edge[]): string | null {
+    if (shouldUseFeedbackDelay(node)) return 'FeedbackDelay';
+    if (shouldUseTriggeredSampler(node, controlEdges)) return 'TriggeredSampler';
+    return getAudioComponentName(node.data.type);
+}
+
+function getPreviewComponent(node: Node<AudioNodeData>, controlEdges: Edge[]): React.ComponentType<any> | null {
+    if (shouldUseFeedbackDelay(node)) return PreviewFeedbackDelay;
+    if (shouldUseTriggeredSampler(node, controlEdges)) return PreviewTriggeredSampler;
+    return AUDIO_NODE_COMPONENTS[node.data.type] ?? null;
 }
 
 interface ParamInfo {
@@ -956,10 +1002,12 @@ function buildNodeProps(
             const qValue = resolveHandleValue('q', { baseValue: filter.q, modulatable: true });
             if (qValue.value !== undefined) addValueProp('Q', qValue.value);
             if (qValue.base !== undefined) addValueProp('QBase', qValue.base);
-            const detune = resolveHandleValue('detune', { baseValue: filter.detune });
+            const detune = resolveHandleValue('detune', { baseValue: filter.detune, modulatable: true });
             if (detune.value !== undefined) addValueProp('detune', detune.value);
-            const gainValue = resolveHandleValue('gain', { baseValue: filter.gain });
+            if (detune.base !== undefined) addValueProp('detuneBase', detune.base);
+            const gainValue = resolveHandleValue('gain', { baseValue: filter.gain, modulatable: true });
             if (gainValue.value !== undefined) addValueProp('gain', gainValue.value);
+            if (gainValue.base !== undefined) addValueProp('gainBase', gainValue.base);
             if (voiceEdges.some((edge) => edge.targetHandle === 'frequency' || edge.targetHandle === 'q')) {
                 addNodeRef('nodeRef', 'filterRef');
             }
@@ -968,6 +1016,7 @@ function buildNodeProps(
         case 'delay': {
             const delay = nodeData as DelayNodeData;
             if (delay.delayTime !== undefined) addValueProp('delayTime', formatNumber(delay.delayTime));
+            if (delay.feedback > 0) addValueProp('feedback', formatNumber(delay.feedback));
             break;
         }
         case 'reverb': {
@@ -999,6 +1048,12 @@ function buildNodeProps(
                 addValueProp('detune', formatNumber(sampler.detune));
             }
             const hasTrigger = controlEdges.some((edge) => edge.targetHandle === 'trigger');
+            if (voiceEdges.some((edge) => edge.targetHandle === 'trigger')) {
+                voiceVars.add('gate');
+                voiceVars.add('duration');
+                props.push('active={gate}');
+                props.push('duration={duration}');
+            }
             if (!hasTrigger) {
                 addBooleanProp('autoStart', true);
             }
@@ -1107,16 +1162,13 @@ interface PreviewGraphData {
     paramsByHandle: Map<string, number>;
     rootNodes: Node<AudioNodeData>[];
     trackSourcesUsed: Set<string>;
+    transportConnectedIds: Set<string>;
 }
 
 function buildPreviewGraphData(nodes: Node<AudioNodeData>[], edges: Edge[]): PreviewGraphData {
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
-    const isAudioEdge = (edge: Edge) => {
-        if (edge.sourceHandle !== 'out') return false;
-        if (edge.targetHandle !== 'in' && !edge.targetHandle?.startsWith('in')) return false;
-        const sourceNode = nodeById.get(edge.source);
-        return !!sourceNode && isAudioNodeType(sourceNode.data.type);
-    };
+    const transportConnectedIds = getTransportConnections(edges, nodeById);
+    const isAudioEdge = (edge: Edge) => isAudioConnection(edge, nodeById);
 
     const audioEdges = edges.filter(isAudioEdge);
     const controlEdges = edges.filter((edge) => !isAudioEdge(edge));
@@ -1147,13 +1199,13 @@ function buildPreviewGraphData(nodes: Node<AudioNodeData>[], edges: Edge[]): Pre
     nodes.forEach((node) => {
         if (node.data.type !== 'input') return;
         const input = node.data as InputNodeData;
-        input.params?.forEach((param, index) => {
+        input.params?.forEach((param) => {
             const value = Number.isFinite(param.value)
                 ? param.value
                 : Number.isFinite(param.defaultValue)
                     ? param.defaultValue
                     : 0;
-            paramsByHandle.set(`${node.id}:param_${index}`, value);
+            paramsByHandle.set(`${node.id}:${getInputParamHandleId(param)}`, value);
         });
     });
 
@@ -1165,7 +1217,10 @@ function buildPreviewGraphData(nodes: Node<AudioNodeData>[], edges: Edge[]): Pre
     controlEdges.forEach((edge) => {
         if (edge.targetHandle !== 'trigger' && edge.targetHandle !== 'gate') return;
         const sourceNode = nodeById.get(edge.source);
-        if (sourceNode?.data.type === 'stepSequencer' || sourceNode?.data.type === 'pianoRoll') {
+        if (
+            (sourceNode?.data.type === 'stepSequencer' || sourceNode?.data.type === 'pianoRoll')
+            && transportConnectedIds.has(sourceNode.id)
+        ) {
             trackSourcesUsed.add(sourceNode.id);
         }
     });
@@ -1178,6 +1233,7 @@ function buildPreviewGraphData(nodes: Node<AudioNodeData>[], edges: Edge[]): Pre
         paramsByHandle,
         rootNodes,
         trackSourcesUsed,
+        transportConnectedIds,
     };
 }
 
@@ -1241,10 +1297,10 @@ const PreviewRenderer: React.FC<{ graph: PreviewGraphData; sequencerBpm?: number
         const sourceNode = graph.nodeById.get(triggerEdge.source);
         if (!sourceNode) return null;
         if (sourceNode.data.type === 'stepSequencer' || sourceNode.data.type === 'pianoRoll') {
-            return sourceNode;
+            return graph.transportConnectedIds.has(sourceNode.id) ? sourceNode : null;
         }
         return null;
-    }, [graph.controlEdgesByTarget, graph.nodeById]);
+    }, [graph.controlEdgesByTarget, graph.nodeById, graph.transportConnectedIds]);
 
     const getTrackInfo = useCallback((node: Node<AudioNodeData>): PreviewTrackInfo => {
         if (trackInfoById.has(node.id)) {
@@ -1383,10 +1439,10 @@ const PreviewRenderer: React.FC<{ graph: PreviewGraphData; sequencerBpm?: number
         if (visited.has(node.id)) return null;
         visited.add(node.id);
 
-        const Component = AUDIO_NODE_COMPONENTS[node.data.type];
+        const controlEdges = graph.controlEdgesByTarget.get(node.id) ?? [];
+        const Component = getPreviewComponent(node, controlEdges);
         if (!Component) return null;
 
-        const controlEdges = graph.controlEdgesByTarget.get(node.id) ?? [];
         const voiceEdges = controlEdges.filter(
             (edge) => graph.nodeById.get(edge.source)?.data.type === 'voice'
         );
@@ -1441,11 +1497,9 @@ const PreviewRenderer: React.FC<{ graph: PreviewGraphData; sequencerBpm?: number
                     adsrVoiceEdge,
                     !!adsrTrackSource
                 );
-                element = React.createElement(
-                    adsrTrackSource ? Envelope : ADSR,
-                    adsrProps,
-                    element
-                );
+                element = adsrTrackSource
+                    ? React.createElement(Envelope, adsrProps, element)
+                    : React.createElement(ADSR, adsrProps, element);
             }
 
             return element;
@@ -1640,10 +1694,12 @@ function buildPreviewProps(
             const qValue = resolveControlValue('q', { baseValue: filter.q, modulatable: true });
             if (qValue.value !== undefined) props.Q = qValue.value;
             if (qValue.base !== undefined) props.QBase = qValue.base;
-            const detune = resolveControlValue('detune', { baseValue: filter.detune });
+            const detune = resolveControlValue('detune', { baseValue: filter.detune, modulatable: true });
             if (detune.value !== undefined) props.detune = detune.value;
-            const gainValue = resolveControlValue('gain', { baseValue: filter.gain });
+            if (detune.base !== undefined) props.detuneBase = detune.base;
+            const gainValue = resolveControlValue('gain', { baseValue: filter.gain, modulatable: true });
             if (gainValue.value !== undefined) props.gain = gainValue.value;
+            if (gainValue.base !== undefined) props.gainBase = gainValue.base;
             if (voiceEdges.some((edge) => edge.targetHandle === 'frequency' || edge.targetHandle === 'q') && voiceContext) {
                 props.nodeRef = voiceContext.filterRef;
             }
@@ -1652,6 +1708,7 @@ function buildPreviewProps(
         case 'delay': {
             const delay = nodeData as DelayNodeData;
             props.delayTime = delay.delayTime;
+            props.feedback = delay.feedback;
             break;
         }
         case 'reverb': {
@@ -1684,6 +1741,10 @@ function buildPreviewProps(
                 props.detune = sampler.detune;
             }
             const hasTrigger = controlEdges.some((edge) => edge.targetHandle === 'trigger');
+            if (voiceEdges.some((edge) => edge.targetHandle === 'trigger') && voiceContext) {
+                props.active = voiceContext.gate;
+                props.duration = voiceContext.duration;
+            }
             if (!hasTrigger) {
                 props.autoStart = true;
             }
@@ -1699,7 +1760,7 @@ function buildPreviewProps(
 function buildPreviewAdsrProps(
     adsr: ADSRNodeData,
     voiceContext: VoiceRenderProps | undefined,
-    voiceEdge: Edge | undefined,
+    voiceEdge: Edge | null | undefined,
     usesEnvelope: boolean
 ): Record<string, any> {
     const props: Record<string, any> = {};
@@ -1715,4 +1776,446 @@ function buildPreviewAdsrProps(
     }
 
     return props;
+}
+
+interface PreviewFeedbackDelayProps {
+    children?: React.ReactNode;
+    delayTime?: number;
+    feedback?: number;
+    maxDelayTime?: number;
+    bypass?: boolean;
+}
+
+function PreviewFeedbackDelay({
+    children,
+    delayTime = 0,
+    feedback = 0,
+    maxDelayTime = 2,
+    bypass = false,
+}: PreviewFeedbackDelayProps) {
+    const { context } = useAudio();
+    const { outputNode } = useAudioOut();
+    const inputRef = useRef<GainNode | null>(null);
+    const delayRef = useRef<DelayNode | null>(null);
+    const feedbackRef = useRef<GainNode | null>(null);
+
+    useEffect(() => {
+        if (!context) return;
+
+        const input = context.createGain();
+        const delay = context.createDelay(maxDelayTime);
+        const feedbackGain = context.createGain();
+
+        input.connect(delay);
+        delay.connect(feedbackGain);
+        feedbackGain.connect(delay);
+
+        inputRef.current = input;
+        delayRef.current = delay;
+        feedbackRef.current = feedbackGain;
+
+        return () => {
+            try { input.disconnect(); } catch { /* ignore */ }
+            try { delay.disconnect(); } catch { /* ignore */ }
+            try { feedbackGain.disconnect(); } catch { /* ignore */ }
+            inputRef.current = null;
+            delayRef.current = null;
+            feedbackRef.current = null;
+        };
+    }, [context, maxDelayTime]);
+
+    useEffect(() => {
+        if (!delayRef.current || !outputNode || bypass) return;
+        delayRef.current.connect(outputNode);
+        return () => {
+            try {
+                delayRef.current?.disconnect(outputNode);
+            } catch {
+                // Ignore disconnect errors during teardown.
+            }
+        };
+    }, [outputNode, bypass]);
+
+    useEffect(() => {
+        if (delayRef.current) {
+            delayRef.current.delayTime.value = delayTime;
+        }
+    }, [delayTime]);
+
+    useEffect(() => {
+        if (feedbackRef.current) {
+            feedbackRef.current.gain.value = feedback;
+        }
+    }, [feedback]);
+
+    return (
+        <AudioOutProvider node={bypass ? outputNode : inputRef.current}>
+            {children}
+        </AudioOutProvider>
+    );
+}
+
+interface PreviewTriggeredSamplerProps {
+    children?: React.ReactNode;
+    src?: string | AudioBuffer;
+    autoStart?: boolean;
+    active?: boolean;
+    loop?: boolean;
+    playbackRate?: number;
+    detune?: number;
+    offset?: number;
+    duration?: number;
+}
+
+function PreviewTriggeredSampler({
+    children,
+    src,
+    autoStart = false,
+    active,
+    loop = false,
+    playbackRate = 1,
+    detune = 0,
+    offset = 0,
+    duration,
+}: PreviewTriggeredSamplerProps) {
+    const { context, isUnlocked } = useAudio();
+    const { outputNode } = useAudioOut();
+    const trigger = useTrigger();
+    const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
+    const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+    const activeRef = useRef(false);
+
+    useEffect(() => {
+        if (!context || !src) return;
+
+        let cancelled = false;
+
+        if (typeof src === 'string') {
+            fetch(src)
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error(`Failed to load sampler source: ${src}`);
+                    }
+                    return response.arrayBuffer();
+                })
+                .then((arrayBuffer) => context.decodeAudioData(arrayBuffer))
+                .then((decodedBuffer) => {
+                    if (!cancelled) {
+                        setBuffer(decodedBuffer);
+                    }
+                })
+                .catch(() => {
+                    if (!cancelled) {
+                        setBuffer(null);
+                    }
+                });
+        } else {
+            setBuffer(src);
+        }
+
+        return () => {
+            cancelled = true;
+        };
+    }, [context, src]);
+
+    const stop = () => {
+        const source = sourceRef.current;
+        if (!source) return;
+        try {
+            source.stop();
+        } catch {
+            // Ignore stop races during retriggering.
+        }
+        sourceRef.current = null;
+    };
+
+    const play = (playDuration?: number) => {
+        if (!context || !outputNode || !buffer || !isUnlocked) return;
+
+        stop();
+
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        source.loop = loop;
+        source.playbackRate.value = playbackRate;
+        source.detune.value = detune;
+        source.connect(outputNode);
+        source.onended = () => {
+            if (sourceRef.current === source) {
+                sourceRef.current = null;
+            }
+        };
+
+        sourceRef.current = source;
+
+        if (loop || !playDuration) {
+            source.start(context.currentTime, offset);
+        } else {
+            source.start(context.currentTime, offset, playDuration);
+        }
+
+        if (loop && playDuration) {
+            window.setTimeout(() => {
+                if (sourceRef.current === source) {
+                    stop();
+                }
+            }, playDuration * 1000);
+        }
+    };
+
+    useEffect(() => {
+        if (autoStart && active === undefined && buffer && isUnlocked) {
+            play(duration);
+        }
+        // Intentionally scoped to source/loading changes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [autoStart, active, buffer, isUnlocked, src]);
+
+    useEffect(() => {
+        if (!trigger || active !== undefined) return;
+        play(trigger.duration);
+        // Intentionally scoped to trigger edges.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [trigger, active]);
+
+    useEffect(() => {
+        if (active === undefined) return;
+
+        if (active && !activeRef.current) {
+            play(duration);
+        } else if (!active && activeRef.current && loop) {
+            stop();
+        }
+
+        activeRef.current = active;
+        // Intentionally scoped to active edge changes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [active, duration, loop]);
+
+    useEffect(() => () => stop(), []);
+
+    return (
+        <AudioOutProvider node={outputNode}>
+            {children}
+        </AudioOutProvider>
+    );
+}
+
+function generateFeedbackDelayHelper(): string {
+    return [
+        'type FeedbackDelayProps = {',
+        '    children?: ReactNode;',
+        '    delayTime?: number;',
+        '    feedback?: number;',
+        '    maxDelayTime?: number;',
+        '    bypass?: boolean;',
+        '};',
+        '',
+        'const FeedbackDelay = ({',
+        '    children,',
+        '    delayTime = 0,',
+        '    feedback = 0,',
+        '    maxDelayTime = 2,',
+        '    bypass = false,',
+        '}: FeedbackDelayProps) => {',
+        '    const { context } = useAudio();',
+        '    const { outputNode } = useAudioOut();',
+        '    const inputRef = useRef<GainNode | null>(null);',
+        '    const delayRef = useRef<DelayNode | null>(null);',
+        '    const feedbackRef = useRef<GainNode | null>(null);',
+        '',
+        '    useEffect(() => {',
+        '        if (!context) return;',
+        '',
+        '        const input = context.createGain();',
+        '        const delay = context.createDelay(maxDelayTime);',
+        '        const feedbackGain = context.createGain();',
+        '',
+        '        input.connect(delay);',
+        '        delay.connect(feedbackGain);',
+        '        feedbackGain.connect(delay);',
+        '',
+        '        inputRef.current = input;',
+        '        delayRef.current = delay;',
+        '        feedbackRef.current = feedbackGain;',
+        '',
+        '        return () => {',
+        '            try { input.disconnect(); } catch {}',
+        '            try { delay.disconnect(); } catch {}',
+        '            try { feedbackGain.disconnect(); } catch {}',
+        '            inputRef.current = null;',
+        '            delayRef.current = null;',
+        '            feedbackRef.current = null;',
+        '        };',
+        '    }, [context, maxDelayTime]);',
+        '',
+        '    useEffect(() => {',
+        '        if (!delayRef.current || !outputNode || bypass) return;',
+        '        delayRef.current.connect(outputNode);',
+        '        return () => {',
+        '            try {',
+        '                delayRef.current?.disconnect(outputNode);',
+        '            } catch {}',
+        '        };',
+        '    }, [outputNode, bypass]);',
+        '',
+        '    useEffect(() => {',
+        '        if (delayRef.current) {',
+        '            delayRef.current.delayTime.value = delayTime;',
+        '        }',
+        '    }, [delayTime]);',
+        '',
+        '    useEffect(() => {',
+        '        if (feedbackRef.current) {',
+        '            feedbackRef.current.gain.value = feedback;',
+        '        }',
+        '    }, [feedback]);',
+        '',
+        '    return (',
+        '        <AudioOutProvider node={bypass ? outputNode : inputRef.current}>',
+        '            {children}',
+        '        </AudioOutProvider>',
+        '    );',
+        '};',
+    ].join('\n');
+}
+
+function generateTriggeredSamplerHelper(): string {
+    return [
+        'type TriggeredSamplerProps = {',
+        '    children?: ReactNode;',
+        '    src?: string | AudioBuffer;',
+        '    autoStart?: boolean;',
+        '    active?: boolean;',
+        '    loop?: boolean;',
+        '    playbackRate?: number;',
+        '    detune?: number;',
+        '    offset?: number;',
+        '    duration?: number;',
+        '};',
+        '',
+        'const TriggeredSampler = ({',
+        '    children,',
+        '    src,',
+        '    autoStart = false,',
+        '    active,',
+        '    loop = false,',
+        '    playbackRate = 1,',
+        '    detune = 0,',
+        '    offset = 0,',
+        '    duration,',
+        '}: TriggeredSamplerProps) => {',
+        '    const { context, isUnlocked } = useAudio();',
+        '    const { outputNode } = useAudioOut();',
+        '    const trigger = useTrigger();',
+        '    const [buffer, setBuffer] = useState<AudioBuffer | null>(null);',
+        '    const sourceRef = useRef<AudioBufferSourceNode | null>(null);',
+        '    const activeRef = useRef(false);',
+        '',
+        '    useEffect(() => {',
+        '        if (!context || !src) return;',
+        '',
+        '        let cancelled = false;',
+        '',
+        '        if (typeof src === "string") {',
+        '            fetch(src)',
+        '                .then((response) => {',
+        '                    if (!response.ok) throw new Error(`Failed to load sampler source: ${src}`);',
+        '                    return response.arrayBuffer();',
+        '                })',
+        '                .then((arrayBuffer) => context.decodeAudioData(arrayBuffer))',
+        '                .then((decodedBuffer) => {',
+        '                    if (!cancelled) {',
+        '                        setBuffer(decodedBuffer);',
+        '                    }',
+        '                })',
+        '                .catch(() => {',
+        '                    if (!cancelled) {',
+        '                        setBuffer(null);',
+        '                    }',
+        '                });',
+        '        } else {',
+        '            setBuffer(src);',
+        '        }',
+        '',
+        '        return () => {',
+        '            cancelled = true;',
+        '        };',
+        '    }, [context, src]);',
+        '',
+        '    const stop = () => {',
+        '        const source = sourceRef.current;',
+        '        if (!source) return;',
+        '        try {',
+        '            source.stop();',
+        '        } catch {}',
+        '        sourceRef.current = null;',
+        '    };',
+        '',
+        '    const play = (playDuration?: number) => {',
+        '        if (!context || !outputNode || !buffer || !isUnlocked) return;',
+        '',
+        '        stop();',
+        '',
+        '        const source = context.createBufferSource();',
+        '        source.buffer = buffer;',
+        '        source.loop = loop;',
+        '        source.playbackRate.value = playbackRate;',
+        '        source.detune.value = detune;',
+        '        source.connect(outputNode);',
+        '        source.onended = () => {',
+        '            if (sourceRef.current === source) {',
+        '                sourceRef.current = null;',
+        '            }',
+        '        };',
+        '',
+        '        sourceRef.current = source;',
+        '',
+        '        if (loop || !playDuration) {',
+        '            source.start(context.currentTime, offset);',
+        '        } else {',
+        '            source.start(context.currentTime, offset, playDuration);',
+        '        }',
+        '',
+        '        if (loop && playDuration) {',
+        '            window.setTimeout(() => {',
+        '                if (sourceRef.current === source) {',
+        '                    stop();',
+        '                }',
+        '            }, playDuration * 1000);',
+        '        }',
+        '    };',
+        '',
+        '    useEffect(() => {',
+        '        if (autoStart && active === undefined && buffer && isUnlocked) {',
+        '            play(duration);',
+        '        }',
+        '    }, [autoStart, active, buffer, isUnlocked, src]);',
+        '',
+        '    useEffect(() => {',
+        '        if (!trigger || active !== undefined) return;',
+        '        play(trigger.duration);',
+        '    }, [trigger, active]);',
+        '',
+        '    useEffect(() => {',
+        '        if (active === undefined) return;',
+        '',
+        '        if (active && !activeRef.current) {',
+        '            play(duration);',
+        '        } else if (!active && activeRef.current && loop) {',
+        '            stop();',
+        '        }',
+        '',
+        '        activeRef.current = active;',
+        '    }, [active, duration, loop]);',
+        '',
+        '    useEffect(() => () => stop(), []);',
+        '',
+        '    return (',
+        '        <AudioOutProvider node={outputNode}>',
+        '            {children}',
+        '        </AudioOutProvider>',
+        '    );',
+        '};',
+    ].join('\n');
 }

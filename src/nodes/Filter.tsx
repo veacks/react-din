@@ -33,7 +33,9 @@ export const Filter: FC<FilterProps> = ({
     Q = 1,
     QBase,
     gain = 0,
+    gainBase,
     detune = 0,
+    detuneBase,
     id,
 }) => {
     const { nodeRef, context } = useAudioNode<BiquadFilterNode>({
@@ -58,8 +60,8 @@ export const Filter: FC<FilterProps> = ({
     // Apply parameters (with LFO support)
     useAudioParam(nodeRef.current?.frequency, frequency, frequencyBase ?? 350);
     useAudioParam(nodeRef.current?.Q, Q, QBase ?? 1);
-    useAudioParam(nodeRef.current?.gain, gain);
-    useAudioParam(nodeRef.current?.detune, detune);
+    useAudioParam(nodeRef.current?.gain, gain, gainBase ?? 0);
+    useAudioParam(nodeRef.current?.detune, detune, detuneBase ?? 0);
 
     return (
         <AudioOutProvider node={bypass ? null : nodeRef.current}>
@@ -67,4 +69,3 @@ export const Filter: FC<FilterProps> = ({
         </AudioOutProvider>
     );
 };
-
