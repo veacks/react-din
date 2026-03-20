@@ -9,8 +9,8 @@ export default defineConfig({
     dedupe: ['react', 'react-dom'],
     alias: {
       // Ensure we use the same React instance everywhere
-      'react': path.resolve(__dirname, 'node_modules/react'),
-      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+      'react': path.resolve(__dirname, '../node_modules/react'),
+      'react-dom': path.resolve(__dirname, '../node_modules/react-dom'),
       // Use local source for react-din during demo development
       'react-din': path.resolve(__dirname, '../src/index.ts'),
     }

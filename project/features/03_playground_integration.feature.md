@@ -1,0 +1,29 @@
+# 03 Playground Integration
+
+## Feature
+
+Exercise the visual playground as an integrated audio-graph editor instead of a collection of isolated controls.
+
+### F03-S01 Voice synth graphs run across transport, sequencing, voice, envelope, and output
+
+**Given** a contributor builds a synth graph in the playground
+**When** they connect `Transport -> StepSequencer -> Voice -> Osc -> ADSR -> Gain -> Output`
+**Then** the store, engine, UI, and generated code remain coherent
+
+### F03-S02 Saved graphs reload safely
+
+**Given** a contributor saves a graph that includes sampler or output state
+**When** the playground reloads
+**Then** the graph is restored and transient playback state is sanitized
+
+### F03-S03 Generated React code matches mixed audio and data graphs
+
+**Given** a contributor uses data nodes and audio nodes in the same graph
+**When** they open the code generator
+**Then** the generated React code represents both audio routing and control routing
+
+### F03-S04 Browser audio smoke remains available
+
+**Given** timing-sensitive or browser-only audio behavior changes
+**When** automated mocks are not enough
+**Then** manual smoke coverage remains documented for real browser verification

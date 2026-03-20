@@ -1,0 +1,28 @@
+# SamplerNode
+
+## Purpose
+Load and trigger audio files directly from the playground.
+
+## Props / Handles
+- Data fields: `src`, `loop`, `playbackRate`, `detune`, `loaded`, `sampleId`, `fileName`, `label`.
+- Handles: trigger input and audio `out`.
+
+## Defaults
+- Added from the store with empty `src`, `loop false`, `playbackRate 1`, `detune 0`, `loaded false`, and label `Sampler`.
+
+## Integration Notes
+- Keep cache IDs, object URLs, and generated code semantics aligned across UI, storage, and engine loading.
+- Use after a trigger-capable source or with manual playback from the node UI.
+
+## Failure Modes
+- File-cache drift can leave orphaned object URLs or stale `loaded` state.
+- Engine load failures make the node appear configured while staying silent.
+
+## Example
+```tsx
+// Add Sampler, load a file, then connect Sampler -> Output.
+```
+
+## Test Coverage
+- Automated: `playground/tests/unit/nodes-ui.spec.tsx`, `playground/tests/unit/store-and-codegen.spec.ts`
+- Scenarios: `F02-S01`, `F04-S02`

@@ -1,0 +1,28 @@
+# OscNode
+
+## Purpose
+Expose oscillator waveform, frequency, and detune controls in the playground canvas.
+
+## Props / Handles
+- Data fields: `waveform`, `frequency`, `detune`, `label`.
+- Handles: audio `out`, parameter inputs for `frequency` and `detune`.
+
+## Defaults
+- Added from the store with `waveform "sine"`, `frequency 440`, `detune 0`, and label `Oscillator`.
+
+## Integration Notes
+- Keep `OscNode` aligned with `nodes/index.ts`, the palette in `PlaygroundDemo`, store defaults, `AudioEngine`, and `CodeGenerator`.
+- Use it with `NoteNode`, `LFONode`, or `VoiceNode` control outputs.
+
+## Failure Modes
+- Missing registry or code generation updates cause stale UI or invalid generated code.
+- Broken control handles make pitch automation look connected while doing nothing.
+
+## Example
+```tsx
+// Add Oscillator, connect Note -> frequency, then connect Oscillator -> Gain.
+```
+
+## Test Coverage
+- Automated: `playground/tests/unit/nodes-ui.spec.tsx`, `playground/tests/unit/store-and-codegen.spec.ts`
+- Scenarios: `F02-S01`, `F04-S02`

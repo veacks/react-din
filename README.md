@@ -341,6 +341,28 @@ function SpatialAudio() {
 | `tickAudio` | Function | Manual frame tick for external loops |
 | `isSSR` | Function | Check if running on server |
 
+## Documentation
+
+- Overview and contribution rules: [`AGENTS.md`](./AGENTS.md)
+- Component reference index: [`docs/README.md`](./docs/README.md)
+- Product summary: [`project/SUMMARY.md`](./project/SUMMARY.md)
+- Contributor flow: [`project/USERFLOW.md`](./project/USERFLOW.md)
+- Coverage contract: [`project/COVERAGE_MANIFEST.json`](./project/COVERAGE_MANIFEST.json)
+- Test planning matrix: [`project/TEST_MATRIX.md`](./project/TEST_MATRIX.md)
+
+## Quality Gates
+
+```bash
+npm run validate:docs
+npm run validate:coverage
+npm run validate:changes
+npm run test:library
+npm run test:playground
+npm run test:e2e
+```
+
+Every component and playground node in scope is mapped to a dedicated documentation page and at least one required automated test file in [`project/COVERAGE_MANIFEST.json`](./project/COVERAGE_MANIFEST.json). Any source change must update the mapped docs and tests in the same change set.
+
 ## Spatial Audio with @react-three/drei
 
 If you're using [react-three-fiber](https://github.com/pmndrs/react-three-fiber) for 3D graphics, you can integrate spatial audio using `@react-three/drei`'s `PositionalAudio` component which wraps Three.js Audio system.

@@ -1,9 +1,7 @@
-node_modules
-dist
-coverage
+dist/
+coverage/
+playwright-report/
+test-results/
 .DS_Store
-*.log
-.env
-.env.local
-.env.*.local
-*.tgz
+
+node_modules
