@@ -250,12 +250,30 @@ export class AudioEngine {
         return transport ? transport.playing : false;
     }
 
+    private sanitizePositiveNumber(value: number | undefined, fallback: number): number {
+        return Number.isFinite(value) && Number(value) > 0 ? Number(value) : fallback;
+    }
+
+    private sanitizeBpm(value: number | undefined): number {
+        return this.sanitizePositiveNumber(value, 120);
+    }
+
+    private resyncSchedulerClock(resetStep = false): void {
+        if (!this.audioContext) return;
+        if (resetStep) {
+            this.currentStep = 0;
+        }
+        this.nextNoteTime = this.audioContext.currentTime;
+    }
+
     private getStepDuration(): number {
         const transport = this.getTransportData();
-        const beatUnit = transport?.beatUnit ?? 4;
-        const stepsPerBeat = transport?.stepsPerBeat ?? 4;
-        const secondsPerBeat = (60 / this.bpm) * (4 / beatUnit);
-        return secondsPerBeat / stepsPerBeat;
+        const beatUnit = this.sanitizePositiveNumber(transport?.beatUnit, 4);
+        const stepsPerBeat = this.sanitizePositiveNumber(transport?.stepsPerBeat, 4);
+        const bpm = this.sanitizeBpm(this.bpm);
+        const secondsPerBeat = (60 / bpm) * (4 / beatUnit);
+        const stepDuration = secondsPerBeat / stepsPerBeat;
+        return Number.isFinite(stepDuration) && stepDuration > 0 ? stepDuration : (60 / 120) / 4;
     }
 
     private getSwingOffset(stepIndex: number): number {
@@ -740,7 +758,12 @@ export class AudioEngine {
         if (this.timerID) return;
 
         const nextNote = () => {
-            this.nextNoteTime += this.getStepDuration();
+            const stepDuration = this.getStepDuration();
+            if (!Number.isFinite(stepDuration) || stepDuration <= 0) {
+                this.resyncSchedulerClock();
+                return;
+            }
+            this.nextNoteTime += stepDuration;
             this.currentStep = (this.currentStep + 1) % this.getSequencerLoopLength();
         };
 
@@ -799,6 +822,10 @@ export class AudioEngine {
                 return;
             }
 
+            if (!Number.isFinite(this.nextNoteTime)) {
+                this.resyncSchedulerClock();
+            }
+
             while (this.nextNoteTime < this.audioContext.currentTime + this.scheduleAheadTime) {
                 scheduleNote(this.currentStep, this.nextNoteTime);
                 nextNote();
@@ -806,8 +833,7 @@ export class AudioEngine {
             this.timerID = window.setTimeout(scheduler, this.lookahead);
         };
 
-        this.currentStep = 0;
-        this.nextNoteTime = this.audioContext?.currentTime || 0;
+        this.resyncSchedulerClock(true);
         scheduler();
     }
 
@@ -940,7 +966,7 @@ export class AudioEngine {
 
         const transportNode = nodes.find((node) => node.data.type === 'transport');
         if (transportNode) {
-            this.bpm = (transportNode.data as TransportNodeData).bpm || 120;
+            this.bpm = this.sanitizeBpm((transportNode.data as TransportNodeData).bpm);
         }
 
         nodes.forEach((node) => {
@@ -1831,15 +1857,25 @@ export class AudioEngine {
         const instance = this.audioNodes.get(nodeId);
 
         if ('bpm' in data && typeof data.bpm === 'number') {
-            this.bpm = data.bpm;
+            this.bpm = this.sanitizeBpm(data.bpm);
         }
 
         if (visualNode?.data.type === 'transport') {
+            const transportTimingChanged = 'bpm' in data
+                || 'beatsPerBar' in data
+                || 'beatUnit' in data
+                || 'stepsPerBeat' in data
+                || 'barsPerPhrase' in data
+                || 'swing' in data;
+
             if (this.isPlaying) {
                 if (this.isTransportRunning() && !this.timerID) {
                     this.startScheduler();
                 } else if (!this.isTransportRunning() && this.timerID) {
                     this.stopScheduler();
+                }
+                if (transportTimingChanged && this.isTransportRunning()) {
+                    this.resyncSchedulerClock();
                 }
             }
             if (!instance || !this.audioContext) return;

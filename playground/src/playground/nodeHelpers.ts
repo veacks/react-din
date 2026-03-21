@@ -214,15 +214,19 @@ export function getInputParamHandleIdByIndex(params: InputParam[], index: number
 }
 
 export function normalizeTransportNodeData(data: TransportNodeData): TransportNodeData {
+    const normalizePositive = (value: number | undefined, fallback: number) =>
+        Number.isFinite(value) && Number(value) > 0 ? Number(value) : fallback;
+    const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
     return {
         type: 'transport',
-        bpm: Number.isFinite(data.bpm) ? data.bpm : 120,
+        bpm: normalizePositive(data.bpm, 120),
         playing: Boolean(data.playing),
-        beatsPerBar: Number.isFinite(data.beatsPerBar) ? data.beatsPerBar : 4,
-        beatUnit: Number.isFinite(data.beatUnit) ? data.beatUnit : 4,
-        stepsPerBeat: Number.isFinite(data.stepsPerBeat) ? data.stepsPerBeat : 4,
-        barsPerPhrase: Number.isFinite(data.barsPerPhrase) ? data.barsPerPhrase : 4,
-        swing: Number.isFinite(data.swing) ? data.swing : 0,
+        beatsPerBar: normalizePositive(data.beatsPerBar, 4),
+        beatUnit: normalizePositive(data.beatUnit, 4),
+        stepsPerBeat: normalizePositive(data.stepsPerBeat, 4),
+        barsPerPhrase: normalizePositive(data.barsPerPhrase, 4),
+        swing: Number.isFinite(data.swing) ? clamp(Number(data.swing), 0, 1) : 0,
         label: data.label?.trim() || 'Transport',
     };
 }

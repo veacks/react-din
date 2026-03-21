@@ -6,12 +6,39 @@ import type { AudioNodeData } from '../../src/playground/store';
 import {
     getCompatibleExistingHandleMatches,
     getCompatibleNodeSuggestions,
+    normalizeTransportNodeData,
     normalizeConnectionFromStart,
 } from '../../src/playground/nodeHelpers';
 
 const createNode = (node: Node<AudioNodeData>) => node;
 
 describe('playground connection assist helpers', () => {
+    it('normalizes invalid transport timing values to safe defaults', () => {
+        const normalized = normalizeTransportNodeData({
+            type: 'transport',
+            bpm: 0,
+            playing: true,
+            beatsPerBar: -2,
+            beatUnit: 0,
+            stepsPerBeat: NaN,
+            barsPerPhrase: Infinity,
+            swing: 10,
+            label: '  Transport  ',
+        });
+
+        expect(normalized).toMatchObject({
+            type: 'transport',
+            bpm: 120,
+            playing: true,
+            beatsPerBar: 4,
+            beatUnit: 4,
+            stepsPerBeat: 4,
+            barsPerPhrase: 4,
+            swing: 1,
+            label: 'Transport',
+        });
+    });
+
     it('finds compatible existing targets from a source drag', () => {
         const nodes = [
             createNode({
