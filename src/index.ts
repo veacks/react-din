@@ -98,6 +98,7 @@ export {
     // Components
     Sequencer,
     Track,
+    EventTrigger,
     // Hooks
     useTrigger,
     useOnTrigger,
@@ -109,8 +110,10 @@ export {
 export type {
     Pattern,
     TriggerEvent,
+    EventTriggerMode,
     SequencerProps,
     TrackProps,
+    EventTriggerProps,
     UseTriggerOptions,
     SequencerContextValue,
     TrackContextValue,

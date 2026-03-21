@@ -14,6 +14,17 @@ import SwitchNode from '../../src/playground/nodes/SwitchNode';
 import DelayNode from '../../src/playground/nodes/DelayNode';
 import ReverbNode from '../../src/playground/nodes/ReverbNode';
 import StereoPannerNode from '../../src/playground/nodes/StereoPannerNode';
+import DistortionNode from '../../src/playground/nodes/DistortionNode';
+import ChorusNode from '../../src/playground/nodes/ChorusNode';
+import NoiseBurstNode from '../../src/playground/nodes/NoiseBurstNode';
+import WaveShaperNode from '../../src/playground/nodes/WaveShaperNode';
+import ConvolverNode from '../../src/playground/nodes/ConvolverNode';
+import AnalyzerNode from '../../src/playground/nodes/AnalyzerNode';
+import Panner3DNode from '../../src/playground/nodes/Panner3DNode';
+import ConstantSourceNode from '../../src/playground/nodes/ConstantSourceNode';
+import MediaStreamNode from '../../src/playground/nodes/MediaStreamNode';
+import EventTriggerNode from '../../src/playground/nodes/EventTriggerNode';
+import CompressorNode from '../../src/playground/nodes/CompressorNode';
 import { getInputParamHandleId } from '../../src/playground/handleIds';
 
 const updateNodeData = vi.fn();
@@ -110,7 +121,7 @@ describe('playground node UIs', () => {
         expect(screen.getByTestId('handle-delayTime')).toBeInTheDocument();
         expect(screen.getByTestId('handle-feedback')).toBeInTheDocument();
         expect(screen.getByTestId('handle-decay')).toBeInTheDocument();
-        expect(screen.getByTestId('handle-mix')).toBeInTheDocument();
+        expect(screen.getAllByTestId('handle-mix').length).toBeGreaterThan(0);
         expect(screen.getByTestId('handle-pan')).toBeInTheDocument();
         expect(screen.getByTestId('handle-masterGain')).toBeInTheDocument();
         expect(screen.getByText('Math')).toBeInTheDocument();
@@ -187,5 +198,60 @@ describe('playground node UIs', () => {
 
         expect(screen.queryByTitle('Gain level')).not.toBeInTheDocument();
         expect(screen.getByText('72%')).toBeInTheDocument();
+    });
+
+    it('renders extended MVP feedback and routing node controls with stable handles', () => {
+        const sharedProps = {
+            dragging: false,
+            selected: false,
+            zIndex: 0,
+            selectable: true,
+            draggable: true,
+            isConnectable: true,
+            positionAbsoluteX: 0,
+            positionAbsoluteY: 0,
+            xPos: 0,
+            yPos: 0,
+        } as const;
+
+        render(
+            <div>
+                <CompressorNode {...(sharedProps as any)} id="compressor-1" data={{ type: 'compressor', threshold: -24, knee: 30, ratio: 12, attack: 0.003, release: 0.25, label: 'Compressor' }} />
+                <DistortionNode {...(sharedProps as any)} id="distortion-1" data={{ type: 'distortion', distortionType: 'soft', drive: 0.4, level: 0.6, mix: 0.5, tone: 3200, label: 'Distortion' }} />
+                <ChorusNode {...(sharedProps as any)} id="chorus-1" data={{ type: 'chorus', rate: 1.2, depth: 2.4, feedback: 0.2, delay: 18, mix: 0.3, stereo: true, label: 'Chorus' }} />
+                <NoiseBurstNode {...(sharedProps as any)} id="noise-burst-1" data={{ type: 'noiseBurst', noiseType: 'white', duration: 0.06, gain: 0.7, attack: 0.001, release: 0.02, label: 'Noise Burst' }} />
+                <WaveShaperNode {...(sharedProps as any)} id="wave-shaper-1" data={{ type: 'waveShaper', amount: 0.45, preset: 'softClip', oversample: '2x', label: 'WaveShaper' }} />
+                <ConvolverNode {...(sharedProps as any)} id="convolver-1" data={{ type: 'convolver', impulseSrc: '/impulses/plate.wav', normalize: true, label: 'Convolver' }} />
+                <AnalyzerNode {...(sharedProps as any)} id="analyzer-1" data={{ type: 'analyzer', fftSize: 1024, smoothingTimeConstant: 0.8, updateRate: 60, autoUpdate: true, label: 'Analyzer' }} />
+                <Panner3DNode {...(sharedProps as any)} id="panner3d-1" data={{ type: 'panner3d', positionX: 0, positionY: 0, positionZ: -1, refDistance: 1, maxDistance: 10000, rolloffFactor: 1, panningModel: 'HRTF', distanceModel: 'inverse', label: 'Panner 3D' }} />
+                <ConstantSourceNode {...(sharedProps as any)} id="constant-source-1" data={{ type: 'constantSource', offset: 1, label: 'Constant Source' }} />
+                <MediaStreamNode {...(sharedProps as any)} id="media-stream-1" data={{ type: 'mediaStream', requestMic: false, label: 'Media Stream' }} />
+                <EventTriggerNode {...(sharedProps as any)} id="event-trigger-1" data={{ type: 'eventTrigger', token: 0, mode: 'change', cooldownMs: 40, velocity: 1, duration: 0.1, note: 60, trackId: 'event', label: 'Event Trigger' }} />
+            </div>
+        );
+
+        expect(screen.getByTestId('handle-threshold')).toBeInTheDocument();
+        expect(screen.getByTestId('handle-knee')).toBeInTheDocument();
+        expect(screen.getByTestId('handle-ratio')).toBeInTheDocument();
+        expect(screen.getByTestId('handle-drive')).toBeInTheDocument();
+        expect(screen.getByTestId('handle-level')).toBeInTheDocument();
+        expect(screen.getAllByTestId('handle-mix').length).toBeGreaterThan(0);
+        expect(screen.getByTestId('handle-tone')).toBeInTheDocument();
+        expect(screen.getByTestId('handle-rate')).toBeInTheDocument();
+        expect(screen.getByTestId('handle-depth')).toBeInTheDocument();
+        expect(screen.getByTestId('handle-delay')).toBeInTheDocument();
+        expect(screen.getAllByTestId('handle-trigger').length).toBeGreaterThan(0);
+        expect(screen.getByTestId('handle-duration')).toBeInTheDocument();
+        expect(screen.getByTestId('handle-amount')).toBeInTheDocument();
+        expect(screen.getByTestId('handle-positionX')).toBeInTheDocument();
+        expect(screen.getByTestId('handle-positionY')).toBeInTheDocument();
+        expect(screen.getByTestId('handle-positionZ')).toBeInTheDocument();
+        expect(screen.getByTestId('handle-refDistance')).toBeInTheDocument();
+        expect(screen.getByTestId('handle-maxDistance')).toBeInTheDocument();
+        expect(screen.getByTestId('handle-rolloffFactor')).toBeInTheDocument();
+        expect(screen.getByTestId('handle-offset')).toBeInTheDocument();
+        expect(screen.getByTestId('handle-token')).toBeInTheDocument();
+        expect(screen.getByText('Media Stream')).toBeInTheDocument();
+        expect(screen.getByText('Convolver')).toBeInTheDocument();
     });
 });

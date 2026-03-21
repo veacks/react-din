@@ -7,6 +7,7 @@ import {
     BackgroundVariant,
     type NodeTypes,
     type Node,
+    type Edge,
     type OnNodesChange,
     type OnConnectStartParams,
     type FinalConnectionState,
@@ -26,9 +27,20 @@ import {
     NoiseNode,
     DelayNode,
     ReverbNode,
+    CompressorNode,
+    DistortionNode,
+    ChorusNode,
+    NoiseBurstNode,
+    WaveShaperNode,
+    ConvolverNode,
+    AnalyzerNode,
     StereoPannerNode,
+    Panner3DNode,
     MixerNode,
     InputNode,
+    ConstantSourceNode,
+    MediaStreamNode,
+    EventTriggerNode,
     NoteNode,
     TransportNode,
     StepSequencerNode,
@@ -49,6 +61,7 @@ import { sanitizeGraphForStorage, toPascalCase } from './playground/graphUtils';
 import { audioEngine } from './playground/AudioEngine';
 import {
     canConnect,
+    getInputParamHandleId,
     getCompatibleExistingHandleMatches,
     getCompatibleNodeSuggestions,
     type ConnectionAssistStart,
@@ -65,9 +78,20 @@ const nodeTypes: NodeTypes = {
     noiseNode: NoiseNode as NodeTypes[string],
     delayNode: DelayNode as NodeTypes[string],
     reverbNode: ReverbNode as NodeTypes[string],
+    compressorNode: CompressorNode as NodeTypes[string],
+    distortionNode: DistortionNode as NodeTypes[string],
+    chorusNode: ChorusNode as NodeTypes[string],
+    noiseBurstNode: NoiseBurstNode as NodeTypes[string],
+    waveShaperNode: WaveShaperNode as NodeTypes[string],
+    convolverNode: ConvolverNode as NodeTypes[string],
+    analyzerNode: AnalyzerNode as NodeTypes[string],
     pannerNode: StereoPannerNode as NodeTypes[string],
+    panner3dNode: Panner3DNode as NodeTypes[string],
     mixerNode: MixerNode as NodeTypes[string],
     inputNode: InputNode as NodeTypes[string],
+    constantSourceNode: ConstantSourceNode as NodeTypes[string],
+    mediaStreamNode: MediaStreamNode as NodeTypes[string],
+    eventTriggerNode: EventTriggerNode as NodeTypes[string],
     noteNode: NoteNode as NodeTypes[string],
     transportNode: TransportNode as NodeTypes[string],
     stepSequencerNode: StepSequencerNode as NodeTypes[string],
@@ -87,6 +111,10 @@ const nodeCategories = groupCatalogByCategory();
 const ASSIST_MENU_WIDTH = 320;
 const ASSIST_MENU_HEIGHT = 420;
 const ASSIST_MENU_MARGIN = 16;
+
+const AUDIO_EDGE_STYLE = { stroke: '#44cc44', strokeWidth: 3 };
+const CONTROL_EDGE_STYLE = { stroke: '#4488ff', strokeWidth: 2, strokeDasharray: '5,5' };
+const TRIGGER_EDGE_STYLE = { stroke: '#ff4466', strokeWidth: 2, strokeDasharray: '6,4' };
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -110,6 +138,166 @@ const getInitialTheme = (): 'light' | 'dark' => {
 const getViewportWidth = () => (typeof window === 'undefined' ? 1440 : window.innerWidth);
 const getDefaultPaletteCollapsed = (viewportWidth: number) => viewportWidth < 1220;
 const getDefaultInspectorCollapsed = (viewportWidth: number) => viewportWidth < 1040;
+
+interface FeedbackTemplateGraph {
+    nodes: Node<AudioNodeData>[];
+    edges: Edge[];
+}
+
+function createTokenParam(id: string, label: string) {
+    return {
+        id,
+        name: id,
+        label,
+        type: 'float' as const,
+        value: 0,
+        defaultValue: 0,
+        min: 0,
+        max: 9999,
+    };
+}
+
+function createHoverFeedbackTemplate(): FeedbackTemplateGraph {
+    const hoverParam = createTokenParam('hoverToken', 'Hover Token');
+
+    return {
+        nodes: [
+            { id: 'input-hover', type: 'inputNode', dragHandle: '.node-header', position: { x: 40, y: 80 }, data: { type: 'input', params: [hoverParam], label: 'UI Tokens' } as any },
+            { id: 'evt-hover', type: 'eventTriggerNode', dragHandle: '.node-header', position: { x: 280, y: 80 }, data: { type: 'eventTrigger', token: 0, mode: 'change', cooldownMs: 40, velocity: 0.45, duration: 0.06, note: 72, trackId: 'hover', label: 'Hover Trigger' } as any },
+            { id: 'noise-hover', type: 'noiseBurstNode', dragHandle: '.node-header', position: { x: 520, y: 40 }, data: { type: 'noiseBurst', noiseType: 'white', duration: 0.03, gain: 0.55, attack: 0.001, release: 0.02, label: 'Hover Noise' } as any },
+            { id: 'filter-hover', type: 'filterNode', dragHandle: '.node-header', position: { x: 760, y: 40 }, data: { type: 'filter', filterType: 'highpass', frequency: 1800, detune: 0, q: 0.9, gain: 0, label: 'HP Filter' } as any },
+            { id: 'chorus-hover', type: 'chorusNode', dragHandle: '.node-header', position: { x: 990, y: 40 }, data: { type: 'chorus', rate: 1.2, depth: 2.4, feedback: 0.12, delay: 14, mix: 0.22, stereo: true, label: 'Light Chorus' } as any },
+            { id: 'gain-hover', type: 'gainNode', dragHandle: '.node-header', position: { x: 1220, y: 40 }, data: { type: 'gain', gain: 0.5, label: 'Hover Gain' } as any },
+            { id: 'analyzer-hover', type: 'analyzerNode', dragHandle: '.node-header', position: { x: 1450, y: 40 }, data: { type: 'analyzer', fftSize: 1024, smoothingTimeConstant: 0.75, updateRate: 60, autoUpdate: true, label: 'Monitor' } as any },
+            { id: 'output', type: 'outputNode', dragHandle: '.node-header', position: { x: 1680, y: 120 }, data: { type: 'output', masterGain: 0.5, playing: false, label: 'Output' } as any },
+        ],
+        edges: [
+            { id: 'hover-token', source: 'input-hover', sourceHandle: getInputParamHandleId(hoverParam), target: 'evt-hover', targetHandle: 'token', animated: true, style: CONTROL_EDGE_STYLE },
+            { id: 'hover-trigger', source: 'evt-hover', sourceHandle: 'trigger', target: 'noise-hover', targetHandle: 'trigger', animated: true, style: TRIGGER_EDGE_STYLE },
+            { id: 'hover-a1', source: 'noise-hover', sourceHandle: 'out', target: 'filter-hover', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'hover-a2', source: 'filter-hover', sourceHandle: 'out', target: 'chorus-hover', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'hover-a3', source: 'chorus-hover', sourceHandle: 'out', target: 'gain-hover', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'hover-a4', source: 'gain-hover', sourceHandle: 'out', target: 'analyzer-hover', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'hover-a5', source: 'analyzer-hover', sourceHandle: 'out', target: 'output', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+        ],
+    };
+}
+
+function createSuccessFeedbackTemplate(): FeedbackTemplateGraph {
+    const successParam = createTokenParam('successToken', 'Success Token');
+
+    return {
+        nodes: [
+            { id: 'input-success', type: 'inputNode', dragHandle: '.node-header', position: { x: 40, y: 80 }, data: { type: 'input', params: [successParam], label: 'UI Tokens' } as any },
+            { id: 'evt-success', type: 'eventTriggerNode', dragHandle: '.node-header', position: { x: 280, y: 80 }, data: { type: 'eventTrigger', token: 0, mode: 'change', cooldownMs: 120, velocity: 0.9, duration: 0.35, note: 76, trackId: 'success', label: 'Success Trigger' } as any },
+            { id: 'sampler-success', type: 'samplerNode', dragHandle: '.node-header', position: { x: 530, y: 40 }, data: { type: 'sampler', src: '/samples/ui_success.wav', loop: false, playbackRate: 1, detune: 0, loaded: true, label: 'Success Sample' } as any },
+            { id: 'convolver-success', type: 'convolverNode', dragHandle: '.node-header', position: { x: 760, y: 40 }, data: { type: 'convolver', impulseSrc: '/impulses/plate.wav', normalize: true, label: 'Plate IR' } as any },
+            { id: 'chorus-success', type: 'chorusNode', dragHandle: '.node-header', position: { x: 990, y: 40 }, data: { type: 'chorus', rate: 0.9, depth: 1.6, feedback: 0.08, delay: 18, mix: 0.16, stereo: true, label: 'Subtle Chorus' } as any },
+            { id: 'panner-success', type: 'panner3dNode', dragHandle: '.node-header', position: { x: 1220, y: 40 }, data: { type: 'panner3d', positionX: 0, positionY: 0, positionZ: -1, refDistance: 1, maxDistance: 10000, rolloffFactor: 1, panningModel: 'HRTF', distanceModel: 'inverse', label: 'Panner 3D' } as any },
+            { id: 'gain-success', type: 'gainNode', dragHandle: '.node-header', position: { x: 1450, y: 40 }, data: { type: 'gain', gain: 0.65, label: 'Success Gain' } as any },
+            { id: 'analyzer-success', type: 'analyzerNode', dragHandle: '.node-header', position: { x: 1680, y: 40 }, data: { type: 'analyzer', fftSize: 1024, smoothingTimeConstant: 0.8, updateRate: 60, autoUpdate: true, label: 'Monitor' } as any },
+            { id: 'output', type: 'outputNode', dragHandle: '.node-header', position: { x: 1910, y: 120 }, data: { type: 'output', masterGain: 0.5, playing: false, label: 'Output' } as any },
+        ],
+        edges: [
+            { id: 'success-token', source: 'input-success', sourceHandle: getInputParamHandleId(successParam), target: 'evt-success', targetHandle: 'token', animated: true, style: CONTROL_EDGE_STYLE },
+            { id: 'success-trigger', source: 'evt-success', sourceHandle: 'trigger', target: 'sampler-success', targetHandle: 'trigger', animated: true, style: TRIGGER_EDGE_STYLE },
+            { id: 'success-a1', source: 'sampler-success', sourceHandle: 'out', target: 'convolver-success', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'success-a2', source: 'convolver-success', sourceHandle: 'out', target: 'chorus-success', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'success-a3', source: 'chorus-success', sourceHandle: 'out', target: 'panner-success', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'success-a4', source: 'panner-success', sourceHandle: 'out', target: 'gain-success', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'success-a5', source: 'gain-success', sourceHandle: 'out', target: 'analyzer-success', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'success-a6', source: 'analyzer-success', sourceHandle: 'out', target: 'output', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+        ],
+    };
+}
+
+function createErrorFeedbackTemplate(): FeedbackTemplateGraph {
+    const errorParam = createTokenParam('errorToken', 'Error Token');
+
+    return {
+        nodes: [
+            { id: 'input-error', type: 'inputNode', dragHandle: '.node-header', position: { x: 40, y: 80 }, data: { type: 'input', params: [errorParam], label: 'UI Tokens' } as any },
+            { id: 'evt-error', type: 'eventTriggerNode', dragHandle: '.node-header', position: { x: 280, y: 80 }, data: { type: 'eventTrigger', token: 0, mode: 'change', cooldownMs: 120, velocity: 0.95, duration: 0.25, note: 45, trackId: 'error', label: 'Error Trigger' } as any },
+            { id: 'noise-error', type: 'noiseBurstNode', dragHandle: '.node-header', position: { x: 530, y: 10 }, data: { type: 'noiseBurst', noiseType: 'brown', duration: 0.09, gain: 0.7, attack: 0.002, release: 0.08, label: 'Error Noise' } as any },
+            { id: 'sampler-error', type: 'samplerNode', dragHandle: '.node-header', position: { x: 530, y: 150 }, data: { type: 'sampler', src: '/samples/ui_error.wav', loop: false, playbackRate: 1, detune: 0, loaded: true, label: 'Error Sample' } as any },
+            { id: 'dist-error', type: 'distortionNode', dragHandle: '.node-header', position: { x: 780, y: 80 }, data: { type: 'distortion', distortionType: 'soft', drive: 0.35, level: 0.65, mix: 0.52, tone: 2400, label: 'Soft Distortion' } as any },
+            { id: 'ws-error', type: 'waveShaperNode', dragHandle: '.node-header', position: { x: 1020, y: 80 }, data: { type: 'waveShaper', amount: 0.45, preset: 'saturate', oversample: '2x', label: 'WaveShaper' } as any },
+            { id: 'filter-error', type: 'filterNode', dragHandle: '.node-header', position: { x: 1260, y: 80 }, data: { type: 'filter', filterType: 'lowpass', frequency: 1200, detune: 0, q: 1.2, gain: 0, label: 'LP Filter' } as any },
+            { id: 'gain-error', type: 'gainNode', dragHandle: '.node-header', position: { x: 1490, y: 80 }, data: { type: 'gain', gain: 0.6, label: 'Error Gain' } as any },
+            { id: 'analyzer-error', type: 'analyzerNode', dragHandle: '.node-header', position: { x: 1720, y: 80 }, data: { type: 'analyzer', fftSize: 1024, smoothingTimeConstant: 0.78, updateRate: 60, autoUpdate: true, label: 'Monitor' } as any },
+            { id: 'output', type: 'outputNode', dragHandle: '.node-header', position: { x: 1950, y: 140 }, data: { type: 'output', masterGain: 0.5, playing: false, label: 'Output' } as any },
+        ],
+        edges: [
+            { id: 'error-token', source: 'input-error', sourceHandle: getInputParamHandleId(errorParam), target: 'evt-error', targetHandle: 'token', animated: true, style: CONTROL_EDGE_STYLE },
+            { id: 'error-trigger-noise', source: 'evt-error', sourceHandle: 'trigger', target: 'noise-error', targetHandle: 'trigger', animated: true, style: TRIGGER_EDGE_STYLE },
+            { id: 'error-trigger-sampler', source: 'evt-error', sourceHandle: 'trigger', target: 'sampler-error', targetHandle: 'trigger', animated: true, style: TRIGGER_EDGE_STYLE },
+            { id: 'error-a1', source: 'noise-error', sourceHandle: 'out', target: 'dist-error', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'error-a2', source: 'sampler-error', sourceHandle: 'out', target: 'dist-error', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'error-a3', source: 'dist-error', sourceHandle: 'out', target: 'ws-error', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'error-a4', source: 'ws-error', sourceHandle: 'out', target: 'filter-error', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'error-a5', source: 'filter-error', sourceHandle: 'out', target: 'gain-error', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'error-a6', source: 'gain-error', sourceHandle: 'out', target: 'analyzer-error', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'error-a7', source: 'analyzer-error', sourceHandle: 'out', target: 'output', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+        ],
+    };
+}
+
+function createUiFeedbackPackTemplate(): FeedbackTemplateGraph {
+    const hoverParam = createTokenParam('hoverToken', 'Hover Token');
+    const successParam = createTokenParam('successToken', 'Success Token');
+    const errorParam = createTokenParam('errorToken', 'Error Token');
+
+    return {
+        nodes: [
+            { id: 'input-ui', type: 'inputNode', dragHandle: '.node-header', position: { x: 40, y: 220 }, data: { type: 'input', params: [hoverParam, successParam, errorParam], label: 'UI Tokens' } as any },
+            { id: 'evt-hover', type: 'eventTriggerNode', dragHandle: '.node-header', position: { x: 280, y: 60 }, data: { type: 'eventTrigger', token: 0, mode: 'change', cooldownMs: 40, velocity: 0.45, duration: 0.06, note: 72, trackId: 'hover', label: 'Hover Trigger' } as any },
+            { id: 'evt-success', type: 'eventTriggerNode', dragHandle: '.node-header', position: { x: 280, y: 220 }, data: { type: 'eventTrigger', token: 0, mode: 'change', cooldownMs: 120, velocity: 0.9, duration: 0.35, note: 76, trackId: 'success', label: 'Success Trigger' } as any },
+            { id: 'evt-error', type: 'eventTriggerNode', dragHandle: '.node-header', position: { x: 280, y: 380 }, data: { type: 'eventTrigger', token: 0, mode: 'change', cooldownMs: 120, velocity: 0.95, duration: 0.25, note: 45, trackId: 'error', label: 'Error Trigger' } as any },
+            { id: 'noise-hover', type: 'noiseBurstNode', dragHandle: '.node-header', position: { x: 540, y: 20 }, data: { type: 'noiseBurst', noiseType: 'white', duration: 0.03, gain: 0.55, attack: 0.001, release: 0.02, label: 'Hover Noise' } as any },
+            { id: 'filter-hover', type: 'filterNode', dragHandle: '.node-header', position: { x: 770, y: 20 }, data: { type: 'filter', filterType: 'highpass', frequency: 1800, detune: 0, q: 0.9, gain: 0, label: 'HP Filter' } as any },
+            { id: 'chorus-hover', type: 'chorusNode', dragHandle: '.node-header', position: { x: 1000, y: 20 }, data: { type: 'chorus', rate: 1.2, depth: 2.4, feedback: 0.12, delay: 14, mix: 0.22, stereo: true, label: 'Light Chorus' } as any },
+            { id: 'gain-hover', type: 'gainNode', dragHandle: '.node-header', position: { x: 1230, y: 20 }, data: { type: 'gain', gain: 0.5, label: 'Hover Gain' } as any },
+            { id: 'sampler-success', type: 'samplerNode', dragHandle: '.node-header', position: { x: 540, y: 190 }, data: { type: 'sampler', src: '/samples/ui_success.wav', loop: false, playbackRate: 1, detune: 0, loaded: true, label: 'Success Sample' } as any },
+            { id: 'convolver-success', type: 'convolverNode', dragHandle: '.node-header', position: { x: 770, y: 190 }, data: { type: 'convolver', impulseSrc: '/impulses/plate.wav', normalize: true, label: 'Plate IR' } as any },
+            { id: 'chorus-success', type: 'chorusNode', dragHandle: '.node-header', position: { x: 1000, y: 190 }, data: { type: 'chorus', rate: 0.9, depth: 1.6, feedback: 0.08, delay: 18, mix: 0.16, stereo: true, label: 'Subtle Chorus' } as any },
+            { id: 'panner-success', type: 'panner3dNode', dragHandle: '.node-header', position: { x: 1230, y: 190 }, data: { type: 'panner3d', positionX: 0, positionY: 0, positionZ: -1, refDistance: 1, maxDistance: 10000, rolloffFactor: 1, panningModel: 'HRTF', distanceModel: 'inverse', label: 'Panner 3D' } as any },
+            { id: 'gain-success', type: 'gainNode', dragHandle: '.node-header', position: { x: 1460, y: 190 }, data: { type: 'gain', gain: 0.65, label: 'Success Gain' } as any },
+            { id: 'noise-error', type: 'noiseBurstNode', dragHandle: '.node-header', position: { x: 540, y: 360 }, data: { type: 'noiseBurst', noiseType: 'brown', duration: 0.09, gain: 0.7, attack: 0.002, release: 0.08, label: 'Error Noise' } as any },
+            { id: 'sampler-error', type: 'samplerNode', dragHandle: '.node-header', position: { x: 540, y: 500 }, data: { type: 'sampler', src: '/samples/ui_error.wav', loop: false, playbackRate: 1, detune: 0, loaded: true, label: 'Error Sample' } as any },
+            { id: 'dist-error', type: 'distortionNode', dragHandle: '.node-header', position: { x: 770, y: 430 }, data: { type: 'distortion', distortionType: 'soft', drive: 0.35, level: 0.65, mix: 0.52, tone: 2400, label: 'Soft Distortion' } as any },
+            { id: 'ws-error', type: 'waveShaperNode', dragHandle: '.node-header', position: { x: 1000, y: 430 }, data: { type: 'waveShaper', amount: 0.45, preset: 'saturate', oversample: '2x', label: 'WaveShaper' } as any },
+            { id: 'filter-error', type: 'filterNode', dragHandle: '.node-header', position: { x: 1230, y: 430 }, data: { type: 'filter', filterType: 'lowpass', frequency: 1200, detune: 0, q: 1.2, gain: 0, label: 'LP Filter' } as any },
+            { id: 'gain-error', type: 'gainNode', dragHandle: '.node-header', position: { x: 1460, y: 430 }, data: { type: 'gain', gain: 0.6, label: 'Error Gain' } as any },
+            { id: 'monitor', type: 'analyzerNode', dragHandle: '.node-header', position: { x: 1680, y: 250 }, data: { type: 'analyzer', fftSize: 1024, smoothingTimeConstant: 0.78, updateRate: 60, autoUpdate: true, label: 'Monitor' } as any },
+            { id: 'output', type: 'outputNode', dragHandle: '.node-header', position: { x: 1910, y: 250 }, data: { type: 'output', masterGain: 0.5, playing: false, label: 'Output' } as any },
+        ],
+        edges: [
+            { id: 'token-hover', source: 'input-ui', sourceHandle: getInputParamHandleId(hoverParam), target: 'evt-hover', targetHandle: 'token', animated: true, style: CONTROL_EDGE_STYLE },
+            { id: 'token-success', source: 'input-ui', sourceHandle: getInputParamHandleId(successParam), target: 'evt-success', targetHandle: 'token', animated: true, style: CONTROL_EDGE_STYLE },
+            { id: 'token-error', source: 'input-ui', sourceHandle: getInputParamHandleId(errorParam), target: 'evt-error', targetHandle: 'token', animated: true, style: CONTROL_EDGE_STYLE },
+            { id: 'tr-hover', source: 'evt-hover', sourceHandle: 'trigger', target: 'noise-hover', targetHandle: 'trigger', animated: true, style: TRIGGER_EDGE_STYLE },
+            { id: 'tr-success', source: 'evt-success', sourceHandle: 'trigger', target: 'sampler-success', targetHandle: 'trigger', animated: true, style: TRIGGER_EDGE_STYLE },
+            { id: 'tr-error-1', source: 'evt-error', sourceHandle: 'trigger', target: 'noise-error', targetHandle: 'trigger', animated: true, style: TRIGGER_EDGE_STYLE },
+            { id: 'tr-error-2', source: 'evt-error', sourceHandle: 'trigger', target: 'sampler-error', targetHandle: 'trigger', animated: true, style: TRIGGER_EDGE_STYLE },
+            { id: 'a-h1', source: 'noise-hover', sourceHandle: 'out', target: 'filter-hover', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'a-h2', source: 'filter-hover', sourceHandle: 'out', target: 'chorus-hover', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'a-h3', source: 'chorus-hover', sourceHandle: 'out', target: 'gain-hover', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'a-h4', source: 'gain-hover', sourceHandle: 'out', target: 'monitor', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'a-s1', source: 'sampler-success', sourceHandle: 'out', target: 'convolver-success', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'a-s2', source: 'convolver-success', sourceHandle: 'out', target: 'chorus-success', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'a-s3', source: 'chorus-success', sourceHandle: 'out', target: 'panner-success', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'a-s4', source: 'panner-success', sourceHandle: 'out', target: 'gain-success', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'a-s5', source: 'gain-success', sourceHandle: 'out', target: 'monitor', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'a-e1', source: 'noise-error', sourceHandle: 'out', target: 'dist-error', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'a-e2', source: 'sampler-error', sourceHandle: 'out', target: 'dist-error', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'a-e3', source: 'dist-error', sourceHandle: 'out', target: 'ws-error', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'a-e4', source: 'ws-error', sourceHandle: 'out', target: 'filter-error', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'a-e5', source: 'filter-error', sourceHandle: 'out', target: 'gain-error', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'a-e6', source: 'gain-error', sourceHandle: 'out', target: 'monitor', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+            { id: 'a-out', source: 'monitor', sourceHandle: 'out', target: 'output', targetHandle: 'in', animated: false, style: AUDIO_EDGE_STYLE },
+        ],
+    };
+}
 
 const NodePalette: FC<{ compact?: boolean }> = ({ compact = false }) => {
     const addNode = useAudioGraphStore((s) => s.addNode);
@@ -212,10 +400,57 @@ export const PlaygroundDemo: FC = () => {
     const [assistMenuQuery, setAssistMenuQuery] = useState('');
     const [assistMenuPosition, setAssistMenuPosition] = useState<XYPosition>({ x: ASSIST_MENU_MARGIN, y: ASSIST_MENU_MARGIN });
     const [assistDropClientPosition, setAssistDropClientPosition] = useState<XYPosition | null>(null);
+    const [uiTokenCounters, setUiTokenCounters] = useState<Record<'hoverToken' | 'successToken' | 'errorToken', number>>({
+        hoverToken: 0,
+        successToken: 0,
+        errorToken: 0,
+    });
 
     const filteredAssistSuggestions = assistSuggestions.filter((suggestion) =>
         suggestion.title.toLowerCase().includes(assistMenuQuery.trim().toLowerCase())
     );
+
+    const graphDiagnostics = (() => {
+        const nodeById = new Map(nodes.map((node) => [node.id, node]));
+        const missingNodeEdges = edges.filter((edge) => !nodeById.has(edge.source) || !nodeById.has(edge.target));
+        const invalidEdges = edges.filter((edge) => nodeById.has(edge.source) && nodeById.has(edge.target) && !canConnect(edge, nodeById));
+        const outputCount = nodes.filter((node) => node.data.type === 'output').length;
+        const transportCount = nodes.filter((node) => node.data.type === 'transport').length;
+        const messages: string[] = [];
+
+        if (missingNodeEdges.length > 0) {
+            messages.push(`${missingNodeEdges.length} connection(s) reference missing node(s).`);
+        }
+        if (invalidEdges.length > 0) {
+            messages.push(`${invalidEdges.length} connection(s) violate handle compatibility.`);
+        }
+        if (outputCount === 0) {
+            messages.push('No Output node found.');
+        }
+        if (outputCount > 1) {
+            messages.push(`Multiple Output nodes found (${outputCount}).`);
+        }
+        if (transportCount > 1) {
+            messages.push(`Multiple Transport nodes found (${transportCount}).`);
+        }
+
+        return messages;
+    })();
+
+    const uiTokenAvailability = (() => {
+        const available = { hoverToken: false, successToken: false, errorToken: false };
+        nodes.forEach((node) => {
+            if (node.data.type !== 'input') return;
+            const inputData = node.data as any;
+            inputData.params?.forEach((param: any) => {
+                const key = (param.name || param.id || '').trim();
+                if (key === 'hoverToken' || key === 'successToken' || key === 'errorToken') {
+                    available[key] = true;
+                }
+            });
+        });
+        return available;
+    })();
 
     useEffect(() => {
         setNameDraft(activeGraphName);
@@ -466,6 +701,46 @@ export const PlaygroundDemo: FC = () => {
         resetConnectionAssist();
     }, [addNodeAndConnect, assistDropClientPosition, resetConnectionAssist, setSelectedNode]);
 
+    const loadFeedbackTemplate = useCallback((template: FeedbackTemplateGraph) => {
+        useAudioGraphStore.getState().loadGraph(template.nodes, template.edges);
+        setUiTokenCounters({
+            hoverToken: 0,
+            successToken: 0,
+            errorToken: 0,
+        });
+    }, []);
+
+    const pushUiToken = useCallback((token: 'hoverToken' | 'successToken' | 'errorToken') => {
+        setUiTokenCounters((previous) => {
+            const nextValue = previous[token] + 1;
+            const nextCounters = {
+                ...previous,
+                [token]: nextValue,
+            };
+
+            const state = useAudioGraphStore.getState();
+            state.nodes.forEach((node) => {
+                if (node.data.type !== 'input') return;
+                const inputData = node.data as any;
+                if (!Array.isArray(inputData.params)) return;
+
+                let changed = false;
+                const nextParams = inputData.params.map((param: any) => {
+                    const key = (param.name || param.id || '').trim();
+                    if (key !== token) return param;
+                    changed = true;
+                    return { ...param, value: nextValue };
+                });
+
+                if (changed) {
+                    updateNodeData(node.id, { params: nextParams });
+                }
+            });
+
+            return nextCounters;
+        });
+    }, [updateNodeData]);
+
     const commitGraphName = useCallback(() => {
         if (!activeGraphId) return;
         const trimmed = nameDraft.trim();
@@ -600,6 +875,74 @@ export const PlaygroundDemo: FC = () => {
                         Templates
                     </h4>
                     <div className="flex flex-col gap-2">
+                        <button
+                            onClick={() => loadFeedbackTemplate(createUiFeedbackPackTemplate())}
+                            className={`${templateButtonBase} border-[var(--accent)] text-[var(--accent)] hover:text-[var(--text)]`}
+                        >
+                            <span className="text-sm">🎯</span>
+                            <span>UI Feedback Pack</span>
+                        </button>
+                        <button
+                            onClick={() => loadFeedbackTemplate(createHoverFeedbackTemplate())}
+                            className={templateButtonBase}
+                        >
+                            <span className="text-sm">🖱️</span>
+                            <span>Hover Feedback</span>
+                        </button>
+                        <button
+                            onClick={() => loadFeedbackTemplate(createSuccessFeedbackTemplate())}
+                            className={templateButtonBase}
+                        >
+                            <span className="text-sm">✅</span>
+                            <span>Success Feedback</span>
+                        </button>
+                        <button
+                            onClick={() => loadFeedbackTemplate(createErrorFeedbackTemplate())}
+                            className={templateButtonBase}
+                        >
+                            <span className="text-sm">⛔</span>
+                            <span>Error Feedback</span>
+                        </button>
+
+                        <div className="rounded-md border border-[var(--panel-border)] bg-[var(--panel-bg)] px-3 py-3">
+                            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)]">
+                                UI Token Simulator
+                            </p>
+                            <div className="flex flex-col gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => pushUiToken('hoverToken')}
+                                    className="flex items-center justify-between rounded border border-[var(--panel-border)] bg-[var(--panel-muted)] px-2 py-1 text-[10px] text-[var(--text)] hover:border-[var(--accent)]"
+                                >
+                                    <span>hoverToken</span>
+                                    <span className="font-mono">{uiTokenCounters.hoverToken}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => pushUiToken('successToken')}
+                                    className="flex items-center justify-between rounded border border-[var(--panel-border)] bg-[var(--panel-muted)] px-2 py-1 text-[10px] text-[var(--text)] hover:border-[var(--accent)]"
+                                >
+                                    <span>successToken</span>
+                                    <span className="font-mono">{uiTokenCounters.successToken}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => pushUiToken('errorToken')}
+                                    className="flex items-center justify-between rounded border border-[var(--panel-border)] bg-[var(--panel-muted)] px-2 py-1 text-[10px] text-[var(--text)] hover:border-[var(--accent)]"
+                                >
+                                    <span>errorToken</span>
+                                    <span className="font-mono">{uiTokenCounters.errorToken}</span>
+                                </button>
+                            </div>
+                            <p className="mt-2 text-[9px] text-[var(--text-muted)]">
+                                Missing token params: {[
+                                    uiTokenAvailability.hoverToken ? null : 'hoverToken',
+                                    uiTokenAvailability.successToken ? null : 'successToken',
+                                    uiTokenAvailability.errorToken ? null : 'errorToken',
+                                ].filter(Boolean).join(', ') || 'none'}
+                            </p>
+                        </div>
+
                         <button
                             onClick={() => {
                                 const nodes: Node<AudioNodeData>[] = [
@@ -818,6 +1161,24 @@ export const PlaygroundDemo: FC = () => {
                     </div>
                 </div>
 
+                <div className="border-b border-[var(--panel-border)] bg-[var(--panel-muted)] px-4 py-2">
+                    {graphDiagnostics.length === 0 ? (
+                        <p className="text-[10px] text-[var(--text-subtle)]">Graph diagnostics: no invalid connections detected.</p>
+                    ) : (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--danger)]">Graph diagnostics</span>
+                            {graphDiagnostics.map((message) => (
+                                <span
+                                    key={message}
+                                    className="rounded border border-[var(--danger)]/35 bg-[var(--danger-soft)] px-2 py-1 text-[10px] text-[var(--danger)]"
+                                >
+                                    {message}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
                 <div className="ui-canvas-stage flex-1 p-3 pt-2">
                     <div
                         ref={canvasRef}
@@ -870,8 +1231,19 @@ export const PlaygroundDemo: FC = () => {
                                         case 'noiseNode': return '#666666';
                                         case 'delayNode': return '#4488ff';
                                         case 'reverbNode': return '#8844ff';
+                                        case 'compressorNode': return '#5fcd70';
+                                        case 'distortionNode': return '#ff7f50';
+                                        case 'chorusNode': return '#44ccff';
+                                        case 'noiseBurstNode': return '#666666';
+                                        case 'waveShaperNode': return '#ff7f50';
+                                        case 'convolverNode': return '#8844ff';
+                                        case 'analyzerNode': return '#7bd1ff';
                                         case 'pannerNode': return '#44cccc';
+                                        case 'panner3dNode': return '#44cccc';
                                         case 'mixerNode': return '#ffaa44';
+                                        case 'constantSourceNode': return '#7bd1ff';
+                                        case 'mediaStreamNode': return '#7bd1ff';
+                                        case 'eventTriggerNode': return '#ffd166';
                                         default: return '#888';
                                     }
                                 }}

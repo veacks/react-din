@@ -90,6 +90,119 @@ export interface ReverbNodeData {
     [key: string]: unknown;
 }
 
+export interface CompressorNodeData {
+    type: 'compressor';
+    threshold: number;
+    knee: number;
+    ratio: number;
+    attack: number;
+    release: number;
+    label: string;
+    [key: string]: unknown;
+}
+
+export interface DistortionNodeData {
+    type: 'distortion';
+    distortionType: 'soft' | 'hard' | 'fuzz' | 'bitcrush' | 'saturate';
+    drive: number;
+    level: number;
+    mix: number;
+    tone: number;
+    label: string;
+    [key: string]: unknown;
+}
+
+export interface ChorusNodeData {
+    type: 'chorus';
+    rate: number;
+    depth: number;
+    feedback: number;
+    delay: number;
+    mix: number;
+    stereo: boolean;
+    label: string;
+    [key: string]: unknown;
+}
+
+export interface NoiseBurstNodeData {
+    type: 'noiseBurst';
+    noiseType: 'white' | 'pink' | 'brown';
+    duration: number;
+    gain: number;
+    attack: number;
+    release: number;
+    label: string;
+    [key: string]: unknown;
+}
+
+export interface WaveShaperNodeData {
+    type: 'waveShaper';
+    amount: number;
+    preset: 'softClip' | 'hardClip' | 'saturate';
+    oversample: 'none' | '2x' | '4x';
+    label: string;
+    [key: string]: unknown;
+}
+
+export interface ConvolverNodeData {
+    type: 'convolver';
+    impulseSrc: string;
+    normalize: boolean;
+    label: string;
+    [key: string]: unknown;
+}
+
+export interface AnalyzerNodeData {
+    type: 'analyzer';
+    fftSize: number;
+    smoothingTimeConstant: number;
+    updateRate: number;
+    autoUpdate: boolean;
+    label: string;
+    [key: string]: unknown;
+}
+
+export interface Panner3DNodeData {
+    type: 'panner3d';
+    positionX: number;
+    positionY: number;
+    positionZ: number;
+    refDistance: number;
+    maxDistance: number;
+    rolloffFactor: number;
+    panningModel: 'equalpower' | 'HRTF';
+    distanceModel: 'linear' | 'inverse' | 'exponential';
+    label: string;
+    [key: string]: unknown;
+}
+
+export interface ConstantSourceNodeData {
+    type: 'constantSource';
+    offset: number;
+    label: string;
+    [key: string]: unknown;
+}
+
+export interface MediaStreamNodeData {
+    type: 'mediaStream';
+    requestMic: boolean;
+    label: string;
+    [key: string]: unknown;
+}
+
+export interface EventTriggerNodeData {
+    type: 'eventTrigger';
+    token: number;
+    mode: 'change' | 'rising';
+    cooldownMs: number;
+    velocity: number;
+    duration: number;
+    note: number;
+    trackId: string;
+    label: string;
+    [key: string]: unknown;
+}
+
 export interface StereoPannerNodeData {
     type: 'panner';
     pan: number;
@@ -312,6 +425,17 @@ export type AudioNodeData = (
     | NoiseNodeData
     | DelayNodeData
     | ReverbNodeData
+    | CompressorNodeData
+    | DistortionNodeData
+    | ChorusNodeData
+    | NoiseBurstNodeData
+    | WaveShaperNodeData
+    | ConvolverNodeData
+    | AnalyzerNodeData
+    | Panner3DNodeData
+    | ConstantSourceNodeData
+    | MediaStreamNodeData
+    | EventTriggerNodeData
     | StereoPannerNodeData
     | MixerNodeData
     | InputNodeData

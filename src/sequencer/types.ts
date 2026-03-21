@@ -206,6 +206,69 @@ export interface TrackProps {
 }
 
 // =============================================================================
+// EventTrigger Props
+// =============================================================================
+
+/**
+ * Event trigger detection mode.
+ */
+export type EventTriggerMode = 'change' | 'rising';
+
+/**
+ * Props for the EventTrigger component.
+ */
+export interface EventTriggerProps {
+    children: ReactNode;
+
+    /**
+     * Input token observed for event detection.
+     * When this value changes (or rises in `rising` mode), a trigger is emitted.
+     */
+    token: unknown;
+
+    /**
+     * Detection mode.
+     * @default 'change'
+     */
+    mode?: EventTriggerMode;
+
+    /**
+     * Minimum delay between emitted events in milliseconds.
+     * @default 0
+     */
+    cooldownMs?: number;
+
+    /**
+     * Emitted trigger velocity.
+     * @default 1
+     */
+    velocity?: number;
+
+    /**
+     * Emitted trigger duration in seconds.
+     * @default 0.1
+     */
+    duration?: number;
+
+    /**
+     * Emitted trigger MIDI note.
+     * @default 60
+     */
+    note?: number;
+
+    /**
+     * Track ID attached to emitted events.
+     * @default 'event'
+     */
+    trackId?: string;
+
+    /**
+     * Custom payload attached to emitted trigger events.
+     */
+    data?: Record<string, unknown>;
+}
+
+// =============================================================================
 // useTrigger Options
 // =============================================================================
 

@@ -72,9 +72,19 @@ const AUDIO_NODE_TYPES = new Set<AudioNodeData['type']>([
     'filter',
     'delay',
     'reverb',
+    'compressor',
+    'distortion',
+    'chorus',
+    'noiseBurst',
+    'waveShaper',
+    'convolver',
+    'analyzer',
+    'panner3d',
     'panner',
     'mixer',
     'noise',
+    'constantSource',
+    'mediaStream',
     'sampler',
     'output',
 ]);
@@ -95,6 +105,7 @@ const TRANSPORT_TARGET_TYPES = new Set<AudioNodeData['type']>([
 const TRIGGER_SOURCE_TYPES = new Set<AudioNodeData['type']>([
     'stepSequencer',
     'pianoRoll',
+    'eventTrigger',
 ]);
 
 const MODULATION_TARGET_HANDLES = new Set([
@@ -115,6 +126,21 @@ const MODULATION_TARGET_HANDLES = new Set([
     'decay',
     'sustain',
     'release',
+    'threshold',
+    'knee',
+    'ratio',
+    'level',
+    'tone',
+    'drive',
+    'duration',
+    'offset',
+    'positionX',
+    'positionY',
+    'positionZ',
+    'refDistance',
+    'maxDistance',
+    'rolloffFactor',
+    'token',
     'value',
     'min',
     'max',
@@ -236,6 +262,7 @@ export function canConnect(
             && (
                 (targetHandle === 'trigger' && (targetType === 'voice' || targetType === 'sampler'))
                 || (targetHandle === 'gate' && targetType === 'adsr')
+                || (targetHandle === 'trigger' && targetType === 'noiseBurst')
             );
     }
 
@@ -275,6 +302,10 @@ export function canConnect(
 
     if (sourceType === 'adsr') {
         return sourceHandle === 'envelope' && MODULATION_TARGET_HANDLES.has(targetHandle);
+    }
+
+    if (sourceType === 'constantSource') {
+        return sourceHandle === 'out' && MODULATION_TARGET_HANDLES.has(targetHandle);
     }
 
     if (isDataNodeType(sourceType)) {
@@ -475,6 +506,7 @@ export function migrateGraphEdges(
                     targetType === 'voice'
                     || targetType === 'sampler'
                     || targetType === 'adsr'
+                    || targetType === 'noiseBurst'
                 )
             ) {
                 nextEdge = {
@@ -488,7 +520,7 @@ export function migrateGraphEdges(
                 sourceType === 'voice'
                 && nextEdge.sourceHandle === 'gate'
                 && !nextEdge.targetHandle
-                && (targetType === 'adsr' || targetType === 'sampler' || targetType === 'voice')
+                && (targetType === 'adsr' || targetType === 'sampler' || targetType === 'voice' || targetType === 'noiseBurst')
             ) {
                 nextEdge = {
                     ...nextEdge,

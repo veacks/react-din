@@ -5,8 +5,10 @@ import {
     Chorus,
     ConstantSource,
     Distortion,
+    EventTrigger,
     LFO,
     Noise,
+    NoiseBurst,
     Reverb,
     Sampler,
 } from 'react-din';
@@ -22,6 +24,9 @@ describe('sources and effects', () => {
                         <Chorus rate={1.5}>
                             <Distortion drive={0.4}>
                                 <Noise autoStart />
+                                <EventTrigger token={1} trackId="ui-feedback">
+                                    <NoiseBurst type="white" duration={0.05} />
+                                </EventTrigger>
                                 <ConstantSource offset={0.5} />
                                 <LFO rate={2} depth={0.2} />
                                 <Sampler src="/samples/kick.wav" onLoad={onLoad} />

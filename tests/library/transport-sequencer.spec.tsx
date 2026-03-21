@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import React from 'react';
-import { AudioProvider, Sequencer, Track, TransportProvider, useTrigger, useTransport } from 'react-din';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import React, { useState } from 'react';
+import { AudioProvider, EventTrigger, Sequencer, Track, TransportProvider, useOnTrigger, useTrigger, useTransport } from 'react-din';
 
 function TransportProbe() {
     const transport = useTransport();
@@ -14,6 +14,14 @@ function TransportProbe() {
 function TriggerProbe() {
     const trigger = useTrigger();
     return <span data-testid="trigger">{trigger ? `${trigger.trackId}:${trigger.step}` : 'none'}</span>;
+}
+
+function EventCountProbe() {
+    const [count, setCount] = useState(0);
+    useOnTrigger(() => {
+        setCount((value) => value + 1);
+    });
+    return <span data-testid="event-count">{count}</span>;
 }
 
 describe('transport and sequencer components', () => {
@@ -38,5 +46,78 @@ describe('transport and sequencer components', () => {
 
         expect(screen.getByRole('button')).toHaveTextContent('running');
         expect(screen.getByTestId('trigger')).toHaveTextContent('none');
+    });
+
+    it('emits event triggers on token changes and applies cooldown', async () => {
+        function Harness() {
+            const [token, setToken] = useState(0);
+            return (
+                <>
+                    <button type="button" onClick={() => setToken((value) => value + 1)}>
+                        emit
+                    </button>
+                    <EventTrigger token={token} cooldownMs={1000} trackId="ui">
+                        <EventCountProbe />
+                    </EventTrigger>
+                </>
+            );
+        }
+
+        render(
+            <AudioProvider>
+                <Harness />
+            </AudioProvider>
+        );
+
+        expect(screen.getByTestId('event-count')).toHaveTextContent('0');
+
+        fireEvent.click(screen.getByRole('button', { name: 'emit' }));
+        await waitFor(() => {
+            expect(screen.getByTestId('event-count')).toHaveTextContent('1');
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'emit' }));
+        await waitFor(() => {
+            expect(screen.getByTestId('event-count')).toHaveTextContent('1');
+        });
+    });
+
+    it('supports rising mode for boolean tokens', async () => {
+        function Harness() {
+            const [token, setToken] = useState(false);
+            return (
+                <>
+                    <button type="button" onClick={() => setToken((value) => !value)}>
+                        toggle
+                    </button>
+                    <EventTrigger token={token} mode="rising" trackId="ui">
+                        <EventCountProbe />
+                    </EventTrigger>
+                </>
+            );
+        }
+
+        render(
+            <AudioProvider>
+                <Harness />
+            </AudioProvider>
+        );
+
+        expect(screen.getByTestId('event-count')).toHaveTextContent('0');
+
+        fireEvent.click(screen.getByRole('button', { name: 'toggle' })); // false -> true
+        await waitFor(() => {
+            expect(screen.getByTestId('event-count')).toHaveTextContent('1');
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'toggle' })); // true -> false
+        await waitFor(() => {
+            expect(screen.getByTestId('event-count')).toHaveTextContent('1');
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'toggle' })); // false -> true
+        await waitFor(() => {
+            expect(screen.getByTestId('event-count')).toHaveTextContent('2');
+        });
     });
 });

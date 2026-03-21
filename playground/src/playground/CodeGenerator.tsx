@@ -4,46 +4,68 @@ import {
     type AudioNodeData,
     type DelayNodeData,
     type ADSRNodeData,
+    type AnalyzerNodeData,
+    type ChorusNodeData,
+    type CompressorNodeData,
+    type ConstantSourceNodeData,
+    type ConvolverNodeData,
+    type DistortionNodeData,
+    type EventTriggerNodeData,
     type FilterNodeData,
     type GainNodeData,
     type InputNodeData,
     type LFONodeData,
+    type MediaStreamNodeData,
     type MathNodeData,
     type CompareNodeData,
     type MixNodeData,
     type ClampNodeData,
+    type NoiseBurstNodeData,
     type SwitchNodeData,
     type NoiseNodeData,
     type NoteNodeData,
     type OscNodeData,
     type OutputNodeData,
+    type Panner3DNodeData,
     type PianoRollNodeData,
     type ReverbNodeData,
     type SamplerNodeData,
     type StepSequencerNodeData,
     type StereoPannerNodeData,
+    type WaveShaperNodeData,
     type VoiceNodeData
 } from './store';
 import { type Node, type Edge } from '@xyflow/react';
 import { toPascalCase } from './graphUtils';
 import {
     ADSR,
+    Analyzer,
     AudioOutProvider,
     AudioProvider,
+    Chorus,
+    Compressor,
+    ConstantSource,
+    Convolver,
     Delay,
+    Distortion,
     Envelope,
+    EventTrigger,
     Filter,
     Gain,
+    MediaStream,
     clamp,
     compare,
     math,
     mix,
     Noise,
+    NoiseBurst,
     Osc,
+    Panner,
     Reverb,
     Sampler,
     Sequencer,
     StereoPanner,
+    WaveShaper,
     switchValue,
     Track,
     TransportProvider,
@@ -362,6 +384,7 @@ export function generateCode(
     const trackInfoById = new Map<string, TrackInfo>();
     let usesFeedbackDelay = false;
     let usesTriggeredSampler = false;
+    let usesPresetWaveShaper = false;
     const buildContext = {
         controlEdgesByTarget,
         nodeById,
@@ -387,6 +410,52 @@ export function generateCode(
             return transportConnectedIds.has(sourceNode.id) ? sourceNode : null;
         }
         return null;
+    };
+
+    const getEventTriggerSource = (nodeId: string) => {
+        const edgesForTarget = controlEdgesByTarget.get(nodeId) ?? [];
+        const edge = edgesForTarget.find((item) => {
+            if (item.targetHandle !== 'trigger' && item.targetHandle !== 'gate') return false;
+            return nodeById.get(item.source)?.data.type === 'eventTrigger';
+        });
+        if (!edge) return null;
+        const sourceNode = nodeById.get(edge.source);
+        return sourceNode?.data.type === 'eventTrigger' ? sourceNode as Node<EventTriggerNodeData> : null;
+    };
+
+    const getEventTriggerTokenExpression = (nodeId: string, fallbackValue: number): string => {
+        const edgesForTarget = controlEdgesByTarget.get(nodeId) ?? [];
+        const tokenEdge = edgesForTarget.find((edge) => edge.targetHandle === 'token');
+        if (!tokenEdge) return formatNumber(fallbackValue);
+
+        const sourceNode = nodeById.get(tokenEdge.source);
+        if (!sourceNode) return formatNumber(fallbackValue);
+
+        if (sourceNode.data.type === 'input') {
+            const info = inputParamInfo.paramInfoByHandle.get(`${tokenEdge.source}:${tokenEdge.sourceHandle}`);
+            return info?.name ?? formatNumber(fallbackValue);
+        }
+
+        if (sourceNode.data.type === 'note') {
+            const noteData = sourceNode.data as NoteNodeData;
+            return Number.isFinite(noteData.frequency) ? formatNumber(noteData.frequency) : formatNumber(fallbackValue);
+        }
+
+        if (isDataNodeType(sourceNode.data.type)) {
+            return dataState.getDataVar(tokenEdge.source) ?? formatNumber(fallbackValue);
+        }
+
+        if (sourceNode.data.type === 'constantSource') {
+            const sourceData = sourceNode.data as ConstantSourceNodeData;
+            return formatNumber(sourceData.offset);
+        }
+
+        if (sourceNode.data.type === 'eventTrigger') {
+            const triggerData = sourceNode.data as EventTriggerNodeData;
+            return formatNumber(triggerData.token);
+        }
+
+        return formatNumber(fallbackValue);
     };
 
     const getTrackInfo = (node: Node<AudioNodeData>): TrackInfo => {
@@ -440,6 +509,9 @@ export function generateCode(
             usesFeedbackDelay = true;
         } else if (componentName === 'TriggeredSampler') {
             usesTriggeredSampler = true;
+        } else if (componentName === 'PresetWaveShaper') {
+            usesPresetWaveShaper = true;
+            usedImports.add('WaveShaper');
         } else if (importedComponentName) {
             usedImports.add(importedComponentName);
         }
@@ -544,6 +616,29 @@ export function generateCode(
             nodeJsx = `${indentation}<Track ${trackProps.join(' ')}>\n${indentLines(nodeJsx, 1, indent)}\n${indentation}</Track>`;
         }
 
+        const eventSource = !trackSource
+            ? getEventTriggerSource(node.id)
+                || (voiceNode ? getEventTriggerSource(voiceNode.id) : null)
+                || (adsrNode ? getEventTriggerSource(adsrNode.id) : null)
+            : null;
+
+        if (eventSource) {
+            const triggerData = eventSource.data as EventTriggerNodeData;
+            const tokenExpression = getEventTriggerTokenExpression(eventSource.id, triggerData.token);
+            const eventProps = [
+                `token={${tokenExpression}}`,
+            ];
+            if (triggerData.mode !== 'change') eventProps.push(`mode=${JSON.stringify(triggerData.mode)}`);
+            if (triggerData.cooldownMs > 0) eventProps.push(`cooldownMs={${formatNumber(triggerData.cooldownMs)}}`);
+            if (triggerData.velocity !== 1) eventProps.push(`velocity={${formatNumber(triggerData.velocity)}}`);
+            if (triggerData.duration !== 0.1) eventProps.push(`duration={${formatNumber(triggerData.duration)}}`);
+            if (triggerData.note !== 60) eventProps.push(`note={${formatNumber(triggerData.note)}}`);
+            if (triggerData.trackId && triggerData.trackId !== 'event') eventProps.push(`trackId=${JSON.stringify(triggerData.trackId)}`);
+
+            usedImports.add('EventTrigger');
+            nodeJsx = `${indentation}<EventTrigger ${eventProps.join(' ')}>\n${indentLines(nodeJsx, 1, indent)}\n${indentation}</EventTrigger>`;
+        }
+
         return nodeJsx;
     };
 
@@ -625,10 +720,14 @@ export function generateCode(
     }
 
     const importList = Array.from(usedImports).sort();
-    const usesReactHelpers = usesFeedbackDelay || usesTriggeredSampler;
-    let code = usesReactHelpers
-        ? `import { useEffect, useRef, useState, type ReactNode } from 'react';\n`
-        : '';
+    const usesReactHooks = usesFeedbackDelay || usesTriggeredSampler;
+    const needsReactNodeType = usesReactHooks || usesPresetWaveShaper;
+    let code = '';
+    if (usesReactHooks) {
+        code = `import { useEffect, useRef, useState, type ReactNode } from 'react';\n`;
+    } else if (needsReactNodeType) {
+        code = `import { type ReactNode } from 'react';\n`;
+    }
     code += importList.length > 0
         ? `import { ${importList.join(', ')} } from 'react-din';\n\n`
         : '\n';
@@ -647,6 +746,10 @@ export function generateCode(
 
     if (usesTriggeredSampler) {
         code += `${generateTriggeredSamplerHelper()}\n\n`;
+    }
+
+    if (usesPresetWaveShaper) {
+        code += `${generatePresetWaveShaperHelper()}\n\n`;
     }
 
     const lfoDeclarations = Array.from(lfoVarsById.entries()).map(([id, varName]) => {
@@ -711,11 +814,21 @@ const AUDIO_COMPONENTS: Record<string, string> = {
     gain: 'Gain',
     filter: 'Filter',
     delay: 'Delay',
+    compressor: 'Compressor',
     reverb: 'Reverb',
+    distortion: 'Distortion',
+    chorus: 'Chorus',
+    noiseBurst: 'NoiseBurst',
+    convolver: 'Convolver',
+    analyzer: 'Analyzer',
+    panner3d: 'Panner',
     panner: 'StereoPanner',
+    constantSource: 'ConstantSource',
+    mediaStream: 'MediaStream',
     output: 'Gain',
     mixer: 'Gain',
     noise: 'Noise',
+    waveShaper: 'WaveShaper',
     sampler: 'Sampler',
 };
 
@@ -724,11 +837,21 @@ const AUDIO_NODE_COMPONENTS: Record<string, React.ComponentType<any>> = {
     gain: Gain,
     filter: Filter,
     delay: Delay,
+    compressor: Compressor,
     reverb: Reverb,
+    distortion: Distortion,
+    chorus: Chorus,
+    noiseBurst: NoiseBurst,
+    convolver: Convolver,
+    analyzer: Analyzer,
+    panner3d: Panner,
     panner: StereoPanner,
+    constantSource: ConstantSource,
+    mediaStream: MediaStream,
     output: Gain,
     mixer: Gain,
     noise: Noise,
+    waveShaper: WaveShaper,
     sampler: Sampler,
 };
 
@@ -744,15 +867,21 @@ function shouldUseTriggeredSampler(node: Node<AudioNodeData>, controlEdges: Edge
     return node.data.type === 'sampler' && controlEdges.some((edge) => edge.targetHandle === 'trigger');
 }
 
+function shouldUsePresetWaveShaper(node: Node<AudioNodeData>): boolean {
+    return node.data.type === 'waveShaper';
+}
+
 function getGeneratedComponentName(node: Node<AudioNodeData>, controlEdges: Edge[]): string | null {
     if (shouldUseFeedbackDelay(node)) return 'FeedbackDelay';
     if (shouldUseTriggeredSampler(node, controlEdges)) return 'TriggeredSampler';
+    if (shouldUsePresetWaveShaper(node)) return 'PresetWaveShaper';
     return getAudioComponentName(node.data.type);
 }
 
 function getPreviewComponent(node: Node<AudioNodeData>, controlEdges: Edge[]): React.ComponentType<any> | null {
     if (shouldUseFeedbackDelay(node)) return PreviewFeedbackDelay;
     if (shouldUseTriggeredSampler(node, controlEdges)) return PreviewTriggeredSampler;
+    if (shouldUsePresetWaveShaper(node)) return PreviewPresetWaveShaper;
     return AUDIO_NODE_COMPONENTS[node.data.type] ?? null;
 }
 
@@ -1019,10 +1148,93 @@ function buildNodeProps(
             if (delay.feedback > 0) addValueProp('feedback', formatNumber(delay.feedback));
             break;
         }
+        case 'compressor': {
+            const compressor = nodeData as CompressorNodeData;
+            const threshold = resolveHandleValue('threshold', { baseValue: compressor.threshold, modulatable: true });
+            if (threshold.value !== undefined) addValueProp('threshold', threshold.value);
+            const knee = resolveHandleValue('knee', { baseValue: compressor.knee, modulatable: true });
+            if (knee.value !== undefined) addValueProp('knee', knee.value);
+            const ratio = resolveHandleValue('ratio', { baseValue: compressor.ratio, modulatable: true });
+            if (ratio.value !== undefined) addValueProp('ratio', ratio.value);
+            const attack = resolveHandleValue('attack', { baseValue: compressor.attack, modulatable: true });
+            if (attack.value !== undefined) addValueProp('attack', attack.value);
+            const release = resolveHandleValue('release', { baseValue: compressor.release, modulatable: true });
+            if (release.value !== undefined) addValueProp('release', release.value);
+            break;
+        }
         case 'reverb': {
             const reverb = nodeData as ReverbNodeData;
             addValueProp('decay', formatNumber(reverb.decay));
             addValueProp('mix', formatNumber(reverb.mix));
+            break;
+        }
+        case 'distortion': {
+            const distortion = nodeData as DistortionNodeData;
+            addStringProp('type', distortion.distortionType);
+            const drive = resolveHandleValue('drive', { baseValue: distortion.drive, modulatable: true });
+            if (drive.value !== undefined) addValueProp('drive', drive.value);
+            const level = resolveHandleValue('level', { baseValue: distortion.level, modulatable: true });
+            if (level.value !== undefined) addValueProp('level', level.value);
+            const mixValue = resolveHandleValue('mix', { baseValue: distortion.mix, modulatable: true });
+            if (mixValue.value !== undefined) addValueProp('mix', mixValue.value);
+            const tone = resolveHandleValue('tone', { baseValue: distortion.tone, modulatable: true });
+            if (tone.value !== undefined) addValueProp('tone', tone.value);
+            break;
+        }
+        case 'chorus': {
+            const chorus = nodeData as ChorusNodeData;
+            const rate = resolveHandleValue('rate', { baseValue: chorus.rate, modulatable: true });
+            if (rate.value !== undefined) addValueProp('rate', rate.value);
+            const depth = resolveHandleValue('depth', { baseValue: chorus.depth, modulatable: true });
+            if (depth.value !== undefined) addValueProp('depth', depth.value);
+            const feedback = resolveHandleValue('feedback', { baseValue: chorus.feedback, modulatable: true });
+            if (feedback.value !== undefined) addValueProp('feedback', feedback.value);
+            const delay = resolveHandleValue('delay', { baseValue: chorus.delay, modulatable: true });
+            if (delay.value !== undefined) addValueProp('delay', delay.value);
+            const mixValue = resolveHandleValue('mix', { baseValue: chorus.mix, modulatable: true });
+            if (mixValue.value !== undefined) addValueProp('mix', mixValue.value);
+            addBooleanProp('stereo', chorus.stereo);
+            break;
+        }
+        case 'noiseBurst': {
+            const burst = nodeData as NoiseBurstNodeData;
+            addStringProp('type', burst.noiseType);
+            const duration = resolveHandleValue('duration', { baseValue: burst.duration, modulatable: true });
+            if (duration.value !== undefined) addValueProp('duration', duration.value);
+            const gainValue = resolveHandleValue('gain', { baseValue: burst.gain, modulatable: true });
+            if (gainValue.value !== undefined) addValueProp('gain', gainValue.value);
+            const attack = resolveHandleValue('attack', { baseValue: burst.attack, modulatable: true });
+            if (attack.value !== undefined) addValueProp('attack', attack.value);
+            const release = resolveHandleValue('release', { baseValue: burst.release, modulatable: true });
+            if (release.value !== undefined) addValueProp('release', release.value);
+            break;
+        }
+        case 'waveShaper': {
+            const waveShaper = nodeData as WaveShaperNodeData;
+            const amount = resolveHandleValue('amount', { baseValue: waveShaper.amount });
+            if (amount.value !== undefined) addValueProp('amount', amount.value);
+            addStringProp('preset', waveShaper.preset);
+            addStringProp('oversample', waveShaper.oversample);
+            break;
+        }
+        case 'convolver': {
+            const convolver = nodeData as ConvolverNodeData;
+            if (convolver.impulseSrc) {
+                addStringProp('impulse', convolver.impulseSrc);
+            }
+            if (!convolver.normalize) {
+                props.push('normalize={false}');
+            }
+            break;
+        }
+        case 'analyzer': {
+            const analyzer = nodeData as AnalyzerNodeData;
+            addValueProp('fftSize', formatNumber(analyzer.fftSize));
+            addValueProp('smoothingTimeConstant', formatNumber(analyzer.smoothingTimeConstant));
+            addValueProp('updateRate', formatNumber(analyzer.updateRate));
+            if (!analyzer.autoUpdate) {
+                props.push('autoUpdate={false}');
+            }
             break;
         }
         case 'panner': {
@@ -1030,10 +1242,40 @@ function buildNodeProps(
             addValueProp('pan', formatNumber(pan.pan));
             break;
         }
+        case 'panner3d': {
+            const panner = nodeData as Panner3DNodeData;
+            const x = resolveHandleValue('positionX', { baseValue: panner.positionX, modulatable: true });
+            if (x.value !== undefined) addValueProp('positionX', x.value);
+            const y = resolveHandleValue('positionY', { baseValue: panner.positionY, modulatable: true });
+            if (y.value !== undefined) addValueProp('positionY', y.value);
+            const z = resolveHandleValue('positionZ', { baseValue: panner.positionZ, modulatable: true });
+            if (z.value !== undefined) addValueProp('positionZ', z.value);
+            const refDistance = resolveHandleValue('refDistance', { baseValue: panner.refDistance, modulatable: true });
+            if (refDistance.value !== undefined) addValueProp('refDistance', refDistance.value);
+            const maxDistance = resolveHandleValue('maxDistance', { baseValue: panner.maxDistance, modulatable: true });
+            if (maxDistance.value !== undefined) addValueProp('maxDistance', maxDistance.value);
+            const rolloff = resolveHandleValue('rolloffFactor', { baseValue: panner.rolloffFactor, modulatable: true });
+            if (rolloff.value !== undefined) addValueProp('rolloffFactor', rolloff.value);
+            addStringProp('panningModel', panner.panningModel);
+            addStringProp('distanceModel', panner.distanceModel);
+            break;
+        }
         case 'noise': {
             const noise = nodeData as NoiseNodeData;
             addStringProp('type', noise.noiseType);
             addBooleanProp('autoStart', true);
+            break;
+        }
+        case 'constantSource': {
+            const source = nodeData as ConstantSourceNodeData;
+            const offset = resolveHandleValue('offset', { baseValue: source.offset, modulatable: true });
+            if (offset.value !== undefined) addValueProp('offset', offset.value);
+            addBooleanProp('autoStart', true);
+            break;
+        }
+        case 'mediaStream': {
+            const stream = nodeData as MediaStreamNodeData;
+            addBooleanProp('requestMic', stream.requestMic);
             break;
         }
         case 'sampler': {
@@ -1302,6 +1544,41 @@ const PreviewRenderer: React.FC<{ graph: PreviewGraphData; sequencerBpm?: number
         return null;
     }, [graph.controlEdgesByTarget, graph.nodeById, graph.transportConnectedIds]);
 
+    const getEventTriggerSource = useCallback((nodeId: string) => {
+        const edgesForTarget = graph.controlEdgesByTarget.get(nodeId) ?? [];
+        const triggerEdge = edgesForTarget.find((edge) => {
+            if (edge.targetHandle !== 'trigger' && edge.targetHandle !== 'gate') return false;
+            return graph.nodeById.get(edge.source)?.data.type === 'eventTrigger';
+        });
+        if (!triggerEdge) return null;
+        const sourceNode = graph.nodeById.get(triggerEdge.source);
+        return sourceNode?.data.type === 'eventTrigger' ? sourceNode as Node<EventTriggerNodeData> : null;
+    }, [graph.controlEdgesByTarget, graph.nodeById]);
+
+    const getEventTriggerTokenValue = useCallback((eventTriggerNodeId: string, fallback: number): number => {
+        const edgesForTarget = graph.controlEdgesByTarget.get(eventTriggerNodeId) ?? [];
+        const tokenEdge = edgesForTarget.find((edge) => edge.targetHandle === 'token');
+        if (!tokenEdge) return fallback;
+
+        const sourceNode = graph.nodeById.get(tokenEdge.source);
+        if (!sourceNode) return fallback;
+
+        if (sourceNode.data.type === 'input') {
+            return graph.paramsByHandle.get(`${tokenEdge.source}:${tokenEdge.sourceHandle}`) ?? fallback;
+        }
+        if (sourceNode.data.type === 'note') {
+            const noteData = sourceNode.data as NoteNodeData;
+            return Number.isFinite(noteData.frequency) ? noteData.frequency : fallback;
+        }
+        if (sourceNode.data.type === 'constantSource') {
+            return (sourceNode.data as ConstantSourceNodeData).offset ?? fallback;
+        }
+        if (sourceNode.data.type === 'eventTrigger') {
+            return (sourceNode.data as EventTriggerNodeData).token ?? fallback;
+        }
+        return fallback;
+    }, [graph.controlEdgesByTarget, graph.nodeById, graph.paramsByHandle]);
+
     const getTrackInfo = useCallback((node: Node<AudioNodeData>): PreviewTrackInfo => {
         if (trackInfoById.has(node.id)) {
             return trackInfoById.get(node.id)!;
@@ -1531,8 +1808,28 @@ const PreviewRenderer: React.FC<{ graph: PreviewGraphData; sequencerBpm?: number
             );
         }
 
+        const eventSource = !trackSource
+            ? getEventTriggerSource(node.id)
+                || (voiceNode ? getEventTriggerSource(voiceNode.id) : null)
+                || (adsrNode ? getEventTriggerSource(adsrNode.id) : null)
+            : null;
+
+        if (eventSource) {
+            const eventData = eventSource.data as EventTriggerNodeData;
+            const tokenValue = getEventTriggerTokenValue(eventSource.id, eventData.token);
+            const eventProps: Record<string, any> = { token: tokenValue };
+            if (eventData.mode !== 'change') eventProps.mode = eventData.mode;
+            if (eventData.cooldownMs > 0) eventProps.cooldownMs = eventData.cooldownMs;
+            if (eventData.velocity !== 1) eventProps.velocity = eventData.velocity;
+            if (eventData.duration !== 0.1) eventProps.duration = eventData.duration;
+            if (eventData.note !== 60) eventProps.note = eventData.note;
+            if (eventData.trackId && eventData.trackId !== 'event') eventProps.trackId = eventData.trackId;
+
+            element = React.createElement(EventTrigger, eventProps, element);
+        }
+
         return element;
-    }, [graph, getSequencerSource, getTrackInfo, lfoValues, getDataValue]);
+    }, [graph, getSequencerSource, getEventTriggerSource, getEventTriggerTokenValue, getTrackInfo, lfoValues, getDataValue]);
 
     const rootElements = graph.rootNodes
         .map((node) => {
@@ -1711,10 +2008,89 @@ function buildPreviewProps(
             props.feedback = delay.feedback;
             break;
         }
+        case 'compressor': {
+            const compressor = nodeData as CompressorNodeData;
+            const threshold = resolveControlValue('threshold', { baseValue: compressor.threshold, modulatable: true });
+            if (threshold.value !== undefined) props.threshold = threshold.value;
+            const knee = resolveControlValue('knee', { baseValue: compressor.knee, modulatable: true });
+            if (knee.value !== undefined) props.knee = knee.value;
+            const ratio = resolveControlValue('ratio', { baseValue: compressor.ratio, modulatable: true });
+            if (ratio.value !== undefined) props.ratio = ratio.value;
+            const attack = resolveControlValue('attack', { baseValue: compressor.attack, modulatable: true });
+            if (attack.value !== undefined) props.attack = attack.value;
+            const release = resolveControlValue('release', { baseValue: compressor.release, modulatable: true });
+            if (release.value !== undefined) props.release = release.value;
+            break;
+        }
         case 'reverb': {
             const reverb = nodeData as ReverbNodeData;
             props.decay = reverb.decay;
             props.mix = reverb.mix;
+            break;
+        }
+        case 'distortion': {
+            const distortion = nodeData as DistortionNodeData;
+            props.type = distortion.distortionType;
+            const drive = resolveControlValue('drive', { baseValue: distortion.drive, modulatable: true });
+            if (drive.value !== undefined) props.drive = drive.value;
+            const level = resolveControlValue('level', { baseValue: distortion.level, modulatable: true });
+            if (level.value !== undefined) props.level = level.value;
+            const mixValue = resolveControlValue('mix', { baseValue: distortion.mix, modulatable: true });
+            if (mixValue.value !== undefined) props.mix = mixValue.value;
+            const tone = resolveControlValue('tone', { baseValue: distortion.tone, modulatable: true });
+            if (tone.value !== undefined) props.tone = tone.value;
+            break;
+        }
+        case 'chorus': {
+            const chorus = nodeData as ChorusNodeData;
+            const rate = resolveControlValue('rate', { baseValue: chorus.rate, modulatable: true });
+            if (rate.value !== undefined) props.rate = rate.value;
+            const depth = resolveControlValue('depth', { baseValue: chorus.depth, modulatable: true });
+            if (depth.value !== undefined) props.depth = depth.value;
+            const feedback = resolveControlValue('feedback', { baseValue: chorus.feedback, modulatable: true });
+            if (feedback.value !== undefined) props.feedback = feedback.value;
+            const delay = resolveControlValue('delay', { baseValue: chorus.delay, modulatable: true });
+            if (delay.value !== undefined) props.delay = delay.value;
+            const mixValue = resolveControlValue('mix', { baseValue: chorus.mix, modulatable: true });
+            if (mixValue.value !== undefined) props.mix = mixValue.value;
+            if (chorus.stereo) props.stereo = true;
+            break;
+        }
+        case 'noiseBurst': {
+            const burst = nodeData as NoiseBurstNodeData;
+            props.type = burst.noiseType;
+            const duration = resolveControlValue('duration', { baseValue: burst.duration, modulatable: true });
+            if (duration.value !== undefined) props.duration = duration.value;
+            const gainValue = resolveControlValue('gain', { baseValue: burst.gain, modulatable: true });
+            if (gainValue.value !== undefined) props.gain = gainValue.value;
+            const attack = resolveControlValue('attack', { baseValue: burst.attack, modulatable: true });
+            if (attack.value !== undefined) props.attack = attack.value;
+            const release = resolveControlValue('release', { baseValue: burst.release, modulatable: true });
+            if (release.value !== undefined) props.release = release.value;
+            break;
+        }
+        case 'waveShaper': {
+            const waveShaper = nodeData as WaveShaperNodeData;
+            const amount = resolveControlValue('amount', { baseValue: waveShaper.amount });
+            if (amount.value !== undefined) props.amount = amount.value;
+            props.preset = waveShaper.preset;
+            props.oversample = waveShaper.oversample;
+            break;
+        }
+        case 'convolver': {
+            const convolver = nodeData as ConvolverNodeData;
+            if (convolver.impulseSrc) {
+                props.impulse = convolver.impulseSrc;
+            }
+            props.normalize = convolver.normalize;
+            break;
+        }
+        case 'analyzer': {
+            const analyzer = nodeData as AnalyzerNodeData;
+            props.fftSize = analyzer.fftSize;
+            props.smoothingTimeConstant = analyzer.smoothingTimeConstant;
+            props.updateRate = analyzer.updateRate;
+            props.autoUpdate = analyzer.autoUpdate;
             break;
         }
         case 'panner': {
@@ -1722,10 +2098,40 @@ function buildPreviewProps(
             props.pan = pan.pan;
             break;
         }
+        case 'panner3d': {
+            const panner = nodeData as Panner3DNodeData;
+            const x = resolveControlValue('positionX', { baseValue: panner.positionX, modulatable: true });
+            if (x.value !== undefined) props.positionX = x.value;
+            const y = resolveControlValue('positionY', { baseValue: panner.positionY, modulatable: true });
+            if (y.value !== undefined) props.positionY = y.value;
+            const z = resolveControlValue('positionZ', { baseValue: panner.positionZ, modulatable: true });
+            if (z.value !== undefined) props.positionZ = z.value;
+            const refDistance = resolveControlValue('refDistance', { baseValue: panner.refDistance, modulatable: true });
+            if (refDistance.value !== undefined) props.refDistance = refDistance.value;
+            const maxDistance = resolveControlValue('maxDistance', { baseValue: panner.maxDistance, modulatable: true });
+            if (maxDistance.value !== undefined) props.maxDistance = maxDistance.value;
+            const rolloff = resolveControlValue('rolloffFactor', { baseValue: panner.rolloffFactor, modulatable: true });
+            if (rolloff.value !== undefined) props.rolloffFactor = rolloff.value;
+            props.panningModel = panner.panningModel;
+            props.distanceModel = panner.distanceModel;
+            break;
+        }
         case 'noise': {
             const noise = nodeData as NoiseNodeData;
             props.type = noise.noiseType;
             props.autoStart = true;
+            break;
+        }
+        case 'constantSource': {
+            const source = nodeData as ConstantSourceNodeData;
+            const offset = resolveControlValue('offset', { baseValue: source.offset, modulatable: true });
+            if (offset.value !== undefined) props.offset = offset.value;
+            props.autoStart = true;
+            break;
+        }
+        case 'mediaStream': {
+            const stream = nodeData as MediaStreamNodeData;
+            if (stream.requestMic) props.requestMic = true;
             break;
         }
         case 'sampler': {
@@ -1776,6 +2182,46 @@ function buildPreviewAdsrProps(
     }
 
     return props;
+}
+
+function createPreviewWaveShaperCurve(amount: number, preset: 'softClip' | 'hardClip' | 'saturate'): Float32Array {
+    const samples = 512;
+    const curve = new Float32Array(samples);
+    const k = Math.max(0, amount) * 100;
+
+    for (let i = 0; i < samples; i++) {
+        const x = (i * 2) / samples - 1;
+        if (preset === 'hardClip') {
+            curve[i] = Math.max(-1, Math.min(1, x * (1 + k / 8)));
+        } else if (preset === 'saturate') {
+            const amt = 1 + k / 20;
+            curve[i] = ((3 + amt) * x * 20) / (Math.PI + (amt * Math.abs(x * 20)));
+        } else {
+            curve[i] = Math.tanh(x * (1 + k / 12));
+        }
+    }
+
+    return curve;
+}
+
+interface PreviewPresetWaveShaperProps {
+    children?: React.ReactNode;
+    amount?: number;
+    preset?: 'softClip' | 'hardClip' | 'saturate';
+    oversample?: 'none' | '2x' | '4x';
+}
+
+function PreviewPresetWaveShaper({
+    children,
+    amount = 0.5,
+    preset = 'softClip',
+    oversample = '2x',
+}: PreviewPresetWaveShaperProps) {
+    return (
+        <WaveShaper curve={createPreviewWaveShaperCurve(amount, preset)} oversample={oversample}>
+            {children}
+        </WaveShaper>
+    );
 }
 
 interface PreviewFeedbackDelayProps {
@@ -2215,6 +2661,52 @@ function generateTriggeredSamplerHelper(): string {
         '        <AudioOutProvider node={outputNode}>',
         '            {children}',
         '        </AudioOutProvider>',
+        '    );',
+        '};',
+    ].join('\n');
+}
+
+function generatePresetWaveShaperHelper(): string {
+    return [
+        "type WaveShaperPreset = 'softClip' | 'hardClip' | 'saturate';",
+        '',
+        'type PresetWaveShaperProps = {',
+        '    children?: ReactNode;',
+        '    amount?: number;',
+        '    preset?: WaveShaperPreset;',
+        "    oversample?: 'none' | '2x' | '4x';",
+        '};',
+        '',
+        'const createPresetWaveShaperCurve = (amount: number, preset: WaveShaperPreset): Float32Array => {',
+        '    const samples = 512;',
+        '    const curve = new Float32Array(samples);',
+        '    const k = Math.max(0, amount) * 100;',
+        '',
+        '    for (let i = 0; i < samples; i++) {',
+        '        const x = (i * 2) / samples - 1;',
+        '        if (preset === "hardClip") {',
+        '            curve[i] = Math.max(-1, Math.min(1, x * (1 + k / 8)));',
+        '        } else if (preset === "saturate") {',
+        '            const amt = 1 + k / 20;',
+        '            curve[i] = ((3 + amt) * x * 20) / (Math.PI + (amt * Math.abs(x * 20)));',
+        '        } else {',
+        '            curve[i] = Math.tanh(x * (1 + k / 12));',
+        '        }',
+        '    }',
+        '',
+        '    return curve;',
+        '};',
+        '',
+        'const PresetWaveShaper = ({',
+        '    children,',
+        '    amount = 0.5,',
+        '    preset = "softClip",',
+        '    oversample = "2x",',
+        '}: PresetWaveShaperProps) => {',
+        '    return (',
+        '        <WaveShaper curve={createPresetWaveShaperCurve(amount, preset)} oversample={oversample}>',
+        '            {children}',
+        '        </WaveShaper>',
         '    );',
         '};',
     ].join('\n');

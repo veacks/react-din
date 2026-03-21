@@ -102,6 +102,94 @@ export function createPlaygroundNode(
                 dragHandle: '.node-header',
                 data: { type: 'reverb', decay: 2, mix: 0.5, label: 'Reverb' } as AudioNodeData,
             };
+        case 'compressor':
+            return {
+                id,
+                type: 'compressorNode',
+                position,
+                dragHandle: '.node-header',
+                data: { type: 'compressor', threshold: -24, knee: 30, ratio: 12, attack: 0.003, release: 0.25, label: 'Compressor' } as AudioNodeData,
+            };
+        case 'distortion':
+            return {
+                id,
+                type: 'distortionNode',
+                position,
+                dragHandle: '.node-header',
+                data: { type: 'distortion', distortionType: 'soft', drive: 0.5, level: 0.5, mix: 0.5, tone: 4000, label: 'Distortion' } as AudioNodeData,
+            };
+        case 'chorus':
+            return {
+                id,
+                type: 'chorusNode',
+                position,
+                dragHandle: '.node-header',
+                data: { type: 'chorus', rate: 1.5, depth: 3.5, feedback: 0.2, delay: 20, mix: 0.5, stereo: true, label: 'Chorus' } as AudioNodeData,
+            };
+        case 'noiseBurst':
+            return {
+                id,
+                type: 'noiseBurstNode',
+                position,
+                dragHandle: '.node-header',
+                data: { type: 'noiseBurst', noiseType: 'white', duration: 0.1, gain: 1, attack: 0.001, release: 0.05, label: 'Noise Burst' } as AudioNodeData,
+            };
+        case 'waveShaper':
+            return {
+                id,
+                type: 'waveShaperNode',
+                position,
+                dragHandle: '.node-header',
+                data: { type: 'waveShaper', amount: 0.5, preset: 'softClip', oversample: '2x', label: 'WaveShaper' } as AudioNodeData,
+            };
+        case 'convolver':
+            return {
+                id,
+                type: 'convolverNode',
+                position,
+                dragHandle: '.node-header',
+                data: { type: 'convolver', impulseSrc: '', normalize: true, label: 'Convolver' } as AudioNodeData,
+            };
+        case 'analyzer':
+            return {
+                id,
+                type: 'analyzerNode',
+                position,
+                dragHandle: '.node-header',
+                data: { type: 'analyzer', fftSize: 2048, smoothingTimeConstant: 0.8, updateRate: 60, autoUpdate: true, label: 'Analyzer' } as AudioNodeData,
+            };
+        case 'panner3d':
+            return {
+                id,
+                type: 'panner3dNode',
+                position,
+                dragHandle: '.node-header',
+                data: { type: 'panner3d', positionX: 0, positionY: 0, positionZ: 0, refDistance: 1, maxDistance: 10000, rolloffFactor: 1, panningModel: 'equalpower', distanceModel: 'inverse', label: 'Panner 3D' } as AudioNodeData,
+            };
+        case 'constantSource':
+            return {
+                id,
+                type: 'constantSourceNode',
+                position,
+                dragHandle: '.node-header',
+                data: { type: 'constantSource', offset: 1, label: 'Constant Source' } as AudioNodeData,
+            };
+        case 'mediaStream':
+            return {
+                id,
+                type: 'mediaStreamNode',
+                position,
+                dragHandle: '.node-header',
+                data: { type: 'mediaStream', requestMic: false, label: 'Media Stream' } as AudioNodeData,
+            };
+        case 'eventTrigger':
+            return {
+                id,
+                type: 'eventTriggerNode',
+                position,
+                dragHandle: '.node-header',
+                data: { type: 'eventTrigger', token: 0, mode: 'change', cooldownMs: 0, velocity: 1, duration: 0.1, note: 60, trackId: 'event', label: 'Event Trigger' } as AudioNodeData,
+            };
         case 'panner':
             return {
                 id,

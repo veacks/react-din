@@ -128,6 +128,15 @@
       "scenarios": ["F01-S03", "F04-S02"]
     },
     {
+      "id": "component:EventTrigger",
+      "kind": "public-component",
+      "name": "EventTrigger",
+      "source": "src/sequencer/EventTrigger.tsx",
+      "docs": "docs/components/sequencer/EventTrigger.md",
+      "tests": ["tests/library/transport-sequencer.spec.tsx"],
+      "scenarios": ["F01-S03", "F04-S02"]
+    },
+    {
       "id": "component:Analyzer",
       "kind": "public-component",
       "name": "Analyzer",
@@ -281,11 +290,110 @@
       "scenarios": ["F02-S01", "F04-S02"]
     },
     {
+      "id": "playground-node:AnalyzerNode",
+      "kind": "playground-node",
+      "name": "AnalyzerNode",
+      "source": "playground/src/playground/nodes/AnalyzerNode.tsx",
+      "docs": "docs/playground-nodes/AnalyzerNode.md",
+      "tests": ["playground/tests/unit/nodes-ui.spec.tsx", "playground/tests/unit/store-and-codegen.spec.ts"],
+      "scenarios": ["F02-S01", "F04-S02"]
+    },
+    {
+      "id": "playground-node:ChorusNode",
+      "kind": "playground-node",
+      "name": "ChorusNode",
+      "source": "playground/src/playground/nodes/ChorusNode.tsx",
+      "docs": "docs/playground-nodes/ChorusNode.md",
+      "tests": ["playground/tests/unit/nodes-ui.spec.tsx", "playground/tests/unit/store-and-codegen.spec.ts"],
+      "scenarios": ["F02-S01", "F04-S02"]
+    },
+    {
+      "id": "playground-node:CompressorNode",
+      "kind": "playground-node",
+      "name": "CompressorNode",
+      "source": "playground/src/playground/nodes/CompressorNode.tsx",
+      "docs": "docs/playground-nodes/CompressorNode.md",
+      "tests": ["playground/tests/unit/nodes-ui.spec.tsx", "playground/tests/unit/store-and-codegen.spec.ts"],
+      "scenarios": ["F02-S01", "F04-S02"]
+    },
+    {
+      "id": "playground-node:ConstantSourceNode",
+      "kind": "playground-node",
+      "name": "ConstantSourceNode",
+      "source": "playground/src/playground/nodes/ConstantSourceNode.tsx",
+      "docs": "docs/playground-nodes/ConstantSourceNode.md",
+      "tests": ["playground/tests/unit/nodes-ui.spec.tsx", "playground/tests/unit/store-and-codegen.spec.ts"],
+      "scenarios": ["F02-S02", "F04-S02"]
+    },
+    {
+      "id": "playground-node:ConvolverNode",
+      "kind": "playground-node",
+      "name": "ConvolverNode",
+      "source": "playground/src/playground/nodes/ConvolverNode.tsx",
+      "docs": "docs/playground-nodes/ConvolverNode.md",
+      "tests": ["playground/tests/unit/nodes-ui.spec.tsx", "playground/tests/unit/store-and-codegen.spec.ts"],
+      "scenarios": ["F02-S01", "F04-S02"]
+    },
+    {
+      "id": "playground-node:DistortionNode",
+      "kind": "playground-node",
+      "name": "DistortionNode",
+      "source": "playground/src/playground/nodes/DistortionNode.tsx",
+      "docs": "docs/playground-nodes/DistortionNode.md",
+      "tests": ["playground/tests/unit/nodes-ui.spec.tsx", "playground/tests/unit/store-and-codegen.spec.ts"],
+      "scenarios": ["F02-S01", "F04-S02"]
+    },
+    {
+      "id": "playground-node:EventTriggerNode",
+      "kind": "playground-node",
+      "name": "EventTriggerNode",
+      "source": "playground/src/playground/nodes/EventTriggerNode.tsx",
+      "docs": "docs/playground-nodes/EventTriggerNode.md",
+      "tests": ["playground/tests/unit/nodes-ui.spec.tsx", "playground/tests/unit/store-and-codegen.spec.ts"],
+      "scenarios": ["F02-S03", "F04-S02"]
+    },
+    {
+      "id": "playground-node:MediaStreamNode",
+      "kind": "playground-node",
+      "name": "MediaStreamNode",
+      "source": "playground/src/playground/nodes/MediaStreamNode.tsx",
+      "docs": "docs/playground-nodes/MediaStreamNode.md",
+      "tests": ["playground/tests/unit/nodes-ui.spec.tsx", "playground/tests/unit/store-and-codegen.spec.ts"],
+      "scenarios": ["F02-S01", "F04-S02"]
+    },
+    {
+      "id": "playground-node:NoiseBurstNode",
+      "kind": "playground-node",
+      "name": "NoiseBurstNode",
+      "source": "playground/src/playground/nodes/NoiseBurstNode.tsx",
+      "docs": "docs/playground-nodes/NoiseBurstNode.md",
+      "tests": ["playground/tests/unit/nodes-ui.spec.tsx", "playground/tests/unit/store-and-codegen.spec.ts"],
+      "scenarios": ["F02-S01", "F04-S02"]
+    },
+    {
+      "id": "playground-node:Panner3DNode",
+      "kind": "playground-node",
+      "name": "Panner3DNode",
+      "source": "playground/src/playground/nodes/Panner3DNode.tsx",
+      "docs": "docs/playground-nodes/Panner3DNode.md",
+      "tests": ["playground/tests/unit/nodes-ui.spec.tsx", "playground/tests/unit/store-and-codegen.spec.ts"],
+      "scenarios": ["F02-S01", "F04-S02"]
+    },
+    {
       "id": "playground-node:StereoPannerNode",
       "kind": "playground-node",
       "name": "StereoPannerNode",
       "source": "playground/src/playground/nodes/StereoPannerNode.tsx",
       "docs": "docs/playground-nodes/StereoPannerNode.md",
+      "tests": ["playground/tests/unit/nodes-ui.spec.tsx", "playground/tests/unit/store-and-codegen.spec.ts"],
+      "scenarios": ["F02-S01", "F04-S02"]
+    },
+    {
+      "id": "playground-node:WaveShaperNode",
+      "kind": "playground-node",
+      "name": "WaveShaperNode",
+      "source": "playground/src/playground/nodes/WaveShaperNode.tsx",
+      "docs": "docs/playground-nodes/WaveShaperNode.md",
       "tests": ["playground/tests/unit/nodes-ui.spec.tsx", "playground/tests/unit/store-and-codegen.spec.ts"],
       "scenarios": ["F02-S01", "F04-S02"]
     },

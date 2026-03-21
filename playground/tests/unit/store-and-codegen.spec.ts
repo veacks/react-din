@@ -302,4 +302,100 @@ describe('playground store and code generation', () => {
         expect(connectedCode).not.toContain('param_0');
         expect(disconnectedCode).not.toContain('<Sequencer');
     });
+
+    it('generates extended MVP nodes and wraps event-driven chains with EventTrigger', async () => {
+        vi.resetModules();
+        const { generateCode } = await import('../../src/playground/CodeGenerator');
+
+        const nodes = [
+            {
+                id: 'input-1',
+                type: 'inputNode',
+                position: { x: 0, y: 0 },
+                data: {
+                    type: 'input',
+                    label: 'UI Tokens',
+                    params: [{ id: 'hoverToken', name: 'hoverToken', label: 'Hover Token', type: 'float', value: 0, defaultValue: 0, min: 0, max: 9999 }],
+                },
+            },
+            {
+                id: 'event-1',
+                type: 'eventTriggerNode',
+                position: { x: 0, y: 0 },
+                data: { type: 'eventTrigger', token: 0, mode: 'change', cooldownMs: 40, velocity: 1, duration: 0.1, note: 60, trackId: 'hover', label: 'Event Trigger' },
+            },
+            {
+                id: 'noise-burst-1',
+                type: 'noiseBurstNode',
+                position: { x: 0, y: 0 },
+                data: { type: 'noiseBurst', noiseType: 'white', duration: 0.03, gain: 0.6, attack: 0.001, release: 0.02, label: 'Noise Burst' },
+            },
+            {
+                id: 'distortion-1',
+                type: 'distortionNode',
+                position: { x: 0, y: 0 },
+                data: { type: 'distortion', distortionType: 'soft', drive: 0.35, level: 0.65, mix: 0.5, tone: 2400, label: 'Distortion' },
+            },
+            {
+                id: 'wave-shaper-1',
+                type: 'waveShaperNode',
+                position: { x: 0, y: 0 },
+                data: { type: 'waveShaper', amount: 0.45, preset: 'saturate', oversample: '2x', label: 'WaveShaper' },
+            },
+            {
+                id: 'convolver-1',
+                type: 'convolverNode',
+                position: { x: 0, y: 0 },
+                data: { type: 'convolver', impulseSrc: '/impulses/plate.wav', normalize: true, label: 'Convolver' },
+            },
+            {
+                id: 'chorus-1',
+                type: 'chorusNode',
+                position: { x: 0, y: 0 },
+                data: { type: 'chorus', rate: 1.1, depth: 2.2, feedback: 0.12, delay: 16, mix: 0.2, stereo: true, label: 'Chorus' },
+            },
+            {
+                id: 'panner3d-1',
+                type: 'panner3dNode',
+                position: { x: 0, y: 0 },
+                data: { type: 'panner3d', positionX: 0, positionY: 0, positionZ: -1, refDistance: 1, maxDistance: 10000, rolloffFactor: 1, panningModel: 'HRTF', distanceModel: 'inverse', label: 'Panner 3D' },
+            },
+            {
+                id: 'analyzer-1',
+                type: 'analyzerNode',
+                position: { x: 0, y: 0 },
+                data: { type: 'analyzer', fftSize: 1024, smoothingTimeConstant: 0.8, updateRate: 60, autoUpdate: true, label: 'Analyzer' },
+            },
+            {
+                id: 'output-1',
+                type: 'outputNode',
+                position: { x: 0, y: 0 },
+                data: { type: 'output', playing: false, masterGain: 0.5, label: 'Output' },
+            },
+        ];
+
+        const edges = [
+            { id: 'token-link', source: 'input-1', sourceHandle: 'param:hoverToken', target: 'event-1', targetHandle: 'token' },
+            { id: 'trigger-link', source: 'event-1', sourceHandle: 'trigger', target: 'noise-burst-1', targetHandle: 'trigger' },
+            { id: 'a1', source: 'noise-burst-1', sourceHandle: 'out', target: 'distortion-1', targetHandle: 'in' },
+            { id: 'a2', source: 'distortion-1', sourceHandle: 'out', target: 'wave-shaper-1', targetHandle: 'in' },
+            { id: 'a3', source: 'wave-shaper-1', sourceHandle: 'out', target: 'convolver-1', targetHandle: 'in' },
+            { id: 'a4', source: 'convolver-1', sourceHandle: 'out', target: 'chorus-1', targetHandle: 'in' },
+            { id: 'a5', source: 'chorus-1', sourceHandle: 'out', target: 'panner3d-1', targetHandle: 'in' },
+            { id: 'a6', source: 'panner3d-1', sourceHandle: 'out', target: 'analyzer-1', targetHandle: 'in' },
+            { id: 'a7', source: 'analyzer-1', sourceHandle: 'out', target: 'output-1', targetHandle: 'in' },
+        ];
+
+        const code = generateCode(nodes as any, edges as any, true, 'UI Feedback');
+
+        expect(code).toContain('EventTrigger');
+        expect(code).toContain('NoiseBurst');
+        expect(code).toContain('Distortion');
+        expect(code).toContain('Convolver');
+        expect(code).toContain('Chorus');
+        expect(code).toContain('Panner');
+        expect(code).toContain('Analyzer');
+        expect(code).toContain('const PresetWaveShaper');
+        expect(code).toContain('<EventTrigger token={hoverToken}');
+    });
 });

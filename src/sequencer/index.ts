@@ -6,8 +6,10 @@
 export type {
     Pattern,
     TriggerEvent,
+    EventTriggerMode,
     SequencerProps,
     TrackProps,
+    EventTriggerProps,
     UseTriggerOptions,
     SequencerContextValue,
     TrackContextValue,
@@ -16,6 +18,7 @@ export type {
 // Components
 export { Sequencer } from './Sequencer';
 export { Track } from './Track';
+export { EventTrigger } from './EventTrigger';
 
 // Context
 export { TriggerContext, useTriggerContext } from './TriggerContext';

@@ -39,6 +39,16 @@ function resolveSourceHandleValue(
         return (sourceData as NoteNodeData).frequency;
     }
 
+    if (sourceData.type === 'constantSource' && sourceHandle === 'out') {
+        const value = (sourceData as Record<string, unknown>).offset;
+        return typeof value === 'number' ? value : null;
+    }
+
+    if (sourceData.type === 'eventTrigger' && sourceHandle === 'trigger') {
+        const value = (sourceData as Record<string, unknown>).token;
+        return typeof value === 'number' ? value : null;
+    }
+
     if (isDataNodeType(sourceData.type)) {
         return evaluateDataNode(sourceNode.id, nodeById, controlEdgesByTarget, visiting, cache);
     }

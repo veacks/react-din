@@ -10,6 +10,17 @@ import type {
     NoiseNodeData,
     DelayNodeData,
     ReverbNodeData,
+    CompressorNodeData,
+    DistortionNodeData,
+    ChorusNodeData,
+    NoiseBurstNodeData,
+    WaveShaperNodeData,
+    ConvolverNodeData,
+    AnalyzerNodeData,
+    Panner3DNodeData,
+    ConstantSourceNodeData,
+    MediaStreamNodeData,
+    EventTriggerNodeData,
     StereoPannerNodeData,
     InputNodeData,
     NoteNodeData,
@@ -41,6 +52,20 @@ interface AudioNodeInstance {
     reverbConvolver?: ConvolverNode;
     reverbDryGain?: GainNode;
     reverbWetGain?: GainNode;
+    distortionWaveShaper?: WaveShaperNode;
+    distortionDriveGain?: GainNode;
+    distortionToneFilter?: BiquadFilterNode;
+    distortionDryGain?: GainNode;
+    distortionWetGain?: GainNode;
+    distortionOutputGain?: GainNode;
+    chorusDelay?: DelayNode;
+    chorusFeedbackGain?: GainNode;
+    chorusDryGain?: GainNode;
+    chorusWetGain?: GainNode;
+    chorusLfoGain?: GainNode;
+    convolverNode?: ConvolverNode;
+    mediaStreamSource?: MediaStreamAudioSourceNode;
+    mediaStream?: MediaStream;
     // Map handle ID (e.g., 'frequency') to AudioParam
     params?: Map<string, AudioParam>;
     // Map output handle ID to AudioNode (for InputNode multiple outputs)
@@ -57,6 +82,23 @@ interface AudioNodeInstance {
         detune: number;
         buffer: AudioBuffer | null;
     };
+    noiseBurstData?: {
+        noiseType: 'white' | 'pink' | 'brown';
+        duration: number;
+        gain: number;
+        attack: number;
+        release: number;
+    };
+    eventTriggerData?: {
+        token: number;
+        mode: 'change' | 'rising';
+        cooldownMs: number;
+        velocity: number;
+        duration: number;
+        note: number;
+        trackId: string;
+        lastEmitAtMs: number;
+    };
     lfoOsc?: OscillatorNode; // For LFO waveform updates
     lastTriggerValue?: number;
 }
@@ -64,9 +106,13 @@ interface AudioNodeInstance {
 /**
  * Creates a noise buffer for white/pink/brown noise
  */
-function createNoiseBuffer(ctx: AudioContext, type: 'white' | 'pink' | 'brown'): AudioBuffer {
+function createNoiseBuffer(
+    ctx: AudioContext,
+    type: 'white' | 'pink' | 'brown',
+    sampleCount?: number
+): AudioBuffer {
     const sampleRate = ctx.sampleRate;
-    const length = sampleRate * 2; // 2 seconds
+    const length = sampleCount ?? (sampleRate * 2); // 2 seconds default
     const buffer = ctx.createBuffer(1, length, sampleRate);
     const data = buffer.getChannelData(0);
 
@@ -116,6 +162,27 @@ function createReverbImpulse(ctx: AudioContext, decay: number): AudioBuffer {
     }
 
     return buffer;
+}
+
+function createWaveShaperCurve(amount: number, preset: 'softClip' | 'hardClip' | 'saturate'): Float32Array {
+    const samples = 512;
+    const curve = new Float32Array(samples);
+    const k = Math.max(0, amount) * 100;
+
+    for (let i = 0; i < samples; i++) {
+        const x = (i * 2) / samples - 1;
+
+        if (preset === 'hardClip') {
+            curve[i] = Math.max(-1, Math.min(1, x * (1 + k / 8)));
+        } else if (preset === 'saturate') {
+            const amt = 1 + k / 20;
+            curve[i] = ((3 + amt) * x * 20) / (Math.PI + (amt * Math.abs(x * 20)));
+        } else {
+            curve[i] = Math.tanh(x * (1 + k / 12));
+        }
+    }
+
+    return curve;
 }
 
 /**
@@ -279,6 +346,47 @@ export class AudioEngine {
             instance.reverbDryGain.connect(instance.node);
             instance.reverbWetGain.connect(instance.node);
         }
+
+        if (
+            instance.type === 'distortion'
+            && instance.inputNode
+            && instance.distortionDriveGain
+            && instance.distortionWaveShaper
+            && instance.distortionToneFilter
+            && instance.distortionOutputGain
+            && instance.distortionDryGain
+            && instance.distortionWetGain
+        ) {
+            instance.inputNode.connect(instance.distortionDryGain);
+            instance.distortionDryGain.connect(instance.node);
+            instance.inputNode.connect(instance.distortionDriveGain);
+            instance.distortionDriveGain.connect(instance.distortionWaveShaper);
+            instance.distortionWaveShaper.connect(instance.distortionToneFilter);
+            instance.distortionToneFilter.connect(instance.distortionOutputGain);
+            instance.distortionOutputGain.connect(instance.distortionWetGain);
+            instance.distortionWetGain.connect(instance.node);
+        }
+
+        if (
+            instance.type === 'chorus'
+            && instance.inputNode
+            && instance.chorusDelay
+            && instance.chorusFeedbackGain
+            && instance.chorusDryGain
+            && instance.chorusWetGain
+        ) {
+            instance.inputNode.connect(instance.chorusDryGain);
+            instance.chorusDryGain.connect(instance.node);
+            instance.inputNode.connect(instance.chorusDelay);
+            instance.chorusDelay.connect(instance.chorusFeedbackGain);
+            instance.chorusFeedbackGain.connect(instance.chorusDelay);
+            instance.chorusDelay.connect(instance.chorusWetGain);
+            instance.chorusWetGain.connect(instance.node);
+            if (instance.lfoOsc && instance.chorusLfoGain) {
+                instance.lfoOsc.connect(instance.chorusLfoGain);
+                instance.chorusLfoGain.connect(instance.chorusDelay.delayTime);
+            }
+        }
     }
 
     private connectGraph(nodes: Node<AudioNodeData>[], edges: Edge[]) {
@@ -346,6 +454,38 @@ export class AudioEngine {
         }
     }
 
+    private triggerNoiseBurst(nodeId: string, time: number, velocity: number): void {
+        const instance = this.audioNodes.get(nodeId);
+        if (!instance?.noiseBurstData || !this.audioContext) return;
+
+        const { noiseType, duration, gain, attack, release } = instance.noiseBurstData;
+        const totalDuration = Math.max(0.005, attack + duration + release);
+        const sampleCount = Math.max(1, Math.ceil(this.audioContext.sampleRate * totalDuration));
+        const buffer = createNoiseBuffer(this.audioContext, noiseType, sampleCount);
+
+        const source = this.audioContext.createBufferSource();
+        source.buffer = buffer;
+
+        const envelope = this.audioContext.createGain();
+        const startTime = Math.max(time, this.audioContext.currentTime);
+        const targetGain = Math.max(0, Math.min(1, gain * velocity));
+
+        envelope.gain.setValueAtTime(0, startTime);
+        envelope.gain.linearRampToValueAtTime(targetGain, startTime + attack);
+        envelope.gain.setValueAtTime(targetGain, startTime + attack + duration);
+        envelope.gain.linearRampToValueAtTime(0, startTime + totalDuration);
+
+        source.connect(envelope);
+        envelope.connect(instance.node);
+
+        source.start(startTime);
+        source.stop(startTime + totalDuration + 0.01);
+        source.onended = () => {
+            try { source.disconnect(); } catch { /* noop */ }
+            try { envelope.disconnect(); } catch { /* noop */ }
+        };
+    }
+
     private triggerSequencerTargets(sourceId: string, time: number, velocity: number, duration: number, midiPitch?: number) {
         const connectedEdges = this.edges.filter((edge) => edge.source === sourceId);
 
@@ -363,6 +503,8 @@ export class AudioEngine {
                 }
             } else if (targetInstance.type === 'sampler' && edge.targetHandle === 'trigger') {
                 this.triggerSampler(edge.target, time, duration);
+            } else if (targetInstance.type === 'noiseBurst' && edge.targetHandle === 'trigger') {
+                this.triggerNoiseBurst(edge.target, time, velocity);
             }
         });
     }
@@ -391,6 +533,49 @@ export class AudioEngine {
         } catch (error) {
             console.warn(`[AudioEngine] Error loading sample ${url}:`, error);
             return null;
+        }
+    }
+
+    private async loadConvolverImpulse(nodeId: string, url: string): Promise<void> {
+        if (!url || !this.audioContext) return;
+        const instance = this.audioNodes.get(nodeId);
+        if (!instance?.convolverNode) return;
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) return;
+            const arrayBuffer = await response.arrayBuffer();
+            const decoded = await this.audioContext.decodeAudioData(arrayBuffer);
+            instance.convolverNode.buffer = decoded;
+        } catch {
+            // Ignore fetch/decode errors in playground mode.
+        }
+    }
+
+    private async attachMediaStream(nodeId: string, requestMic: boolean): Promise<void> {
+        const instance = this.audioNodes.get(nodeId);
+        if (!instance || instance.type !== 'mediaStream' || !this.audioContext) return;
+
+        if (instance.mediaStreamSource) {
+            try { instance.mediaStreamSource.disconnect(); } catch { /* noop */ }
+            instance.mediaStreamSource = undefined;
+        }
+        if (instance.mediaStream) {
+            instance.mediaStream.getTracks().forEach((track) => track.stop());
+            instance.mediaStream = undefined;
+        }
+
+        if (!requestMic) return;
+        if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) return;
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            instance.mediaStream = stream;
+            const source = this.audioContext.createMediaStreamSource(stream);
+            source.connect(instance.node);
+            instance.mediaStreamSource = source;
+        } catch {
+            // Ignore permission or browser capability errors in playground mode.
         }
     }
 
@@ -652,6 +837,8 @@ export class AudioEngine {
                 this.triggerVoice(edge.target, time, velocity, duration);
             } else if (targetInstance.type === 'sampler' && edge.targetHandle === 'trigger') {
                 this.triggerSampler(edge.target, time, duration);
+            } else if (targetInstance.type === 'noiseBurst' && edge.targetHandle === 'trigger') {
+                this.triggerNoiseBurst(edge.target, time, velocity);
             }
         });
     }
@@ -759,6 +946,9 @@ export class AudioEngine {
             const audioNode = this.createAudioNode(ctx, node);
             if (audioNode) {
                 this.audioNodes.set(node.id, audioNode);
+                if (node.data.type === 'mediaStream' && (node.data as MediaStreamNodeData).requestMic) {
+                    this.attachMediaStream(node.id, true);
+                }
             }
         });
 
@@ -808,6 +998,15 @@ export class AudioEngine {
 
                 if (instance.lfoOsc) {
                     try { instance.lfoOsc.stop(); } catch (e) { }
+                }
+
+                if (instance.mediaStream) {
+                    instance.mediaStream.getTracks().forEach((track) => track.stop());
+                    instance.mediaStream = undefined;
+                }
+                if (instance.mediaStreamSource) {
+                    try { instance.mediaStreamSource.disconnect(); } catch { /* noop */ }
+                    instance.mediaStreamSource = undefined;
                 }
 
                 this.disconnectInstance(instance);
@@ -1027,6 +1226,178 @@ export class AudioEngine {
                     params,
                 };
             }
+            case 'compressor': {
+                const compressorData = data as CompressorNodeData;
+                const compressor = ctx.createDynamicsCompressor();
+                compressor.threshold.value = compressorData.threshold;
+                compressor.knee.value = compressorData.knee;
+                compressor.ratio.value = compressorData.ratio;
+                compressor.attack.value = compressorData.attack;
+                compressor.release.value = compressorData.release;
+
+                const params = new Map<string, AudioParam>();
+                params.set('threshold', compressor.threshold);
+                params.set('knee', compressor.knee);
+                params.set('ratio', compressor.ratio);
+                params.set('attack', compressor.attack);
+                params.set('release', compressor.release);
+                return { node: compressor, type: 'compressor', params };
+            }
+            case 'distortion': {
+                const distortionData = data as DistortionNodeData;
+                const inputGain = ctx.createGain();
+                const outputGain = ctx.createGain();
+                const dryGain = ctx.createGain();
+                const wetGain = ctx.createGain();
+                const driveGain = ctx.createGain();
+                const waveShaper = ctx.createWaveShaper();
+                const toneFilter = ctx.createBiquadFilter();
+                const postGain = ctx.createGain();
+
+                driveGain.gain.value = 1 + distortionData.drive * 5;
+                waveShaper.curve = createWaveShaperCurve(distortionData.drive, 'softClip');
+                waveShaper.oversample = '2x';
+                toneFilter.type = 'lowpass';
+                toneFilter.frequency.value = distortionData.tone;
+                postGain.gain.value = distortionData.level;
+                wetGain.gain.value = distortionData.mix;
+                dryGain.gain.value = 1 - distortionData.mix;
+
+                inputGain.connect(dryGain);
+                dryGain.connect(outputGain);
+                inputGain.connect(driveGain);
+                driveGain.connect(waveShaper);
+                waveShaper.connect(toneFilter);
+                toneFilter.connect(postGain);
+                postGain.connect(wetGain);
+                wetGain.connect(outputGain);
+
+                const params = new Map<string, AudioParam>();
+                params.set('drive', driveGain.gain);
+                params.set('level', postGain.gain);
+                params.set('mix', wetGain.gain);
+                params.set('tone', toneFilter.frequency);
+
+                return {
+                    node: outputGain,
+                    inputNode: inputGain,
+                    internalNodes: [inputGain, dryGain, wetGain, driveGain, waveShaper, toneFilter, postGain],
+                    type: 'distortion',
+                    params,
+                    distortionWaveShaper: waveShaper,
+                    distortionDriveGain: driveGain,
+                    distortionToneFilter: toneFilter,
+                    distortionDryGain: dryGain,
+                    distortionWetGain: wetGain,
+                    distortionOutputGain: postGain,
+                };
+            }
+            case 'chorus': {
+                const chorusData = data as ChorusNodeData;
+                const inputGain = ctx.createGain();
+                const outputGain = ctx.createGain();
+                const dryGain = ctx.createGain();
+                const wetGain = ctx.createGain();
+                const delay = ctx.createDelay(0.2);
+                const feedbackGain = ctx.createGain();
+                const lfoOsc = ctx.createOscillator();
+                const lfoGain = ctx.createGain();
+
+                delay.delayTime.value = chorusData.delay / 1000;
+                feedbackGain.gain.value = chorusData.feedback;
+                lfoOsc.type = 'sine';
+                lfoOsc.frequency.value = chorusData.rate;
+                lfoGain.gain.value = chorusData.depth / 1000;
+                wetGain.gain.value = chorusData.mix;
+                dryGain.gain.value = 1 - chorusData.mix;
+
+                inputGain.connect(dryGain);
+                dryGain.connect(outputGain);
+                inputGain.connect(delay);
+                delay.connect(feedbackGain);
+                feedbackGain.connect(delay);
+                delay.connect(wetGain);
+                wetGain.connect(outputGain);
+                lfoOsc.connect(lfoGain);
+                lfoGain.connect(delay.delayTime);
+
+                const params = new Map<string, AudioParam>();
+                params.set('rate', lfoOsc.frequency);
+                params.set('depth', lfoGain.gain);
+                params.set('feedback', feedbackGain.gain);
+                params.set('delay', delay.delayTime);
+                params.set('mix', wetGain.gain);
+
+                return {
+                    node: outputGain,
+                    inputNode: inputGain,
+                    internalNodes: [inputGain, dryGain, wetGain, delay, feedbackGain, lfoOsc, lfoGain],
+                    type: 'chorus',
+                    params,
+                    lfoOsc,
+                    chorusDelay: delay,
+                    chorusFeedbackGain: feedbackGain,
+                    chorusDryGain: dryGain,
+                    chorusWetGain: wetGain,
+                    chorusLfoGain: lfoGain,
+                };
+            }
+            case 'noiseBurst': {
+                const burstData = data as NoiseBurstNodeData;
+                const output = ctx.createGain();
+                return {
+                    node: output,
+                    type: 'noiseBurst',
+                    noiseBurstData: {
+                        noiseType: burstData.noiseType,
+                        duration: burstData.duration,
+                        gain: burstData.gain,
+                        attack: burstData.attack,
+                        release: burstData.release,
+                    },
+                };
+            }
+            case 'waveShaper': {
+                const waveShaperData = data as WaveShaperNodeData;
+                const waveShaper = ctx.createWaveShaper();
+                waveShaper.curve = createWaveShaperCurve(waveShaperData.amount, waveShaperData.preset);
+                waveShaper.oversample = waveShaperData.oversample;
+                return { node: waveShaper, type: 'waveShaper' };
+            }
+            case 'convolver': {
+                const convolverData = data as ConvolverNodeData;
+                const convolver = ctx.createConvolver();
+                convolver.normalize = convolverData.normalize;
+                if (convolverData.impulseSrc) {
+                    this.loadConvolverImpulse(node.id, convolverData.impulseSrc);
+                }
+                return { node: convolver, type: 'convolver', convolverNode: convolver };
+            }
+            case 'analyzer': {
+                const analyzerData = data as AnalyzerNodeData;
+                const analyzer = ctx.createAnalyser();
+                analyzer.fftSize = analyzerData.fftSize;
+                analyzer.smoothingTimeConstant = analyzerData.smoothingTimeConstant;
+                return { node: analyzer, type: 'analyzer' };
+            }
+            case 'panner3d': {
+                const pannerData = data as Panner3DNodeData;
+                const panner = ctx.createPanner();
+                panner.panningModel = pannerData.panningModel;
+                panner.distanceModel = pannerData.distanceModel;
+                panner.positionX.value = pannerData.positionX;
+                panner.positionY.value = pannerData.positionY;
+                panner.positionZ.value = pannerData.positionZ;
+                panner.refDistance = pannerData.refDistance;
+                panner.maxDistance = pannerData.maxDistance;
+                panner.rolloffFactor = pannerData.rolloffFactor;
+
+                const params = new Map<string, AudioParam>();
+                params.set('positionX', panner.positionX);
+                params.set('positionY', panner.positionY);
+                params.set('positionZ', panner.positionZ);
+                return { node: panner, type: 'panner3d', params };
+            }
             case 'panner': {
                 const pannerData = data as StereoPannerNodeData;
                 const panner = ctx.createStereoPanner();
@@ -1057,12 +1428,43 @@ export class AudioEngine {
 
                 return { node: dummy, type: 'input', outputs };
             }
+            case 'constantSource': {
+                const sourceData = data as ConstantSourceNodeData;
+                const source = ctx.createConstantSource();
+                source.offset.value = sourceData.offset;
+                const params = new Map<string, AudioParam>();
+                params.set('offset', source.offset);
+                return { node: source, type: 'constantSource', params };
+            }
+            case 'mediaStream': {
+                const gain = ctx.createGain();
+                return { node: gain, type: 'mediaStream' };
+            }
             case 'note': {
                 const noteData = data as NoteNodeData;
                 const freqSource = ctx.createConstantSource();
                 freqSource.offset.value = noteData.frequency;
 
                 return { node: freqSource, type: 'note' };
+            }
+            case 'eventTrigger': {
+                const triggerData = data as EventTriggerNodeData;
+                const source = ctx.createConstantSource();
+                source.offset.value = 0;
+                return {
+                    node: source,
+                    type: 'eventTrigger',
+                    eventTriggerData: {
+                        token: triggerData.token,
+                        mode: triggerData.mode,
+                        cooldownMs: triggerData.cooldownMs,
+                        velocity: triggerData.velocity,
+                        duration: triggerData.duration,
+                        note: triggerData.note,
+                        trackId: triggerData.trackId,
+                        lastEmitAtMs: -Infinity,
+                    },
+                };
             }
             case 'sampler': {
                 const samplerData = data as SamplerNodeData;
@@ -1082,7 +1484,7 @@ export class AudioEngine {
                 };
 
                 if (samplerData.src) {
-                    this.loadSamplerBuffer(samplerData.src, samplerData.src).then(buffer => {
+                    this.loadSamplerBuffer(node.id, samplerData.src).then(buffer => {
                         if (buffer && samplerInstance.samplerData) {
                             samplerInstance.samplerData.buffer = buffer;
                         }
@@ -1164,6 +1566,14 @@ export class AudioEngine {
                 case 'adsr':
                 case 'stepSequencer':
                 case 'pianoRoll': {
+                    const instance = this.audioNodes.get(sourceNode.id);
+                    if (instance?.node instanceof ConstantSourceNode) {
+                        return instance.node.offset.value;
+                    }
+                    return null;
+                }
+                case 'constantSource':
+                case 'eventTrigger': {
                     const instance = this.audioNodes.get(sourceNode.id);
                     if (instance?.node instanceof ConstantSourceNode) {
                         return instance.node.offset.value;
@@ -1278,6 +1688,9 @@ export class AudioEngine {
             'feedback',
             'mix',
             'pan',
+            'positionX',
+            'positionY',
+            'positionZ',
             'masterGain',
             'rate',
             'depth',
@@ -1287,6 +1700,18 @@ export class AudioEngine {
             'release',
             'portamento',
             'playbackRate',
+            'threshold',
+            'knee',
+            'ratio',
+            'level',
+            'tone',
+            'drive',
+            'duration',
+            'offset',
+            'refDistance',
+            'maxDistance',
+            'rolloffFactor',
+            'token',
         ]);
 
         controlEdgesByTarget.forEach((edgesForTarget, targetNodeId) => {
@@ -1333,6 +1758,14 @@ export class AudioEngine {
                             }
                         });
                     }
+                    if (instance.mediaStream) {
+                        instance.mediaStream.getTracks().forEach((track) => track.stop());
+                        instance.mediaStream = undefined;
+                    }
+                    if (instance.mediaStreamSource) {
+                        try { instance.mediaStreamSource.disconnect(); } catch { /* noop */ }
+                        instance.mediaStreamSource = undefined;
+                    }
                     this.disconnectInstance(instance);
                 } catch {
                     // Ignore cleanup failures while removing nodes.
@@ -1347,6 +1780,9 @@ export class AudioEngine {
                 if (instance) {
                     this.audioNodes.set(node.id, instance);
                     this.startInstance(instance);
+                    if (node.data.type === 'mediaStream' && (node.data as MediaStreamNodeData).requestMic) {
+                        this.attachMediaStream(node.id, true);
+                    }
                 }
             }
         });
@@ -1410,21 +1846,11 @@ export class AudioEngine {
             }
         } else if (instance.type === 'filter') {
             const node = instance.node as BiquadFilterNode;
-            if ('frequency' in data && typeof data.frequency === 'number') {
-                node.frequency.setTargetAtTime(data.frequency, currentTime, 0.01);
-            }
-            if ('q' in data && typeof data.q === 'number') {
-                node.Q.setTargetAtTime(data.q, currentTime, 0.01);
-            }
-            if ('detune' in data && typeof data.detune === 'number') {
-                node.detune.setTargetAtTime(data.detune, currentTime, 0.01);
-            }
-            if ('gain' in data && typeof data.gain === 'number') {
-                node.gain.setTargetAtTime(data.gain, currentTime, 0.01);
-            }
-            if ('filterType' in data && typeof data.filterType === 'string') {
-                node.type = data.filterType as BiquadFilterType;
-            }
+            if ('frequency' in data && typeof data.frequency === 'number') node.frequency.setTargetAtTime(data.frequency, currentTime, 0.01);
+            if ('q' in data && typeof data.q === 'number') node.Q.setTargetAtTime(data.q, currentTime, 0.01);
+            if ('detune' in data && typeof data.detune === 'number') node.detune.setTargetAtTime(data.detune, currentTime, 0.01);
+            if ('gain' in data && typeof data.gain === 'number') node.gain.setTargetAtTime(data.gain, currentTime, 0.01);
+            if ('filterType' in data && typeof data.filterType === 'string') node.type = data.filterType as BiquadFilterType;
         } else if (instance.type === 'input') {
             const inputData = data as InputNodeData;
             if ('params' in inputData && instance.outputs) {
@@ -1437,6 +1863,11 @@ export class AudioEngine {
                     }
                 });
             }
+        } else if (instance.type === 'constantSource') {
+            const node = instance.node as ConstantSourceNode;
+            if ('offset' in data && typeof data.offset === 'number') {
+                node.offset.setTargetAtTime(data.offset, currentTime, 0.01);
+            }
         } else if (instance.type === 'note') {
             const noteData = data as NoteNodeData;
             const node = instance.node as ConstantSourceNode;
@@ -1445,9 +1876,7 @@ export class AudioEngine {
             }
         } else if (instance.type === 'delay') {
             const node = instance.node as DelayNode;
-            if ('delayTime' in data && typeof data.delayTime === 'number') {
-                node.delayTime.setTargetAtTime(data.delayTime, currentTime, 0.01);
-            }
+            if ('delayTime' in data && typeof data.delayTime === 'number') node.delayTime.setTargetAtTime(data.delayTime, currentTime, 0.01);
             if ('feedback' in data && typeof data.feedback === 'number' && instance.feedbackGain) {
                 instance.feedbackGain.gain.setTargetAtTime(data.feedback, currentTime, 0.01);
             }
@@ -1461,16 +1890,118 @@ export class AudioEngine {
             if ('decay' in data && typeof data.decay === 'number' && instance.reverbConvolver) {
                 instance.reverbConvolver.buffer = createReverbImpulse(this.audioContext, data.decay);
             }
+        } else if (instance.type === 'compressor') {
+            const node = instance.node as DynamicsCompressorNode;
+            if ('threshold' in data && typeof data.threshold === 'number') node.threshold.setTargetAtTime(data.threshold, currentTime, 0.01);
+            if ('knee' in data && typeof data.knee === 'number') node.knee.setTargetAtTime(data.knee, currentTime, 0.01);
+            if ('ratio' in data && typeof data.ratio === 'number') node.ratio.setTargetAtTime(data.ratio, currentTime, 0.01);
+            if ('attack' in data && typeof data.attack === 'number') node.attack.setTargetAtTime(data.attack, currentTime, 0.01);
+            if ('release' in data && typeof data.release === 'number') node.release.setTargetAtTime(data.release, currentTime, 0.01);
+        } else if (instance.type === 'distortion') {
+            if ('drive' in data && typeof data.drive === 'number' && instance.distortionDriveGain) {
+                instance.distortionDriveGain.gain.setTargetAtTime(1 + data.drive * 5, currentTime, 0.01);
+                if (instance.distortionWaveShaper) {
+                    const visualData = this.nodeById.get(nodeId)?.data as DistortionNodeData | undefined;
+                    const preset = visualData?.distortionType === 'hard'
+                        ? 'hardClip'
+                        : visualData?.distortionType === 'saturate'
+                            ? 'saturate'
+                            : 'softClip';
+                    instance.distortionWaveShaper.curve = createWaveShaperCurve(data.drive, preset);
+                }
+            }
+            if ('level' in data && typeof data.level === 'number' && instance.distortionOutputGain) {
+                instance.distortionOutputGain.gain.setTargetAtTime(data.level, currentTime, 0.01);
+            }
+            if ('mix' in data && typeof data.mix === 'number' && instance.distortionWetGain && instance.distortionDryGain) {
+                instance.distortionWetGain.gain.setTargetAtTime(data.mix, currentTime, 0.01);
+                instance.distortionDryGain.gain.setTargetAtTime(1 - data.mix, currentTime, 0.01);
+            }
+            if ('tone' in data && typeof data.tone === 'number' && instance.distortionToneFilter) {
+                instance.distortionToneFilter.frequency.setTargetAtTime(data.tone, currentTime, 0.01);
+            }
+            if ('distortionType' in data && typeof data.distortionType === 'string' && instance.distortionWaveShaper) {
+                const visualData = this.nodeById.get(nodeId)?.data as DistortionNodeData | undefined;
+                const drive = visualData?.drive ?? 0.5;
+                const preset = data.distortionType === 'hard'
+                    ? 'hardClip'
+                    : data.distortionType === 'saturate'
+                        ? 'saturate'
+                        : 'softClip';
+                instance.distortionWaveShaper.curve = createWaveShaperCurve(drive, preset);
+            }
+        } else if (instance.type === 'chorus') {
+            if ('rate' in data && typeof data.rate === 'number' && instance.lfoOsc) {
+                instance.lfoOsc.frequency.setTargetAtTime(data.rate, currentTime, 0.01);
+            }
+            if ('depth' in data && typeof data.depth === 'number' && instance.chorusLfoGain) {
+                instance.chorusLfoGain.gain.setTargetAtTime(data.depth / 1000, currentTime, 0.01);
+            }
+            if ('feedback' in data && typeof data.feedback === 'number' && instance.chorusFeedbackGain) {
+                instance.chorusFeedbackGain.gain.setTargetAtTime(data.feedback, currentTime, 0.01);
+            }
+            if ('delay' in data && typeof data.delay === 'number' && instance.chorusDelay) {
+                instance.chorusDelay.delayTime.setTargetAtTime(data.delay / 1000, currentTime, 0.01);
+            }
+            if ('mix' in data && typeof data.mix === 'number' && instance.chorusWetGain && instance.chorusDryGain) {
+                instance.chorusWetGain.gain.setTargetAtTime(data.mix, currentTime, 0.01);
+                instance.chorusDryGain.gain.setTargetAtTime(1 - data.mix, currentTime, 0.01);
+            }
+        } else if (instance.type === 'noiseBurst') {
+            if (instance.noiseBurstData) {
+                if ('noiseType' in data && typeof data.noiseType === 'string') instance.noiseBurstData.noiseType = data.noiseType as NoiseBurstNodeData['noiseType'];
+                if ('duration' in data && typeof data.duration === 'number') instance.noiseBurstData.duration = data.duration;
+                if ('gain' in data && typeof data.gain === 'number') instance.noiseBurstData.gain = data.gain;
+                if ('attack' in data && typeof data.attack === 'number') instance.noiseBurstData.attack = data.attack;
+                if ('release' in data && typeof data.release === 'number') instance.noiseBurstData.release = data.release;
+            }
+        } else if (instance.type === 'waveShaper') {
+            const node = instance.node as WaveShaperNode;
+            const visualData = this.nodeById.get(nodeId)?.data as WaveShaperNodeData | undefined;
+            const preset = visualData?.preset ?? 'softClip';
+            const amount = typeof data.amount === 'number' ? data.amount : (visualData?.amount ?? 0.5);
+            node.curve = createWaveShaperCurve(amount, preset);
+            if ('oversample' in data && typeof data.oversample === 'string') {
+                node.oversample = data.oversample as OverSampleType;
+            }
+            if ('preset' in data && typeof data.preset === 'string') {
+                const presetValue = data.preset === 'hardClip'
+                    ? 'hardClip'
+                    : data.preset === 'saturate'
+                        ? 'saturate'
+                        : 'softClip';
+                node.curve = createWaveShaperCurve(amount, presetValue);
+            }
+        } else if (instance.type === 'convolver') {
+            const node = instance.node as ConvolverNode;
+            if ('normalize' in data && typeof data.normalize === 'boolean') node.normalize = data.normalize;
+            if ('impulseSrc' in data && typeof data.impulseSrc === 'string' && data.impulseSrc) {
+                this.loadConvolverImpulse(nodeId, data.impulseSrc);
+            }
+        } else if (instance.type === 'analyzer') {
+            const node = instance.node as AnalyserNode;
+            if ('fftSize' in data && typeof data.fftSize === 'number') node.fftSize = data.fftSize;
+            if ('smoothingTimeConstant' in data && typeof data.smoothingTimeConstant === 'number') node.smoothingTimeConstant = data.smoothingTimeConstant;
+        } else if (instance.type === 'panner3d') {
+            const node = instance.node as PannerNode;
+            if ('positionX' in data && typeof data.positionX === 'number') node.positionX.setTargetAtTime(data.positionX, currentTime, 0.01);
+            if ('positionY' in data && typeof data.positionY === 'number') node.positionY.setTargetAtTime(data.positionY, currentTime, 0.01);
+            if ('positionZ' in data && typeof data.positionZ === 'number') node.positionZ.setTargetAtTime(data.positionZ, currentTime, 0.01);
+            if ('refDistance' in data && typeof data.refDistance === 'number') node.refDistance = data.refDistance;
+            if ('maxDistance' in data && typeof data.maxDistance === 'number') node.maxDistance = data.maxDistance;
+            if ('rolloffFactor' in data && typeof data.rolloffFactor === 'number') node.rolloffFactor = data.rolloffFactor;
+            if ('panningModel' in data && typeof data.panningModel === 'string') node.panningModel = data.panningModel as PanningModelType;
+            if ('distanceModel' in data && typeof data.distanceModel === 'string') node.distanceModel = data.distanceModel as DistanceModelType;
         } else if (instance.type === 'panner') {
             const node = instance.node as StereoPannerNode;
-            if ('pan' in data && typeof data.pan === 'number') {
-                node.pan.setTargetAtTime(data.pan, currentTime, 0.01);
+            if ('pan' in data && typeof data.pan === 'number') node.pan.setTargetAtTime(data.pan, currentTime, 0.01);
+        } else if (instance.type === 'mediaStream') {
+            if ('requestMic' in data && typeof data.requestMic === 'boolean') {
+                this.attachMediaStream(nodeId, data.requestMic);
             }
         } else if (instance.type === 'output') {
             const node = instance.node as GainNode;
-            if ('masterGain' in data && typeof data.masterGain === 'number') {
-                node.gain.setTargetAtTime(data.masterGain, currentTime, 0.01);
-            }
+            if ('masterGain' in data && typeof data.masterGain === 'number') node.gain.setTargetAtTime(data.masterGain, currentTime, 0.01);
         } else if (instance.type === 'stepSequencer') {
             if (instance.sequencerData) {
                 if ('pattern' in data) instance.sequencerData.pattern = data.pattern as number[];
@@ -1501,12 +2032,47 @@ export class AudioEngine {
             }
             if ('depth' in data && typeof data.depth === 'number' && instance.params) {
                 const depthParam = instance.params.get('depth');
-                if (depthParam) {
-                    depthParam.setTargetAtTime(data.depth, currentTime, 0.01);
-                }
+                if (depthParam) depthParam.setTargetAtTime(data.depth, currentTime, 0.01);
             }
             if ('waveform' in data && typeof data.waveform === 'string' && instance.lfoOsc) {
                 instance.lfoOsc.type = data.waveform as OscillatorType;
+            }
+        } else if (instance.type === 'eventTrigger') {
+            if (!instance.eventTriggerData || !(instance.node instanceof ConstantSourceNode)) return;
+
+            if ('mode' in data && typeof data.mode === 'string') instance.eventTriggerData.mode = data.mode as EventTriggerNodeData['mode'];
+            if ('cooldownMs' in data && typeof data.cooldownMs === 'number') instance.eventTriggerData.cooldownMs = Math.max(0, data.cooldownMs);
+            if ('velocity' in data && typeof data.velocity === 'number') instance.eventTriggerData.velocity = Math.max(0, Math.min(1, data.velocity));
+            if ('duration' in data && typeof data.duration === 'number') instance.eventTriggerData.duration = Math.max(0, data.duration);
+            if ('note' in data && typeof data.note === 'number') instance.eventTriggerData.note = data.note;
+            if ('trackId' in data && typeof data.trackId === 'string') instance.eventTriggerData.trackId = data.trackId;
+
+            if ('token' in data && typeof data.token === 'number') {
+                const previous = instance.eventTriggerData.token;
+                const next = data.token;
+                instance.eventTriggerData.token = next;
+
+                const shouldEmit = instance.eventTriggerData.mode === 'rising'
+                    ? next > previous
+                    : !Object.is(next, previous);
+                if (!shouldEmit) return;
+
+                const nowMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
+                if ((nowMs - instance.eventTriggerData.lastEmitAtMs) < instance.eventTriggerData.cooldownMs) return;
+                instance.eventTriggerData.lastEmitAtMs = nowMs;
+
+                const startTime = Math.max(currentTime, this.audioContext.currentTime);
+                instance.node.offset.cancelScheduledValues(startTime);
+                instance.node.offset.setValueAtTime(1, startTime);
+                instance.node.offset.setValueAtTime(0, startTime + 0.02);
+
+                this.triggerSequencerTargets(
+                    nodeId,
+                    startTime,
+                    instance.eventTriggerData.velocity,
+                    Math.max(0.01, instance.eventTriggerData.duration),
+                    instance.eventTriggerData.note
+                );
             }
         } else if (instance.type === 'sampler' && instance.samplerData) {
             if ('src' in data && typeof data.src === 'string') instance.samplerData.src = data.src;

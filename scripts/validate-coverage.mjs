@@ -21,6 +21,7 @@ const expectedPublicSources = [
     'src/transport/TransportContext.tsx',
     'src/sequencer/Sequencer.tsx',
     'src/sequencer/Track.tsx',
+    'src/sequencer/EventTrigger.tsx',
     'src/analyzers/Analyzer.tsx',
     'src/sources/Sampler.tsx',
     'src/sources/Noise.tsx',
