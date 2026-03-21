@@ -143,6 +143,466 @@ const TRIGGER_EDGE_STYLE = { stroke: '#ff4466', strokeWidth: 2, strokeDasharray:
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
+const AUTO_LAYOUT_PADDING_X = 48;
+const AUTO_LAYOUT_PADDING_Y = 56;
+const AUTO_LAYOUT_COLUMN_GAP = 90;
+const AUTO_LAYOUT_ROW_GAP = 26;
+const AUTO_LAYOUT_BRANCH_GAP = 54;
+const AUTO_LAYOUT_COMPONENT_GAP_X = 120;
+const AUTO_LAYOUT_COMPONENT_GAP_Y = 96;
+
+const compareByCurrentPosition = (nodeById: Map<string, Node<AudioNodeData>>, leftId: string, rightId: string) => {
+    const left = nodeById.get(leftId);
+    const right = nodeById.get(rightId);
+    if (!left || !right) return 0;
+    if (left.position.x !== right.position.x) return left.position.x - right.position.x;
+    return left.position.y - right.position.y;
+};
+
+function computeAutoLayoutPositions(nodes: Node<AudioNodeData>[], edges: Edge[]): Map<string, XYPosition> {
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const positions = new Map<string, XYPosition>();
+    if (nodes.length === 0) return positions;
+
+    const getNodeWidth = (nodeId: string) => {
+        const node = nodeById.get(nodeId);
+        if (!node) return DEFAULT_NODE_SIZE.width;
+        const measured = (node as Node<AudioNodeData> & { measured?: { width?: number; height?: number } }).measured;
+        return measured?.width ?? DEFAULT_NODE_SIZE.width;
+    };
+
+    const getNodeHeight = (nodeId: string) => {
+        const node = nodeById.get(nodeId);
+        if (!node) return DEFAULT_NODE_SIZE.height;
+        const measured = (node as Node<AudioNodeData> & { measured?: { width?: number; height?: number } }).measured;
+        return measured?.height ?? DEFAULT_NODE_SIZE.height;
+    };
+
+    const allOutgoing = new Map<string, Set<string>>();
+    const allIncoming = new Map<string, Set<string>>();
+    const undirected = new Map<string, Set<string>>();
+    nodes.forEach((node) => {
+        allOutgoing.set(node.id, new Set());
+        allIncoming.set(node.id, new Set());
+        undirected.set(node.id, new Set());
+    });
+
+    edges.forEach((edge) => {
+        if (!nodeById.has(edge.source) || !nodeById.has(edge.target) || edge.source === edge.target) return;
+        allOutgoing.get(edge.source)?.add(edge.target);
+        allIncoming.get(edge.target)?.add(edge.source);
+        undirected.get(edge.source)?.add(edge.target);
+        undirected.get(edge.target)?.add(edge.source);
+    });
+
+    const sortedNodeIds = nodes.map((node) => node.id).sort((leftId, rightId) => compareByCurrentPosition(nodeById, leftId, rightId));
+    const weakVisited = new Set<string>();
+    const components: string[][] = [];
+
+    sortedNodeIds.forEach((startId) => {
+        if (weakVisited.has(startId)) return;
+        const queue = [startId];
+        weakVisited.add(startId);
+        const component: string[] = [];
+        while (queue.length > 0) {
+            const currentId = queue.shift();
+            if (!currentId) break;
+            component.push(currentId);
+            (undirected.get(currentId) ?? new Set<string>()).forEach((nextId) => {
+                if (weakVisited.has(nextId)) return;
+                weakVisited.add(nextId);
+                queue.push(nextId);
+            });
+        }
+        component.sort((leftId, rightId) => compareByCurrentPosition(nodeById, leftId, rightId));
+        components.push(component);
+    });
+
+    type ComponentLayout = {
+        ids: string[];
+        localPositions: Map<string, XYPosition>;
+        width: number;
+        height: number;
+        anchorX: number;
+        anchorY: number;
+    };
+
+    const componentLayouts: ComponentLayout[] = components.map((componentIds) => {
+        const idSet = new Set(componentIds);
+        const outgoing = new Map<string, Set<string>>();
+        const incoming = new Map<string, Set<string>>();
+        componentIds.forEach((id) => {
+            outgoing.set(id, new Set());
+            incoming.set(id, new Set());
+        });
+
+        componentIds.forEach((id) => {
+            (allOutgoing.get(id) ?? new Set<string>()).forEach((targetId) => {
+                if (!idSet.has(targetId)) return;
+                outgoing.get(id)?.add(targetId);
+                incoming.get(targetId)?.add(id);
+            });
+        });
+
+        const discoveryIndex = new Map<string, number>();
+        const lowLink = new Map<string, number>();
+        const stack: string[] = [];
+        const onStack = new Set<string>();
+        const sccByNode = new Map<string, number>();
+        const sccMembers: string[][] = [];
+        let nextIndex = 0;
+
+        const strongConnect = (nodeId: string) => {
+            discoveryIndex.set(nodeId, nextIndex);
+            lowLink.set(nodeId, nextIndex);
+            nextIndex += 1;
+            stack.push(nodeId);
+            onStack.add(nodeId);
+
+            (outgoing.get(nodeId) ?? new Set<string>()).forEach((targetId) => {
+                if (!discoveryIndex.has(targetId)) {
+                    strongConnect(targetId);
+                    lowLink.set(nodeId, Math.min(lowLink.get(nodeId) ?? 0, lowLink.get(targetId) ?? 0));
+                } else if (onStack.has(targetId)) {
+                    lowLink.set(nodeId, Math.min(lowLink.get(nodeId) ?? 0, discoveryIndex.get(targetId) ?? 0));
+                }
+            });
+
+            if ((lowLink.get(nodeId) ?? -1) !== (discoveryIndex.get(nodeId) ?? -2)) return;
+
+            const sccId = sccMembers.length;
+            const members: string[] = [];
+            while (stack.length > 0) {
+                const member = stack.pop();
+                if (!member) break;
+                onStack.delete(member);
+                members.push(member);
+                sccByNode.set(member, sccId);
+                if (member === nodeId) break;
+            }
+            members.sort((leftId, rightId) => compareByCurrentPosition(nodeById, leftId, rightId));
+            sccMembers.push(members);
+        };
+
+        componentIds.forEach((id) => {
+            if (!discoveryIndex.has(id)) strongConnect(id);
+        });
+
+        const sccOutgoing = new Map<number, Set<number>>();
+        const sccIndegree = new Map<number, number>();
+        const sccLevel = new Map<number, number>();
+        for (let sccId = 0; sccId < sccMembers.length; sccId += 1) {
+            sccOutgoing.set(sccId, new Set());
+            sccIndegree.set(sccId, 0);
+            sccLevel.set(sccId, 0);
+        }
+
+        outgoing.forEach((targets, sourceId) => {
+            const sourceScc = sccByNode.get(sourceId);
+            if (typeof sourceScc !== 'number') return;
+            targets.forEach((targetId) => {
+                const targetScc = sccByNode.get(targetId);
+                if (typeof targetScc !== 'number' || targetScc === sourceScc) return;
+                const nextTargets = sccOutgoing.get(sourceScc);
+                if (!nextTargets || nextTargets.has(targetScc)) return;
+                nextTargets.add(targetScc);
+                sccIndegree.set(targetScc, (sccIndegree.get(targetScc) ?? 0) + 1);
+            });
+        });
+
+        const getSccAnchor = (sccId: number) =>
+            Math.min(...(sccMembers[sccId] ?? []).map((id) => nodeById.get(id)?.position.x ?? Number.MAX_SAFE_INTEGER));
+
+        const sccQueue = Array.from({ length: sccMembers.length }, (_, index) => index)
+            .filter((sccId) => (sccIndegree.get(sccId) ?? 0) === 0)
+            .sort((left, right) => getSccAnchor(left) - getSccAnchor(right));
+        const sccVisited = new Set<number>();
+
+        while (sccQueue.length > 0) {
+            const currentScc = sccQueue.shift();
+            if (typeof currentScc !== 'number') break;
+            sccVisited.add(currentScc);
+            const currentLevel = sccLevel.get(currentScc) ?? 0;
+            (sccOutgoing.get(currentScc) ?? new Set<number>()).forEach((targetScc) => {
+                sccLevel.set(targetScc, Math.max(sccLevel.get(targetScc) ?? 0, currentLevel + 1));
+                const nextIndegree = (sccIndegree.get(targetScc) ?? 1) - 1;
+                sccIndegree.set(targetScc, nextIndegree);
+                if (nextIndegree === 0) sccQueue.push(targetScc);
+            });
+            sccQueue.sort((left, right) => getSccAnchor(left) - getSccAnchor(right));
+        }
+
+        const maxVisitedLevel = Array.from(sccLevel.values()).reduce((max, value) => Math.max(max, value), 0);
+        const unresolvedScc = Array.from({ length: sccMembers.length }, (_, index) => index)
+            .filter((sccId) => !sccVisited.has(sccId))
+            .sort((left, right) => getSccAnchor(left) - getSccAnchor(right));
+        unresolvedScc.forEach((sccId, index) => {
+            sccLevel.set(sccId, maxVisitedLevel + 1 + index);
+        });
+
+        const levelByNode = new Map<string, number>();
+        componentIds.forEach((id) => {
+            const sccId = sccByNode.get(id);
+            levelByNode.set(id, typeof sccId === 'number' ? (sccLevel.get(sccId) ?? 0) : 0);
+        });
+
+        const minLevel = componentIds.reduce((min, id) => Math.min(min, levelByNode.get(id) ?? 0), Number.MAX_SAFE_INTEGER);
+        const roots = componentIds
+            .filter((id) => (incoming.get(id)?.size ?? 0) === 0)
+            .sort((leftId, rightId) => compareByCurrentPosition(nodeById, leftId, rightId));
+        const branchRoots = (roots.length > 0 ? roots : componentIds.filter((id) => (levelByNode.get(id) ?? 0) === minLevel))
+            .sort((leftId, rightId) => compareByCurrentPosition(nodeById, leftId, rightId));
+        const fallbackRoot = branchRoots[0] ?? componentIds[0];
+        const branchByNode = new Map<string, string>();
+        branchRoots.forEach((rootId) => branchByNode.set(rootId, rootId));
+        const branchIndex = new Map<string, number>();
+        branchRoots.forEach((id, index) => branchIndex.set(id, index));
+
+        const levelsAscending = Array.from(new Set(componentIds.map((id) => levelByNode.get(id) ?? 0))).sort((a, b) => a - b);
+        levelsAscending.forEach((levelValue) => {
+            const idsAtLevel = componentIds
+                .filter((id) => (levelByNode.get(id) ?? 0) === levelValue)
+                .sort((leftId, rightId) => compareByCurrentPosition(nodeById, leftId, rightId));
+
+            idsAtLevel.forEach((id) => {
+                if (branchByNode.has(id)) return;
+                const candidates = Array.from(incoming.get(id) ?? new Set<string>())
+                    .filter((sourceId) => branchByNode.has(sourceId))
+                    .sort((leftId, rightId) => {
+                        const leftLevel = levelByNode.get(leftId) ?? 0;
+                        const rightLevel = levelByNode.get(rightId) ?? 0;
+                        if (leftLevel !== rightLevel) return rightLevel - leftLevel;
+                        const leftNode = nodeById.get(leftId);
+                        const rightNode = nodeById.get(rightId);
+                        const currentNode = nodeById.get(id);
+                        const leftDist = Math.abs((leftNode?.position.y ?? 0) - (currentNode?.position.y ?? 0));
+                        const rightDist = Math.abs((rightNode?.position.y ?? 0) - (currentNode?.position.y ?? 0));
+                        return leftDist - rightDist;
+                    });
+
+                if (candidates.length > 0) {
+                    const branch = branchByNode.get(candidates[0]) ?? fallbackRoot;
+                    branchByNode.set(id, branch);
+                    return;
+                }
+
+                const node = nodeById.get(id);
+                const nearestRoot = branchRoots
+                    .slice()
+                    .sort((leftId, rightId) => {
+                        const leftNode = nodeById.get(leftId);
+                        const rightNode = nodeById.get(rightId);
+                        const leftDist = Math.abs((leftNode?.position.y ?? 0) - (node?.position.y ?? 0));
+                        const rightDist = Math.abs((rightNode?.position.y ?? 0) - (node?.position.y ?? 0));
+                        return leftDist - rightDist;
+                    })[0] ?? fallbackRoot;
+                branchByNode.set(id, nearestRoot);
+            });
+        });
+
+        componentIds.forEach((id) => {
+            if (!branchByNode.has(id)) {
+                branchByNode.set(id, fallbackRoot);
+            }
+        });
+
+        const columns = new Map<number, string[]>();
+        componentIds.forEach((id) => {
+            const levelValue = levelByNode.get(id) ?? 0;
+            const list = columns.get(levelValue) ?? [];
+            list.push(id);
+            columns.set(levelValue, list);
+        });
+        const sortedColumns = Array.from(columns.keys()).sort((a, b) => a - b);
+        const columnNodeIds = sortedColumns.map((levelValue) =>
+            (columns.get(levelValue) ?? [])
+                .slice()
+                .sort((leftId, rightId) => {
+                    const leftBranch = branchByNode.get(leftId) ?? fallbackRoot;
+                    const rightBranch = branchByNode.get(rightId) ?? fallbackRoot;
+                    const leftBranchIndex = branchIndex.get(leftBranch) ?? Number.MAX_SAFE_INTEGER;
+                    const rightBranchIndex = branchIndex.get(rightBranch) ?? Number.MAX_SAFE_INTEGER;
+                    if (leftBranchIndex !== rightBranchIndex) return leftBranchIndex - rightBranchIndex;
+                    return compareByCurrentPosition(nodeById, leftId, rightId);
+                })
+        );
+
+        const buildIndexMap = (ids: string[]) => {
+            const map = new Map<string, number>();
+            ids.forEach((id, index) => map.set(id, index));
+            return map;
+        };
+
+        const getBarycenter = (neighbors: Set<string> | undefined, neighborIndex: Map<string, number>, expectedNeighborLevel: number) => {
+            if (!neighbors || neighbors.size === 0) return Number.NaN;
+            let sum = 0;
+            let count = 0;
+            neighbors.forEach((id) => {
+                if ((levelByNode.get(id) ?? -1) !== expectedNeighborLevel) return;
+                const index = neighborIndex.get(id);
+                if (typeof index !== 'number') return;
+                sum += index;
+                count += 1;
+            });
+            if (count === 0) return Number.NaN;
+            return sum / count;
+        };
+
+        for (let pass = 0; pass < 6; pass += 1) {
+            for (let columnIndex = 1; columnIndex < columnNodeIds.length; columnIndex += 1) {
+                const previousIndex = buildIndexMap(columnNodeIds[columnIndex - 1]);
+                const previousLevel = sortedColumns[columnIndex - 1];
+                columnNodeIds[columnIndex].sort((leftId, rightId) => {
+                    const leftScore = getBarycenter(incoming.get(leftId), previousIndex, previousLevel);
+                    const rightScore = getBarycenter(incoming.get(rightId), previousIndex, previousLevel);
+                    const leftValid = Number.isFinite(leftScore);
+                    const rightValid = Number.isFinite(rightScore);
+                    if (leftValid && rightValid && leftScore !== rightScore) return leftScore - rightScore;
+                    if (leftValid !== rightValid) return leftValid ? -1 : 1;
+                    const leftBranch = branchByNode.get(leftId) ?? fallbackRoot;
+                    const rightBranch = branchByNode.get(rightId) ?? fallbackRoot;
+                    const leftBranchIndex = branchIndex.get(leftBranch) ?? Number.MAX_SAFE_INTEGER;
+                    const rightBranchIndex = branchIndex.get(rightBranch) ?? Number.MAX_SAFE_INTEGER;
+                    if (leftBranchIndex !== rightBranchIndex) return leftBranchIndex - rightBranchIndex;
+                    return compareByCurrentPosition(nodeById, leftId, rightId);
+                });
+            }
+
+            for (let columnIndex = columnNodeIds.length - 2; columnIndex >= 0; columnIndex -= 1) {
+                const nextIndex = buildIndexMap(columnNodeIds[columnIndex + 1]);
+                const nextLevel = sortedColumns[columnIndex + 1];
+                columnNodeIds[columnIndex].sort((leftId, rightId) => {
+                    const leftScore = getBarycenter(outgoing.get(leftId), nextIndex, nextLevel);
+                    const rightScore = getBarycenter(outgoing.get(rightId), nextIndex, nextLevel);
+                    const leftValid = Number.isFinite(leftScore);
+                    const rightValid = Number.isFinite(rightScore);
+                    if (leftValid && rightValid && leftScore !== rightScore) return leftScore - rightScore;
+                    if (leftValid !== rightValid) return leftValid ? -1 : 1;
+                    const leftBranch = branchByNode.get(leftId) ?? fallbackRoot;
+                    const rightBranch = branchByNode.get(rightId) ?? fallbackRoot;
+                    const leftBranchIndex = branchIndex.get(leftBranch) ?? Number.MAX_SAFE_INTEGER;
+                    const rightBranchIndex = branchIndex.get(rightBranch) ?? Number.MAX_SAFE_INTEGER;
+                    if (leftBranchIndex !== rightBranchIndex) return leftBranchIndex - rightBranchIndex;
+                    return compareByCurrentPosition(nodeById, leftId, rightId);
+                });
+            }
+        }
+
+        const localPositions = new Map<string, XYPosition>();
+        let currentX = 0;
+        let maxHeight = 0;
+
+        sortedColumns.forEach((_, columnIndex) => {
+            const ids = columnNodeIds[columnIndex] ?? [];
+            const columnWidth = Math.max(DEFAULT_NODE_SIZE.width, ...ids.map((id) => getNodeWidth(id)));
+            let currentY = 0;
+            let previousBranch: string | null = null;
+            ids.forEach((id) => {
+                const branch = branchByNode.get(id) ?? fallbackRoot;
+                const height = getNodeHeight(id);
+                if (previousBranch !== null) {
+                    currentY += previousBranch === branch ? AUTO_LAYOUT_ROW_GAP : AUTO_LAYOUT_BRANCH_GAP;
+                }
+                localPositions.set(id, { x: currentX, y: currentY });
+                currentY += height;
+                previousBranch = branch;
+            });
+            maxHeight = Math.max(maxHeight, currentY);
+            currentX += columnWidth + AUTO_LAYOUT_COLUMN_GAP;
+        });
+
+        const width = Math.max(DEFAULT_NODE_SIZE.width, currentX > 0 ? currentX - AUTO_LAYOUT_COLUMN_GAP : DEFAULT_NODE_SIZE.width);
+        const height = Math.max(DEFAULT_NODE_SIZE.height, maxHeight);
+        const anchorX = Math.min(...componentIds.map((id) => nodeById.get(id)?.position.x ?? Number.MAX_SAFE_INTEGER));
+        const anchorY = Math.min(...componentIds.map((id) => nodeById.get(id)?.position.y ?? Number.MAX_SAFE_INTEGER));
+
+        return {
+            ids: componentIds,
+            localPositions,
+            width,
+            height,
+            anchorX,
+            anchorY,
+        };
+    });
+
+    componentLayouts.sort((left, right) => {
+        if (left.anchorX !== right.anchorX) return left.anchorX - right.anchorX;
+        return left.anchorY - right.anchorY;
+    });
+
+    const placed = componentLayouts.map((layout) => ({
+        layout,
+        x: layout.anchorX,
+        y: layout.anchorY,
+    }));
+
+    const intersectsWithGap = (left: { x: number; y: number; layout: { width: number; height: number } }, right: { x: number; y: number; layout: { width: number; height: number } }) => {
+        return (
+            left.x < right.x + right.layout.width + AUTO_LAYOUT_COMPONENT_GAP_X
+            && left.x + left.layout.width + AUTO_LAYOUT_COMPONENT_GAP_X > right.x
+            && left.y < right.y + right.layout.height + AUTO_LAYOUT_COMPONENT_GAP_Y
+            && left.y + left.layout.height + AUTO_LAYOUT_COMPONENT_GAP_Y > right.y
+        );
+    };
+
+    for (let pass = 0; pass < 16; pass += 1) {
+        let moved = false;
+        for (let i = 0; i < placed.length; i += 1) {
+            for (let j = i + 1; j < placed.length; j += 1) {
+                const first = placed[i];
+                const second = placed[j];
+                if (!intersectsWithGap(first, second)) continue;
+
+                const overlapX = Math.min(
+                    first.x + first.layout.width + AUTO_LAYOUT_COMPONENT_GAP_X - second.x,
+                    second.x + second.layout.width + AUTO_LAYOUT_COMPONENT_GAP_X - first.x
+                );
+                const overlapY = Math.min(
+                    first.y + first.layout.height + AUTO_LAYOUT_COMPONENT_GAP_Y - second.y,
+                    second.y + second.layout.height + AUTO_LAYOUT_COMPONENT_GAP_Y - first.y
+                );
+                const preferHorizontal = Math.abs(second.layout.anchorX - first.layout.anchorX) >= Math.abs(second.layout.anchorY - first.layout.anchorY);
+
+                if (preferHorizontal && overlapX > 0) {
+                    if (second.layout.anchorX >= first.layout.anchorX) {
+                        second.x += overlapX;
+                    } else {
+                        first.x += overlapX;
+                    }
+                    moved = true;
+                } else if (overlapY > 0) {
+                    if (second.layout.anchorY >= first.layout.anchorY) {
+                        second.y += overlapY;
+                    } else {
+                        first.y += overlapY;
+                    }
+                    moved = true;
+                }
+            }
+        }
+        if (!moved) break;
+    }
+
+    const minPlacedX = placed.reduce((min, item) => Math.min(min, item.x), Number.POSITIVE_INFINITY);
+    const minPlacedY = placed.reduce((min, item) => Math.min(min, item.y), Number.POSITIVE_INFINITY);
+    const offsetX = AUTO_LAYOUT_PADDING_X - minPlacedX;
+    const offsetY = AUTO_LAYOUT_PADDING_Y - minPlacedY;
+
+    placed.forEach((item) => {
+        item.layout.ids.forEach((id) => {
+            const local = item.layout.localPositions.get(id);
+            if (!local) return;
+            positions.set(id, {
+                x: item.x + local.x + offsetX,
+                y: item.y + local.y + offsetY,
+            });
+        });
+    });
+
+    return positions;
+}
+
 const formatBytes = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -491,6 +951,7 @@ export const PlaygroundDemo: FC = () => {
     const saveTimerRef = useRef<number | null>(null);
     const flowRef = useRef<{
         screenToFlowPosition: (clientPosition: XYPosition, options?: { snapToGrid: boolean }) => XYPosition;
+        fitView?: (options?: { padding?: number; duration?: number }) => void;
     } | null>(null);
     const canvasRef = useRef<HTMLDivElement | null>(null);
     const ignorePaneClickUntilRef = useRef(0);
@@ -1113,6 +1574,22 @@ export const PlaygroundDemo: FC = () => {
         setSelectedNode(null);
     }, [resetConnectionAssist, setSelectedNode]);
 
+    const handleAutoArrangeNodes = useCallback(() => {
+        if (nodes.length <= 1) return;
+        const nextPositions = computeAutoLayoutPositions(nodes, edges);
+        const positionChanges = nodes.map((node) => ({
+            id: node.id,
+            type: 'position' as const,
+            position: nextPositions.get(node.id) ?? node.position,
+            dragging: false,
+        }));
+
+        onNodesChange(positionChanges as any);
+        window.setTimeout(() => {
+            flowRef.current?.fitView?.({ padding: 0.16, duration: 260 });
+        }, 0);
+    }, [edges, nodes, onNodesChange]);
+
     const isValidConnection = useCallback((connection: Parameters<typeof canConnect>[0]) => {
         return canConnect(connection, new Map(nodes.map((node) => [node.id, node])));
     }, [nodes]);
@@ -1297,34 +1774,81 @@ export const PlaygroundDemo: FC = () => {
                         <button
                             onClick={() => {
                                 const notes = [
-                                    { pitch: 60, step: 0, duration: 4, velocity: 0.62 },  // C4
-                                    { pitch: 67, step: 6, duration: 6, velocity: 0.58 },  // G4
-                                    { pitch: 64, step: 14, duration: 5, velocity: 0.54 }, // E4
-                                    { pitch: 71, step: 22, duration: 6, velocity: 0.5 },  // B4
+                                    { pitch: 60, step: 0, duration: 6, velocity: 0.58 },  // C4
+                                    { pitch: 67, step: 5, duration: 5, velocity: 0.54 },  // G4
+                                    { pitch: 64, step: 11, duration: 6, velocity: 0.5 },  // E4
+                                    { pitch: 71, step: 18, duration: 5, velocity: 0.47 }, // B4
+                                    { pitch: 69, step: 24, duration: 7, velocity: 0.52 }, // A4
+                                ];
+                                const birdNotes = [
+                                    { pitch: 84, step: 2, duration: 1, velocity: 0.4 },   // C6
+                                    { pitch: 88, step: 6, duration: 1, velocity: 0.35 },  // E6
+                                    { pitch: 86, step: 9, duration: 1, velocity: 0.32 },  // D6
+                                    { pitch: 91, step: 13, duration: 1, velocity: 0.37 }, // G6
+                                    { pitch: 89, step: 17, duration: 1, velocity: 0.34 }, // F6
+                                    { pitch: 93, step: 21, duration: 1, velocity: 0.39 }, // A6
+                                    { pitch: 86, step: 25, duration: 2, velocity: 0.31 }, // D6
+                                    { pitch: 90, step: 29, duration: 1, velocity: 0.36 }, // F#6
                                 ];
                                 const pumpPattern = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
+                                const laughPattern = [1, 0, 0.45, 0, 0.72, 0, 0.3, 0, 0.84, 0.2, 0, 0.55, 0, 0.34, 0, 0];
                                 const nodes: Node<AudioNodeData>[] = [
                                     { id: 'transport', type: 'transportNode', dragHandle: '.node-header', position: { x: 40, y: 60 }, data: { type: 'transport', bpm: 84, playing: true, label: 'Transport' } as any },
                                     { id: 'pianoroll', type: 'pianoRollNode', dragHandle: '.node-header', position: { x: 40, y: 220 }, data: { type: 'pianoRoll', steps: 32, octaves: 3, baseNote: 48, notes, label: 'Piano Roll' } as any },
                                     { id: 'voice', type: 'voiceNode', dragHandle: '.node-header', position: { x: 320, y: 220 }, data: { type: 'voice', portamento: 0.08, label: 'Voice' } as any },
-                                    { id: 'osc-pad-a', type: 'oscNode', dragHandle: '.node-header', position: { x: 570, y: 150 }, data: { type: 'osc', frequency: 0, waveform: 'sine', detune: -6, label: 'Osc Pad A' } as any },
-                                    { id: 'osc-pad-b', type: 'oscNode', dragHandle: '.node-header', position: { x: 570, y: 320 }, data: { type: 'osc', frequency: 0, waveform: 'triangle', detune: 5, label: 'Osc Pad B' } as any },
-                                    { id: 'adsr-pad', type: 'adsrNode', dragHandle: '.node-header', position: { x: 570, y: 470 }, data: { type: 'adsr', attack: 0.35, decay: 1.8, sustain: 0.72, release: 2.8, label: 'ADSR Pad' } as any },
+                                    { id: 'osc-pad-a', type: 'oscNode', dragHandle: '.node-header', position: { x: 560, y: 130 }, data: { type: 'osc', frequency: 0, waveform: 'sine', detune: -7, label: 'Osc Pad A' } as any },
+                                    { id: 'osc-pad-b', type: 'oscNode', dragHandle: '.node-header', position: { x: 560, y: 300 }, data: { type: 'osc', frequency: 0, waveform: 'triangle', detune: 6, label: 'Osc Pad B' } as any },
+                                    { id: 'adsr-pad', type: 'adsrNode', dragHandle: '.node-header', position: { x: 560, y: 460 }, data: { type: 'adsr', attack: 0.42, decay: 2.2, sustain: 0.68, release: 3.2, label: 'ADSR Pad' } as any },
                                     { id: 'gain-a', type: 'gainNode', dragHandle: '.node-header', position: { x: 830, y: 150 }, data: { type: 'gain', gain: 0, label: 'Gain A' } as any },
                                     { id: 'gain-b', type: 'gainNode', dragHandle: '.node-header', position: { x: 830, y: 320 }, data: { type: 'gain', gain: 0, label: 'Gain B' } as any },
+                                    { id: 'pianoroll-birds', type: 'pianoRollNode', dragHandle: '.node-header', position: { x: 40, y: 460 }, data: { type: 'pianoRoll', steps: 32, octaves: 2, baseNote: 72, notes: birdNotes, label: 'Bird Piano Roll' } as any },
+                                    { id: 'voice-birds', type: 'voiceNode', dragHandle: '.node-header', position: { x: 320, y: 460 }, data: { type: 'voice', portamento: 0.01, label: 'Bird Voice' } as any },
+                                    { id: 'osc-birds', type: 'oscNode', dragHandle: '.node-header', position: { x: 560, y: 610 }, data: { type: 'osc', frequency: 0, waveform: 'sine', detune: 0, label: 'Bird Osc' } as any },
+                                    { id: 'adsr-birds', type: 'adsrNode', dragHandle: '.node-header', position: { x: 560, y: 760 }, data: { type: 'adsr', attack: 0.01, decay: 0.12, sustain: 0.08, release: 0.18, label: 'Bird Envelope' } as any },
+                                    { id: 'gain-birds', type: 'gainNode', dragHandle: '.node-header', position: { x: 830, y: 650 }, data: { type: 'gain', gain: 0, label: 'Bird Gain' } as any },
+                                    { id: 'filter-birds', type: 'filterNode', dragHandle: '.node-header', position: { x: 1070, y: 620 }, data: { type: 'filter', filterType: 'highpass', frequency: 2200, detune: 0, q: 0.75, gain: 0, label: 'Bird Filter' } as any },
+                                    { id: 'panner-birds', type: 'pannerNode', dragHandle: '.node-header', position: { x: 1300, y: 620 }, data: { type: 'panner', pan: -0.15, label: 'Bird Pan' } as any },
+                                    { id: 'lfo-bird-vibrato', type: 'lfoNode', dragHandle: '.node-header', position: { x: 560, y: 900 }, data: { type: 'lfo', rate: 5.6, depth: 18, waveform: 'sine', label: 'Bird Vibrato LFO' } as any },
+                                    { id: 'lfo-pan-birds', type: 'lfoNode', dragHandle: '.node-header', position: { x: 1300, y: 780 }, data: { type: 'lfo', rate: 0.09, depth: 0.35, waveform: 'sine', label: 'Bird Pan LFO' } as any },
+                                    { id: 'laugh-seq', type: 'stepSequencerNode', dragHandle: '.node-header', position: { x: 40, y: 1020 }, data: { type: 'stepSequencer', steps: 16, pattern: laughPattern, activeSteps: laughPattern.map((value) => value > 0), label: 'Laugh Sequencer' } as any },
+                                    { id: 'noise-laugh', type: 'noiseBurstNode', dragHandle: '.node-header', position: { x: 320, y: 1020 }, data: { type: 'noiseBurst', noiseType: 'pink', duration: 0.1, gain: 0.22, attack: 0.002, release: 0.12, label: 'Laugh Burst' } as any },
+                                    { id: 'filter-laugh', type: 'filterNode', dragHandle: '.node-header', position: { x: 560, y: 1030 }, data: { type: 'filter', filterType: 'bandpass', frequency: 1400, detune: 0, q: 6, gain: 0, label: 'Laugh Filter' } as any },
+                                    { id: 'chorus-laugh', type: 'chorusNode', dragHandle: '.node-header', position: { x: 830, y: 1030 }, data: { type: 'chorus', rate: 1.8, depth: 1.4, feedback: 0.07, delay: 11, mix: 0.28, stereo: true, label: 'Laugh Chorus' } as any },
+                                    { id: 'gain-laugh', type: 'gainNode', dragHandle: '.node-header', position: { x: 1070, y: 1030 }, data: { type: 'gain', gain: 0.22, label: 'Laugh Gain' } as any },
+                                    { id: 'panner-laugh', type: 'pannerNode', dragHandle: '.node-header', position: { x: 1300, y: 1030 }, data: { type: 'panner', pan: 0.18, label: 'Laugh Pan' } as any },
+                                    { id: 'lfo-laugh-formant', type: 'lfoNode', dragHandle: '.node-header', position: { x: 560, y: 1180 }, data: { type: 'lfo', rate: 3.2, depth: 420, waveform: 'triangle', label: 'Laugh Formant LFO' } as any },
+                                    { id: 'lfo-pan-laugh', type: 'lfoNode', dragHandle: '.node-header', position: { x: 1300, y: 1180 }, data: { type: 'lfo', rate: 0.07, depth: 0.28, waveform: 'sawtooth', label: 'Laugh Pan LFO' } as any },
                                     { id: 'input-ui', type: 'uiTokensNode', dragHandle: '.node-header', position: { x: 40, y: 540 }, data: createUiTokensNodeData() as any },
-                                    { id: 'evt-hover', type: 'eventTriggerNode', dragHandle: '.node-header', position: { x: 320, y: 560 }, data: { type: 'eventTrigger', token: 0, mode: 'change', cooldownMs: 120, velocity: 0.5, duration: 0.18, note: 79, trackId: 'hover', label: 'Event Trigger' } as any },
-                                    { id: 'noise-accent', type: 'noiseBurstNode', dragHandle: '.node-header', position: { x: 570, y: 620 }, data: { type: 'noiseBurst', noiseType: 'pink', duration: 0.12, gain: 0.35, attack: 0.004, release: 0.08, label: 'Noise Burst Accent' } as any },
+                                    { id: 'evt-hover', type: 'eventTriggerNode', dragHandle: '.node-header', position: { x: 320, y: 540 }, data: { type: 'eventTrigger', token: 0, mode: 'change', cooldownMs: 120, velocity: 0.52, duration: 0.16, note: 91, trackId: 'hover', label: 'Event Trigger' } as any },
+                                    { id: 'noise-accent', type: 'noiseBurstNode', dragHandle: '.node-header', position: { x: 560, y: 520 }, data: { type: 'noiseBurst', noiseType: 'white', duration: 0.08, gain: 0.2, attack: 0.001, release: 0.06, label: 'Air Accent Burst' } as any },
+                                    { id: 'filter-accent', type: 'filterNode', dragHandle: '.node-header', position: { x: 830, y: 500 }, data: { type: 'filter', filterType: 'highpass', frequency: 2600, detune: 0, q: 0.8, gain: 0, label: 'Accent Filter' } as any },
+                                    { id: 'gain-accent', type: 'gainNode', dragHandle: '.node-header', position: { x: 1070, y: 500 }, data: { type: 'gain', gain: 0.14, label: 'Accent Gain' } as any },
                                     { id: 'pump-seq', type: 'stepSequencerNode', dragHandle: '.node-header', position: { x: 40, y: 720 }, data: { type: 'stepSequencer', steps: 16, pattern: pumpPattern, activeSteps: pumpPattern.map((value) => value > 0), label: 'Step Sequencer Pump' } as any },
-                                    { id: 'noise-pump', type: 'noiseBurstNode', dragHandle: '.node-header', position: { x: 320, y: 760 }, data: { type: 'noiseBurst', noiseType: 'white', duration: 0.05, gain: 0.45, attack: 0.001, release: 0.02, label: 'Noise Burst Pump' } as any },
-                                    { id: 'matrix', type: 'matrixMixerNode', dragHandle: '.node-header', position: { x: 1120, y: 260 }, data: { type: 'matrixMixer', inputs: 3, outputs: 3, matrix: [[0.72, 0.22, 0.06], [0.68, 0.2, 0.05], [0.12, 0.18, 0.55]], label: 'Matrix Mixer' } as any },
-                                    { id: 'lfo-air', type: 'lfoNode', dragHandle: '.node-header', position: { x: 1120, y: 40 }, data: { type: 'lfo', rate: 0.08, depth: 260, waveform: 'sine', label: 'LFO Air' } as any },
-                                    { id: 'pad-filter', type: 'filterNode', dragHandle: '.node-header', position: { x: 1370, y: 150 }, data: { type: 'filter', filterType: 'lowpass', frequency: 980, detune: 0, q: 0.85, gain: 0, label: 'Pad Filter' } as any },
-                                    { id: 'compressor', type: 'compressorNode', dragHandle: '.node-header', position: { x: 1610, y: 150 }, data: { type: 'compressor', threshold: -20, knee: 26, ratio: 3.5, attack: 0.01, release: 0.22, sidechainStrength: 0.38, label: 'Compressor' } as any },
-                                    { id: 'reverb', type: 'reverbNode', dragHandle: '.node-header', position: { x: 1610, y: 350 }, data: { type: 'reverb', decay: 4.2, mix: 0.85, label: 'Reverb' } as any },
-                                    { id: 'gain-spark', type: 'gainNode', dragHandle: '.node-header', position: { x: 1610, y: 520 }, data: { type: 'gain', gain: 0.25, label: 'Spark Gain' } as any },
-                                    { id: 'mixer-main', type: 'mixerNode', dragHandle: '.node-header', position: { x: 1870, y: 300 }, data: { type: 'mixer', inputs: 3, label: 'Final Mixer' } as any },
-                                    { id: 'output', type: 'outputNode', dragHandle: '.node-header', position: { x: 2120, y: 300 }, data: { type: 'output', masterGain: 0.5, playing: false, label: 'Output' } as any },
+                                    { id: 'noise-pump', type: 'noiseBurstNode', dragHandle: '.node-header', position: { x: 320, y: 740 }, data: { type: 'noiseBurst', noiseType: 'white', duration: 0.05, gain: 0.62, attack: 0.001, release: 0.022, label: 'Noise Burst Pump' } as any },
+                                    { id: 'matrix', type: 'matrixMixerNode', dragHandle: '.node-header', position: { x: 1570, y: 520 }, data: { type: 'matrixMixer', inputs: 5, outputs: 4, matrix: [[0.58, 0.24, 0.08, 0.04], [0.54, 0.28, 0.08, 0.06], [0.08, 0.36, 0.14, 0.24], [0.04, 0.18, 0.32, 0.22], [0.02, 0.08, 0.14, 0.28]], label: 'Matrix Mixer' } as any },
+                                    { id: 'lfo-phase-a', type: 'lfoNode', dragHandle: '.node-header', position: { x: 1570, y: 140 }, data: { type: 'lfo', rate: 0.012, depth: 0.5, waveform: 'sine', label: 'Phase LFO A' } as any },
+                                    { id: 'lfo-phase-b', type: 'lfoNode', dragHandle: '.node-header', position: { x: 1570, y: 280 }, data: { type: 'lfo', rate: 0.018, depth: 0.5, waveform: 'triangle', label: 'Phase LFO B' } as any },
+                                    { id: 'math-shift-a', type: 'mathNode', dragHandle: '.node-header', position: { x: 1810, y: 120 }, data: { type: 'math', operation: 'add', a: 0, b: 0.5, c: 0, label: 'Shift A' } as any },
+                                    { id: 'math-shift-b', type: 'mathNode', dragHandle: '.node-header', position: { x: 1810, y: 260 }, data: { type: 'math', operation: 'add', a: 0, b: 0.5, c: 0, label: 'Shift B' } as any },
+                                    { id: 'clamp-phase-a', type: 'clampNode', dragHandle: '.node-header', position: { x: 2050, y: 120 }, data: { type: 'clamp', mode: 'minmax', value: 0.5, min: 0, max: 1, label: 'Clamp Phase A' } as any },
+                                    { id: 'clamp-phase-b', type: 'clampNode', dragHandle: '.node-header', position: { x: 2050, y: 260 }, data: { type: 'clamp', mode: 'minmax', value: 0.5, min: 0, max: 1, label: 'Clamp Phase B' } as any },
+                                    { id: 'math-phase-invert', type: 'mathNode', dragHandle: '.node-header', position: { x: 2290, y: 260 }, data: { type: 'math', operation: 'subtract', a: 1, b: 0.5, c: 0, label: 'Invert B' } as any },
+                                    { id: 'clamp-phase-invert', type: 'clampNode', dragHandle: '.node-header', position: { x: 2530, y: 260 }, data: { type: 'clamp', mode: 'minmax', value: 0.5, min: 0, max: 1, label: 'Clamp Invert B' } as any },
+                                    { id: 'mix-pad-body', type: 'mixNode', dragHandle: '.node-header', position: { x: 2290, y: 70 }, data: { type: 'mix', a: 0.66, b: 0.28, t: 0.5, clamp: true, label: 'Pad Body Mix' } as any },
+                                    { id: 'mix-pad-air', type: 'mixNode', dragHandle: '.node-header', position: { x: 2290, y: 150 }, data: { type: 'mix', a: 0.18, b: 0.42, t: 0.5, clamp: true, label: 'Pad Air Mix' } as any },
+                                    { id: 'mix-birds', type: 'mixNode', dragHandle: '.node-header', position: { x: 2290, y: 340 }, data: { type: 'mix', a: 0.06, b: 0.24, t: 0.5, clamp: true, label: 'Bird Mix' } as any },
+                                    { id: 'mix-laugh', type: 'mixNode', dragHandle: '.node-header', position: { x: 2530, y: 340 }, data: { type: 'mix', a: 0.02, b: 0.18, t: 0.5, clamp: true, label: 'Laugh Mix' } as any },
+                                    { id: 'mix-accent', type: 'mixNode', dragHandle: '.node-header', position: { x: 2530, y: 70 }, data: { type: 'mix', a: 0.04, b: 0.16, t: 0.5, clamp: true, label: 'Accent Mix' } as any },
+                                    { id: 'lfo-pad-filter', type: 'lfoNode', dragHandle: '.node-header', position: { x: 1810, y: 520 }, data: { type: 'lfo', rate: 0.043, depth: 240, waveform: 'sine', label: 'Pad Filter LFO' } as any },
+                                    { id: 'pad-filter', type: 'filterNode', dragHandle: '.node-header', position: { x: 2050, y: 520 }, data: { type: 'filter', filterType: 'lowpass', frequency: 1100, detune: 0, q: 0.82, gain: 0, label: 'Pad Filter' } as any },
+                                    { id: 'compressor', type: 'compressorNode', dragHandle: '.node-header', position: { x: 2290, y: 520 }, data: { type: 'compressor', threshold: -18, knee: 20, ratio: 2.4, attack: 0.02, release: 0.3, sidechainStrength: 0.3, label: 'Compressor' } as any },
+                                    { id: 'reverb-main', type: 'reverbNode', dragHandle: '.node-header', position: { x: 2050, y: 700 }, data: { type: 'reverb', decay: 5.2, mix: 0.5, label: 'Main Reverb' } as any },
+                                    { id: 'delay-haze', type: 'delayNode', dragHandle: '.node-header', position: { x: 2050, y: 890 }, data: { type: 'delay', delayTime: 0.38, feedback: 0.33, label: 'Haze Delay' } as any },
+                                    { id: 'haze-filter', type: 'filterNode', dragHandle: '.node-header', position: { x: 2290, y: 890 }, data: { type: 'filter', filterType: 'lowpass', frequency: 2400, detune: 0, q: 0.7, gain: 0, label: 'Haze Filter' } as any },
+                                    { id: 'gain-spark', type: 'gainNode', dragHandle: '.node-header', position: { x: 2050, y: 1070 }, data: { type: 'gain', gain: 0.2, label: 'Spark Gain' } as any },
+                                    { id: 'reverb-spark', type: 'reverbNode', dragHandle: '.node-header', position: { x: 2290, y: 1070 }, data: { type: 'reverb', decay: 1.8, mix: 0.35, label: 'Spark Reverb' } as any },
+                                    { id: 'mixer-main', type: 'mixerNode', dragHandle: '.node-header', position: { x: 2530, y: 760 }, data: { type: 'mixer', inputs: 4, label: 'Final Mixer' } as any },
+                                    { id: 'output', type: 'outputNode', dragHandle: '.node-header', position: { x: 2770, y: 760 }, data: { type: 'output', masterGain: 0.5, playing: false, label: 'Output' } as any },
                                 ];
                                 const edges = [
                                     { id: 'e-t-pr', source: 'transport', target: 'pianoroll', style: CONTROL_EDGE_STYLE, animated: true },
@@ -1338,20 +1862,68 @@ export const PlaygroundDemo: FC = () => {
                                     { id: 'e-adsr-gain-b', source: 'adsr-pad', sourceHandle: 'envelope', target: 'gain-b', targetHandle: 'gain', style: CONTROL_EDGE_STYLE, animated: true },
                                     { id: 'e-gain-a-matrix', source: 'gain-a', sourceHandle: 'out', target: 'matrix', targetHandle: 'in1', style: AUDIO_EDGE_STYLE, animated: false },
                                     { id: 'e-gain-b-matrix', source: 'gain-b', sourceHandle: 'out', target: 'matrix', targetHandle: 'in2', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-t-birds', source: 'transport', target: 'pianoroll-birds', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-birds-v', source: 'pianoroll-birds', sourceHandle: 'trigger', target: 'voice-birds', targetHandle: 'trigger', style: TRIGGER_EDGE_STYLE, animated: true },
+                                    { id: 'e-birds-note', source: 'voice-birds', sourceHandle: 'note', target: 'osc-birds', targetHandle: 'frequency', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-birds-gate', source: 'voice-birds', sourceHandle: 'gate', target: 'adsr-birds', targetHandle: 'gate', style: TRIGGER_EDGE_STYLE, animated: true },
+                                    { id: 'e-birds-vibrato', source: 'lfo-bird-vibrato', sourceHandle: 'out', target: 'osc-birds', targetHandle: 'detune', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-birds-audio', source: 'osc-birds', sourceHandle: 'out', target: 'gain-birds', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-birds-env', source: 'adsr-birds', sourceHandle: 'envelope', target: 'gain-birds', targetHandle: 'gain', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-birds-filter', source: 'gain-birds', sourceHandle: 'out', target: 'filter-birds', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-birds-pan', source: 'filter-birds', sourceHandle: 'out', target: 'panner-birds', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-birds-pan-lfo', source: 'lfo-pan-birds', sourceHandle: 'out', target: 'panner-birds', targetHandle: 'pan', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-birds-matrix', source: 'panner-birds', sourceHandle: 'out', target: 'matrix', targetHandle: 'in3', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-t-laugh', source: 'transport', target: 'laugh-seq', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-laugh-trigger', source: 'laugh-seq', sourceHandle: 'trigger', target: 'noise-laugh', targetHandle: 'trigger', style: TRIGGER_EDGE_STYLE, animated: true },
+                                    { id: 'e-laugh-filter', source: 'noise-laugh', sourceHandle: 'out', target: 'filter-laugh', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-laugh-formant', source: 'lfo-laugh-formant', sourceHandle: 'out', target: 'filter-laugh', targetHandle: 'frequency', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-laugh-chorus', source: 'filter-laugh', sourceHandle: 'out', target: 'chorus-laugh', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-laugh-gain', source: 'chorus-laugh', sourceHandle: 'out', target: 'gain-laugh', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-laugh-pan', source: 'gain-laugh', sourceHandle: 'out', target: 'panner-laugh', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-laugh-pan-lfo', source: 'lfo-pan-laugh', sourceHandle: 'out', target: 'panner-laugh', targetHandle: 'pan', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-laugh-matrix', source: 'panner-laugh', sourceHandle: 'out', target: 'matrix', targetHandle: 'in4', style: AUDIO_EDGE_STYLE, animated: false },
                                     { id: 'e-ui-hover-token', source: 'input-ui', sourceHandle: getInputParamHandleId('hoverToken'), target: 'evt-hover', targetHandle: 'token', style: CONTROL_EDGE_STYLE, animated: true },
                                     { id: 'e-evt-accent', source: 'evt-hover', sourceHandle: 'trigger', target: 'noise-accent', targetHandle: 'trigger', style: TRIGGER_EDGE_STYLE, animated: true },
-                                    { id: 'e-accent-matrix', source: 'noise-accent', sourceHandle: 'out', target: 'matrix', targetHandle: 'in3', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-accent-filter', source: 'noise-accent', sourceHandle: 'out', target: 'filter-accent', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-accent-gain', source: 'filter-accent', sourceHandle: 'out', target: 'gain-accent', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-accent-matrix', source: 'gain-accent', sourceHandle: 'out', target: 'matrix', targetHandle: 'in5', style: AUDIO_EDGE_STYLE, animated: false },
                                     { id: 'e-t-pump', source: 'transport', target: 'pump-seq', style: CONTROL_EDGE_STYLE, animated: true },
                                     { id: 'e-pump-trigger', source: 'pump-seq', sourceHandle: 'trigger', target: 'noise-pump', targetHandle: 'trigger', style: TRIGGER_EDGE_STYLE, animated: true },
                                     { id: 'e-sidechain', source: 'noise-pump', sourceHandle: 'out', target: 'compressor', targetHandle: 'sidechainIn', style: AUDIO_EDGE_STYLE, animated: false },
-                                    { id: 'e-lfo-filter', source: 'lfo-air', sourceHandle: 'out', target: 'pad-filter', targetHandle: 'frequency', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-phase-a-shift', source: 'lfo-phase-a', sourceHandle: 'out', target: 'math-shift-a', targetHandle: 'a', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-phase-b-shift', source: 'lfo-phase-b', sourceHandle: 'out', target: 'math-shift-b', targetHandle: 'a', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-shift-a-clamp', source: 'math-shift-a', sourceHandle: 'out', target: 'clamp-phase-a', targetHandle: 'value', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-shift-b-clamp', source: 'math-shift-b', sourceHandle: 'out', target: 'clamp-phase-b', targetHandle: 'value', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-b-invert', source: 'clamp-phase-b', sourceHandle: 'out', target: 'math-phase-invert', targetHandle: 'b', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-invert-clamp', source: 'math-phase-invert', sourceHandle: 'out', target: 'clamp-phase-invert', targetHandle: 'value', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-phase-a-pad-body', source: 'clamp-phase-a', sourceHandle: 'out', target: 'mix-pad-body', targetHandle: 't', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-phase-b-pad-air', source: 'clamp-phase-b', sourceHandle: 'out', target: 'mix-pad-air', targetHandle: 't', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-phase-b-birds', source: 'clamp-phase-b', sourceHandle: 'out', target: 'mix-birds', targetHandle: 't', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-phase-invert-laugh', source: 'clamp-phase-invert', sourceHandle: 'out', target: 'mix-laugh', targetHandle: 't', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-phase-a-accent', source: 'clamp-phase-a', sourceHandle: 'out', target: 'mix-accent', targetHandle: 't', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-matrix-cell-00', source: 'mix-pad-body', sourceHandle: 'out', target: 'matrix', targetHandle: 'cell:0:0', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-matrix-cell-11', source: 'mix-pad-body', sourceHandle: 'out', target: 'matrix', targetHandle: 'cell:1:1', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-matrix-cell-01', source: 'mix-pad-air', sourceHandle: 'out', target: 'matrix', targetHandle: 'cell:0:1', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-matrix-cell-10', source: 'mix-pad-air', sourceHandle: 'out', target: 'matrix', targetHandle: 'cell:1:0', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-matrix-cell-21', source: 'mix-birds', sourceHandle: 'out', target: 'matrix', targetHandle: 'cell:2:1', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-matrix-cell-23', source: 'mix-birds', sourceHandle: 'out', target: 'matrix', targetHandle: 'cell:2:3', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-matrix-cell-32', source: 'mix-laugh', sourceHandle: 'out', target: 'matrix', targetHandle: 'cell:3:2', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-matrix-cell-31', source: 'mix-laugh', sourceHandle: 'out', target: 'matrix', targetHandle: 'cell:3:1', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-matrix-cell-43', source: 'mix-accent', sourceHandle: 'out', target: 'matrix', targetHandle: 'cell:4:3', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-matrix-cell-41', source: 'mix-accent', sourceHandle: 'out', target: 'matrix', targetHandle: 'cell:4:1', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-phase-to-sidechain-strength', source: 'clamp-phase-invert', sourceHandle: 'out', target: 'compressor', targetHandle: 'sidechainStrength', style: CONTROL_EDGE_STYLE, animated: true },
                                     { id: 'e-matrix-filter', source: 'matrix', sourceHandle: 'out1', target: 'pad-filter', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-lfo-filter', source: 'lfo-pad-filter', sourceHandle: 'out', target: 'pad-filter', targetHandle: 'frequency', style: CONTROL_EDGE_STYLE, animated: true },
                                     { id: 'e-filter-comp', source: 'pad-filter', sourceHandle: 'out', target: 'compressor', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
-                                    { id: 'e-matrix-reverb', source: 'matrix', sourceHandle: 'out2', target: 'reverb', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
-                                    { id: 'e-matrix-spark', source: 'matrix', sourceHandle: 'out3', target: 'gain-spark', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-matrix-reverb', source: 'matrix', sourceHandle: 'out2', target: 'reverb-main', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-matrix-haze', source: 'matrix', sourceHandle: 'out3', target: 'delay-haze', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-delay-haze-filter', source: 'delay-haze', sourceHandle: 'out', target: 'haze-filter', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-matrix-spark', source: 'matrix', sourceHandle: 'out4', target: 'gain-spark', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-spark-reverb', source: 'gain-spark', sourceHandle: 'out', target: 'reverb-spark', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
                                     { id: 'e-comp-mix', source: 'compressor', sourceHandle: 'out', target: 'mixer-main', targetHandle: 'in1', style: AUDIO_EDGE_STYLE, animated: false },
-                                    { id: 'e-reverb-mix', source: 'reverb', sourceHandle: 'out', target: 'mixer-main', targetHandle: 'in2', style: AUDIO_EDGE_STYLE, animated: false },
-                                    { id: 'e-spark-mix', source: 'gain-spark', sourceHandle: 'out', target: 'mixer-main', targetHandle: 'in3', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-reverb-mix', source: 'reverb-main', sourceHandle: 'out', target: 'mixer-main', targetHandle: 'in2', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-haze-mix', source: 'haze-filter', sourceHandle: 'out', target: 'mixer-main', targetHandle: 'in3', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-spark-mix', source: 'reverb-spark', sourceHandle: 'out', target: 'mixer-main', targetHandle: 'in4', style: AUDIO_EDGE_STYLE, animated: false },
                                     { id: 'e-mix-output', source: 'mixer-main', sourceHandle: 'out', target: 'output', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
                                 ];
                                 useAudioGraphStore.getState().loadGraph(nodes, edges);
@@ -1513,6 +2085,15 @@ export const PlaygroundDemo: FC = () => {
                         onDrop={onDrop}
                         onDragOver={onDragOver}
                     >
+                        <button
+                            type="button"
+                            onClick={handleAutoArrangeNodes}
+                            className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-[var(--panel-border)] bg-[var(--panel-bg)] text-[16px] text-[var(--text)] shadow-sm transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                            title="Magic clean layout"
+                            aria-label="Magic clean layout"
+                        >
+                            🪄
+                        </button>
                         <ConnectionAssistMenu
                             isOpen={assistMenuOpen}
                             position={assistMenuPosition}
