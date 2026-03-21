@@ -2,10 +2,13 @@ import { memo } from 'react';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { useAudioGraphStore, type DelayNodeData } from '../store';
 import { audioEngine } from '../AudioEngine';
+import { formatConnectedValue, useTargetHandleConnection } from '../paramConnections';
 
 const DelayNode = memo(({ id, data, selected }: NodeProps<Node<DelayNodeData>>) => {
     const delayData = data;
     const updateNodeData = useAudioGraphStore((s) => s.updateNodeData);
+    const delayTimeConnection = useTargetHandleConnection(id, 'delayTime');
+    const feedbackConnection = useTargetHandleConnection(id, 'feedback');
 
     const handleDelayChange = (value: number) => {
         updateNodeData(id, { delayTime: value });
@@ -33,16 +36,22 @@ const DelayNode = memo(({ id, data, selected }: NodeProps<Node<DelayNodeData>>) 
             <div className="node-content">
                 <div className="node-control">
                     <label>Time</label>
-                    <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={delayData.delayTime}
-                        onChange={(e) => handleDelayChange(Number(e.target.value))}
-                        title="Delay time in seconds"
-                    />
-                    <span className="value">{(delayData.delayTime * 1000).toFixed(0)} ms</span>
+                    {delayTimeConnection.connected ? (
+                        <div className="node-connected-value">
+                            {formatConnectedValue(delayTimeConnection.value, (value) => `${(value * 1000).toFixed(0)} ms`)}
+                        </div>
+                    ) : (
+                        <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value={delayData.delayTime}
+                            onChange={(e) => handleDelayChange(Number(e.target.value))}
+                            title="Delay time in seconds"
+                        />
+                    )}
+                    {!delayTimeConnection.connected && <span className="value">{(delayData.delayTime * 1000).toFixed(0)} ms</span>}
                     <Handle
                         type="target"
                         position={Position.Left}
@@ -52,16 +61,22 @@ const DelayNode = memo(({ id, data, selected }: NodeProps<Node<DelayNodeData>>) 
                 </div>
                 <div className="node-control">
                     <label>Feedback</label>
-                    <input
-                        type="range"
-                        min="0"
-                        max="0.95"
-                        step="0.01"
-                        value={delayData.feedback}
-                        onChange={(e) => handleFeedbackChange(Number(e.target.value))}
-                        title="Feedback amount"
-                    />
-                    <span className="value">{Math.round(delayData.feedback * 100)}%</span>
+                    {feedbackConnection.connected ? (
+                        <div className="node-connected-value">
+                            {formatConnectedValue(feedbackConnection.value, (value) => `${Math.round(value * 100)}%`)}
+                        </div>
+                    ) : (
+                        <input
+                            type="range"
+                            min="0"
+                            max="0.95"
+                            step="0.01"
+                            value={delayData.feedback}
+                            onChange={(e) => handleFeedbackChange(Number(e.target.value))}
+                            title="Feedback amount"
+                        />
+                    )}
+                    {!feedbackConnection.connected && <span className="value">{Math.round(delayData.feedback * 100)}%</span>}
                     <Handle
                         type="target"
                         position={Position.Left}

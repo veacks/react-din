@@ -1,12 +1,15 @@
 import React, { memo } from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { useAudioGraphStore, type LFONodeData } from '../store';
+import { formatConnectedValue, useTargetHandleConnection } from '../paramConnections';
 import '../playground.css';
 
 const WAVEFORMS = ['sine', 'triangle', 'sawtooth', 'square'] as const;
 
 export const LFONode: React.FC<NodeProps<Node<LFONodeData>>> = memo(({ id, data, selected }) => {
     const updateNodeData = useAudioGraphStore((s) => s.updateNodeData);
+    const rateConnection = useTargetHandleConnection(id, 'rate');
+    const depthConnection = useTargetHandleConnection(id, 'depth');
 
     return (
         <div className={`audio-node ${selected ? 'selected' : ''}`}>
@@ -29,27 +32,41 @@ export const LFONode: React.FC<NodeProps<Node<LFONodeData>>> = memo(({ id, data,
                 </div>
 
                 <div className="node-control">
-                    <label>Rate {data.rate.toFixed(2)} Hz</label>
-                    <input
-                        type="range"
-                        min="0.1"
-                        max="20"
-                        step="0.1"
-                        value={data.rate}
-                        onChange={(e) => updateNodeData(id, { rate: parseFloat(e.target.value) })}
-                    />
+                    <label>Rate</label>
+                    {rateConnection.connected ? (
+                        <div className="node-connected-value">
+                            {formatConnectedValue(rateConnection.value, (value) => `${value.toFixed(2)} Hz`)}
+                        </div>
+                    ) : (
+                        <input
+                            type="range"
+                            min="0.1"
+                            max="20"
+                            step="0.1"
+                            value={data.rate}
+                            onChange={(e) => updateNodeData(id, { rate: parseFloat(e.target.value) })}
+                        />
+                    )}
+                    <Handle type="target" position={Position.Left} id="rate" className="handle handle-in handle-param" />
                 </div>
 
                 <div className="node-control">
-                    <label>Depth {data.depth.toFixed(0)}</label>
-                    <input
-                        type="range"
-                        min="0"
-                        max="2000"
-                        step="10"
-                        value={data.depth}
-                        onChange={(e) => updateNodeData(id, { depth: parseFloat(e.target.value) })}
-                    />
+                    <label>Depth</label>
+                    {depthConnection.connected ? (
+                        <div className="node-connected-value">
+                            {formatConnectedValue(depthConnection.value, (value) => `${Math.round(value)}`)}
+                        </div>
+                    ) : (
+                        <input
+                            type="range"
+                            min="0"
+                            max="2000"
+                            step="10"
+                            value={data.depth}
+                            onChange={(e) => updateNodeData(id, { depth: parseFloat(e.target.value) })}
+                        />
+                    )}
+                    <Handle type="target" position={Position.Left} id="depth" className="handle handle-in handle-param" />
                 </div>
             </div>
 

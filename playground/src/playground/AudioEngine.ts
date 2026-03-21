@@ -129,6 +129,8 @@ export class AudioEngine {
     private isPlaying = false;
     private edges: Edge[] = [];
     private sampleBufferCache: Map<string, AudioBuffer> = new Map();
+    private liveControlInputValues: Map<string, number> = new Map();
+    private controlValueTimerID: number | undefined = undefined;
 
     constructor() {
         this.audioContext = null;
@@ -138,6 +140,36 @@ export class AudioEngine {
         this.visualNodes = nodes;
         this.nodeById = new Map(nodes.map((node) => [node.id, node]));
         this.edges = edges;
+    }
+
+    private getControlInputKey(nodeId: string, targetHandle: string): string {
+        return `${nodeId}:${targetHandle}`;
+    }
+
+    public getControlInputValue(nodeId: string, targetHandle: string): number | null {
+        return this.liveControlInputValues.get(this.getControlInputKey(nodeId, targetHandle)) ?? null;
+    }
+
+    private startControlValueLoop() {
+        if (this.controlValueTimerID !== undefined || typeof window === 'undefined') return;
+
+        const tick = () => {
+            if (!this.isPlaying || !this.audioContext) {
+                this.stopControlValueLoop();
+                return;
+            }
+
+            this.updateDataValues(this.visualNodes, this.edges);
+            this.controlValueTimerID = window.setTimeout(tick, 50);
+        };
+
+        tick();
+    }
+
+    private stopControlValueLoop() {
+        if (this.controlValueTimerID === undefined) return;
+        window.clearTimeout(this.controlValueTimerID);
+        this.controlValueTimerID = undefined;
     }
 
     private getTransportData(): TransportNodeData | null {
@@ -736,6 +768,7 @@ export class AudioEngine {
         this.updateDataValues(nodes, edges);
 
         this.isPlaying = true;
+        this.startControlValueLoop();
         if (this.isTransportRunning()) {
             this.startScheduler();
         }
@@ -746,7 +779,9 @@ export class AudioEngine {
      */
     stop(): void {
         this.stopScheduler();
+        this.stopControlValueLoop();
         this.cleanup();
+        this.liveControlInputValues.clear();
         this.isPlaying = false;
     }
 
@@ -782,6 +817,7 @@ export class AudioEngine {
         });
         this.stopSamplerPlayback();
         this.audioNodes.clear();
+        this.liveControlInputValues.clear();
     }
 
     /**
@@ -933,7 +969,9 @@ export class AudioEngine {
                 const outputData = data as OutputNodeData;
                 const masterGain = ctx.createGain();
                 masterGain.gain.value = outputData.masterGain;
-                return { node: masterGain, type: 'output' };
+                const params = new Map<string, AudioParam>();
+                params.set('masterGain', masterGain.gain);
+                return { node: masterGain, type: 'output', params };
             }
             case 'noise': {
                 const noiseData = data as NoiseNodeData;
@@ -1069,6 +1107,7 @@ export class AudioEngine {
 
     private updateDataValues(nodes: Node<AudioNodeData>[], edges: Edge[]): void {
         if (!this.audioContext) return;
+        this.liveControlInputValues.clear();
 
         const nodeById = new Map(nodes.map((node) => [node.id, node]));
         const controlEdgesByTarget = new Map<string, Edge[]>();
@@ -1097,6 +1136,39 @@ export class AudioEngine {
                 case 'note': {
                     const noteData = sourceNode.data as NoteNodeData;
                     return Number.isFinite(noteData.frequency) ? noteData.frequency : null;
+                }
+                case 'lfo': {
+                    const lfoData = sourceNode.data as AudioNodeData & { rate?: number; depth?: number; waveform?: string };
+                    const rate = typeof lfoData.rate === 'number' ? lfoData.rate : 1;
+                    const depth = typeof lfoData.depth === 'number' ? lfoData.depth : 0;
+                    const phase = now * rate * Math.PI * 2;
+                    const normalizedPhase = phase / (Math.PI * 2);
+                    let wave = 0;
+
+                    switch (lfoData.waveform) {
+                        case 'square':
+                            wave = Math.sign(Math.sin(phase)) || 1;
+                            break;
+                        case 'triangle':
+                            wave = (2 * Math.asin(Math.sin(phase))) / Math.PI;
+                            break;
+                        case 'sawtooth':
+                            wave = 2 * (normalizedPhase - Math.floor(normalizedPhase + 0.5));
+                            break;
+                        default:
+                            wave = Math.sin(phase);
+                    }
+
+                    return wave * depth;
+                }
+                case 'adsr':
+                case 'stepSequencer':
+                case 'pianoRoll': {
+                    const instance = this.audioNodes.get(sourceNode.id);
+                    if (instance?.node instanceof ConstantSourceNode) {
+                        return instance.node.offset.value;
+                    }
+                    return null;
                 }
                 case 'math':
                 case 'compare':
@@ -1195,6 +1267,38 @@ export class AudioEngine {
             if (output instanceof ConstantSourceNode) {
                 output.offset.setTargetAtTime(value, now, 0.01);
             }
+        });
+
+        const liveControlHandles = new Set([
+            'frequency',
+            'detune',
+            'gain',
+            'q',
+            'delayTime',
+            'feedback',
+            'mix',
+            'pan',
+            'masterGain',
+            'rate',
+            'depth',
+            'attack',
+            'decay',
+            'sustain',
+            'release',
+            'portamento',
+            'playbackRate',
+        ]);
+
+        controlEdgesByTarget.forEach((edgesForTarget, targetNodeId) => {
+            edgesForTarget.forEach((edge) => {
+                const targetHandle = edge.targetHandle;
+                const value = getSourceValue(edge);
+                if (!targetHandle || value === null) return;
+                this.liveControlInputValues.set(this.getControlInputKey(targetNodeId, targetHandle), value);
+                if (liveControlHandles.has(targetHandle)) {
+                    this.updateNode(targetNodeId, { [targetHandle]: value } as Partial<AudioNodeData>);
+                }
+            });
         });
     }
 
@@ -1407,8 +1511,14 @@ export class AudioEngine {
         } else if (instance.type === 'sampler' && instance.samplerData) {
             if ('src' in data && typeof data.src === 'string') instance.samplerData.src = data.src;
             if ('loop' in data && typeof data.loop === 'boolean') instance.samplerData.loop = data.loop;
-            if ('playbackRate' in data && typeof data.playbackRate === 'number') instance.samplerData.playbackRate = data.playbackRate;
-            if ('detune' in data && typeof data.detune === 'number') instance.samplerData.detune = data.detune;
+            if ('playbackRate' in data && typeof data.playbackRate === 'number') {
+                instance.samplerData.playbackRate = data.playbackRate;
+                this.updateSamplerParam(nodeId, 'playbackRate', data.playbackRate);
+            }
+            if ('detune' in data && typeof data.detune === 'number') {
+                instance.samplerData.detune = data.detune;
+                this.updateSamplerParam(nodeId, 'detune', data.detune);
+            }
         }
     }
 

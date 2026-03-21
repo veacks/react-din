@@ -17,6 +17,17 @@
 
 .react-flow {
     background: var(--canvas-bg);
+    border-radius: 12px;
+    overflow: hidden;
+    --pin-size: 12.5px;
+    --node-header-pad-x: 12px;
+    --node-header-pad-y: 8px;
+    --node-content-pad-x: 12px;
+    --node-content-pad-y: 12px;
+    --node-content-gap: 10px;
+    --node-control-gap: 6px;
+    --node-control-min-height: 40px;
+    --node-section-gap: 8px;
 }
 
 .react-flow__background {
@@ -40,7 +51,8 @@
 }
 
 .node-header {
-    padding: 8px 12px;
+    position: relative;
+    padding: var(--node-header-pad-y) var(--node-header-pad-x);
     background: var(--node-header-bg);
     font-weight: bold;
     display: flex;
@@ -114,20 +126,18 @@
 }
 
 .node-content {
-    padding: 12px;
+    padding: var(--node-content-pad-y) var(--node-content-pad-x);
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--node-content-gap);
 }
 
 .node-control {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--node-control-gap);
     position: relative;
-    /* For handle positioning */
-    min-height: 40px;
-    /* Ensure space for handle */
+    min-height: var(--node-control-min-height);
     justify-content: center;
 }
 
@@ -184,14 +194,15 @@
 
 /* Handle Styles */
 .react-flow__handle {
-    width: 10px;
-    height: 10px;
+    width: var(--pin-size);
+    height: var(--pin-size);
     border: 2px solid var(--node-bg);
     border-radius: 50%;
     transition: all 0.2s;
     z-index: 10;
     background: var(--control-border);
     transform-origin: center;
+    box-shadow: 0 0 0 2px rgba(6, 10, 25, 0.35);
 }
 
 /* Audio Handles (Green) */
@@ -216,17 +227,47 @@
 }
 
 .node-control .react-flow__handle-left {
-    left: -12px;
+    left: calc(var(--node-content-pad-x) * -1) !important;
 }
 
 .node-control .react-flow__handle-right {
-    right: -12px;
+    right: calc(var(--node-content-pad-x) * -1) !important;
+}
+
+.react-flow__handle-left {
+    left: 0 !important;
+}
+
+.react-flow__handle-right {
+    right: 0 !important;
+}
+
+.node-header .react-flow__handle-left {
+    left: calc(var(--node-header-pad-x) * -1) !important;
+}
+
+.node-header .react-flow__handle-right {
+    right: calc(var(--node-header-pad-x) * -1) !important;
 }
 
 /* Handle Hover */
 .react-flow__handle:hover {
-    transform: scale(1.2);
+    transform: scale(1.18);
     border-color: var(--node-header-text);
+}
+
+.node-connected-value {
+    min-height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    border: 1px dashed color-mix(in srgb, var(--accent) 54%, var(--panel-border));
+    background: color-mix(in srgb, var(--panel-muted) 86%, transparent);
+    border-radius: 8px;
+    color: var(--accent);
+    font-size: 10px;
+    letter-spacing: 0.03em;
+    padding: 4px 8px;
 }
 
 .react-flow__node.connection-assist-node {
@@ -305,68 +346,6 @@
     }
 }
 
-/* Node Palette */
-.node-palette {
-    width: 200px;
-    background: var(--panel-bg);
-    border-right: 1px solid var(--panel-border);
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    overflow-y: auto;
-}
-
-.palette-category h4 {
-    margin: 0 0 8px 0;
-    font-size: 11px;
-    text-transform: uppercase;
-    color: var(--text-subtle);
-    padding-bottom: 4px;
-    border-bottom: 1px solid var(--panel-border);
-}
-
-.palette-nodes {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.palette-node {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
-    background: var(--panel-muted);
-    border-radius: 4px;
-    border-left: 3px solid transparent;
-    cursor: grab;
-    transition: background 0.2s;
-    user-select: none;
-}
-
-.palette-node:hover {
-    background: var(--panel-bg);
-}
-
-.palette-node .icon {
-    font-size: 16px;
-}
-
-/* Layout */
-.playground-container {
-    display: flex;
-    height: 100vh;
-    width: 100%;
-    background: var(--app-bg);
-    color: var(--text);
-}
-
-.flow-container {
-    flex: 1;
-    position: relative;
-}
-
 /* Connection Lines */
 .react-flow__edge-path {
     stroke: var(--edge-color);
@@ -376,73 +355,6 @@
 
 .react-flow__edge-path:hover {
     stroke: var(--accent);
-}
-
-/* Audio Connections - Green Edge */
-/* We can't easily select audio vs param edges with pure CSS unless we add classes to edges in JS. 
-   But we requested green sockets. The edge color is usually determined by the source handle. 
-   If we can force edges to default to green, or use JS to color them. 
-   For now, we'll try to style them via the component or global override if possible, 
-   but specific edge coloring usually requires edge types or 'style' prop on edge object. */
-
-/* Custom Params in Input Node */
-.custom-param {
-    position: relative;
-    padding: 6px;
-    background: var(--panel-muted);
-    border-radius: 4px;
-    margin-bottom: 4px;
-}
-
-.custom-param .param-name {
-    display: block;
-    margin-bottom: 4px;
-    font-size: 11px;
-}
-
-.remove-param {
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    background: none;
-    border: none;
-    color: var(--text-subtle);
-    cursor: pointer;
-    font-size: 12px;
-    padding: 0 4px;
-}
-
-.remove-param:hover {
-    color: var(--danger);
-}
-
-.add-param {
-    display: flex;
-    gap: 6px;
-    margin-top: 8px;
-}
-
-.add-param input {
-    flex: 1;
-    background: var(--control-bg);
-    border: 1px solid var(--control-border);
-    color: var(--text);
-    padding: 4px;
-    border-radius: 4px;
-    font-size: 11px;
-}
-
-.add-param button {
-    background: var(--panel-border);
-    color: var(--text);
-    border: none;
-    padding: 0 8px;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.add-param button:hover {
-    background: var(--control-border);
 }
 
 /* Note Node */
@@ -503,8 +415,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 20px;
-    /* Aligns with handle area */
+    min-height: var(--node-control-min-height);
+    height: auto;
+    padding-block: 2px;
 }
 
 .input-param-row label {
@@ -721,14 +634,21 @@
 
 .adsr-controls {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    grid-template-columns: 1fr;
+    gap: var(--node-section-gap);
+}
+
+.piano-roll-node .grid.grid-cols-3 {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--node-section-gap);
+    padding-bottom: 12px;
 }
 
 .control-group {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--node-control-gap);
 }
 
 .control-group label {

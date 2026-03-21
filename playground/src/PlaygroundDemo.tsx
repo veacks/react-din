@@ -107,13 +107,37 @@ const getInitialTheme = (): 'light' | 'dark' => {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 };
 
-const NodePalette: FC = () => {
+const getViewportWidth = () => (typeof window === 'undefined' ? 1440 : window.innerWidth);
+const getDefaultPaletteCollapsed = (viewportWidth: number) => viewportWidth < 1220;
+const getDefaultInspectorCollapsed = (viewportWidth: number) => viewportWidth < 1040;
+
+const NodePalette: FC<{ compact?: boolean }> = ({ compact = false }) => {
     const addNode = useAudioGraphStore((s) => s.addNode);
 
     const handleDragStart = useCallback((e: React.DragEvent, nodeType: PlaygroundNodeType) => {
         e.dataTransfer.setData('application/reactflow', nodeType);
         e.dataTransfer.effectAllowed = 'move';
     }, []);
+
+    if (compact) {
+        return (
+            <div className="ui-palette-compact grid grid-cols-2 gap-3 overflow-y-auto px-2 py-3">
+                {nodeCategories.flatMap((category) => category.nodes).map((node) => (
+                    <button
+                        key={node.type}
+                        type="button"
+                        onClick={() => addNode(node.type)}
+                        title={node.label}
+                        className="ui-palette-compact-item flex h-14 items-center justify-center rounded-xl border border-transparent bg-[var(--panel-muted)] text-[24px] text-[var(--text)] transition hover:border-[var(--panel-border)] hover:bg-[var(--panel-bg)]"
+                        style={{ borderLeftColor: node.color }}
+                        aria-label={`Add ${node.label}`}
+                    >
+                        {node.icon}
+                    </button>
+                ))}
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 py-4">
@@ -165,6 +189,10 @@ export const PlaygroundDemo: FC = () => {
 
     const [theme, setTheme] = useState<'light' | 'dark'>(() => getInitialTheme());
     const isDark = theme === 'dark';
+    const [viewportWidth, setViewportWidth] = useState(() => getViewportWidth());
+    const [isPaletteCollapsed, setPaletteCollapsed] = useState(() => getDefaultPaletteCollapsed(getViewportWidth()));
+    const [isInspectorCollapsed, setInspectorCollapsed] = useState(() => getDefaultInspectorCollapsed(getViewportWidth()));
+    const hasManualPanelLayoutRef = useRef(false);
 
     const activeGraph = graphs.find((graph) => graph.id === activeGraphId) ?? graphs[0];
     const activeGraphName = activeGraph?.name ?? 'Untitled Graph';
@@ -196,8 +224,27 @@ export const PlaygroundDemo: FC = () => {
     useEffect(() => {
         const root = document.documentElement;
         root.classList.toggle('dark', isDark);
+        root.classList.toggle('light', !isDark);
         window.localStorage.setItem('playground-theme', theme);
     }, [isDark, theme]);
+
+    useEffect(() => {
+        const onResize = () => {
+            const nextWidth = getViewportWidth();
+            setViewportWidth(nextWidth);
+
+            if (!hasManualPanelLayoutRef.current) {
+                setPaletteCollapsed(getDefaultPaletteCollapsed(nextWidth));
+                setInspectorCollapsed(getDefaultInspectorCollapsed(nextWidth));
+            } else if (nextWidth < 900) {
+                // Keep the canvas usable on narrow viewports.
+                setInspectorCollapsed(true);
+            }
+        };
+
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -508,15 +555,46 @@ export const PlaygroundDemo: FC = () => {
     }, [nodes]);
 
     const tabBase =
-        'rounded-full border px-3 py-1 text-[11px] font-medium transition';
+        'rounded-full border px-4 py-1.5 text-[12px] font-semibold transition';
     const templateButtonBase =
         'flex w-full items-center gap-2 rounded-md border border-[var(--panel-border)] bg-[var(--panel-muted)] px-3 py-2 text-left text-[11px] font-medium text-[var(--text)] transition hover:border-[var(--accent)] hover:bg-[var(--panel-bg)]';
+    const leftPanelWidth = isPaletteCollapsed ? 78 : viewportWidth < 1360 ? 228 : 268;
+    const rightPanelWidth = isInspectorCollapsed ? 78 : viewportWidth < 1360 ? 304 : 344;
+
+    const togglePalette = useCallback(() => {
+        hasManualPanelLayoutRef.current = true;
+        setPaletteCollapsed((previous) => !previous);
+    }, []);
+
+    const toggleInspector = useCallback(() => {
+        hasManualPanelLayoutRef.current = true;
+        setInspectorCollapsed((previous) => !previous);
+    }, []);
 
     return (
-        <div className="grid h-screen w-full grid-cols-[240px_minmax(0,1fr)_320px] bg-[var(--app-bg)] text-[var(--text)]">
-            <aside className="flex h-full flex-col border-r border-[var(--panel-border)] bg-[var(--panel-bg)]">
-                <NodePalette />
+        <div
+            className="ui-shell grid h-screen w-full text-[var(--text)]"
+            style={{ gridTemplateColumns: `${leftPanelWidth}px minmax(0, 1fr) ${rightPanelWidth}px` }}
+        >
+            <aside className="ui-panel ui-panel-left flex h-full min-h-0 flex-col border-r border-[var(--panel-border)]">
+                <div className="ui-panel-header border-b border-[var(--panel-border)] px-3 py-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--text-subtle)]">
+                        Nodes
+                    </span>
+                    <button
+                        type="button"
+                        onClick={togglePalette}
+                        className="ui-collapse-button rounded-xl border border-[var(--panel-border)] bg-[var(--panel-muted)] px-3 py-1 text-[11px] font-semibold text-[var(--text-subtle)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
+                        aria-pressed={!isPaletteCollapsed}
+                        title={isPaletteCollapsed ? 'Expand palette' : 'Collapse palette'}
+                    >
+                        {isPaletteCollapsed ? '>' : '<'}
+                    </button>
+                </div>
 
+                <NodePalette compact={isPaletteCollapsed} />
+
+                {!isPaletteCollapsed && (
                 <div className="border-t border-[var(--panel-border)] px-4 py-4">
                     <h4 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--text-subtle)]">
                         Templates
@@ -647,16 +725,17 @@ export const PlaygroundDemo: FC = () => {
                         </button>
                     </div>
                 </div>
+                )}
             </aside>
 
-            <section className="flex h-full flex-col bg-[var(--canvas-bg)]">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--panel-border)] bg-[var(--panel-bg)] px-4 py-2">
-                    <div className="flex items-center gap-2 overflow-x-auto pr-2">
+            <section className="ui-stage flex h-full min-w-0 flex-col">
+                <div className="ui-topbar flex flex-wrap items-center justify-between gap-3 border-b border-[var(--panel-border)] px-4 py-2">
+                    <div className="ui-graph-tabs flex items-center gap-2 overflow-x-auto pr-2">
                         {graphs.map((graph) => (
                             <button
                                 key={graph.id}
                                 className={`${tabBase} ${graph.id === activeGraphId
-                                    ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text)]'
+                                    ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text)] shadow-[inset_0_0_0_1px_rgba(104,165,255,0.35)]'
                                     : 'border-transparent bg-[var(--panel-muted)] text-[var(--text-muted)] hover:border-[var(--panel-border)] hover:text-[var(--text)]'
                                 }`}
                                 onClick={() => setActiveGraph(graph.id)}
@@ -666,14 +745,32 @@ export const PlaygroundDemo: FC = () => {
                             </button>
                         ))}
                         <button
-                            className={`${tabBase} border-dashed border-[var(--panel-border)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--text)]`}
+                            className="h-8 w-8 rounded-full border border-dashed border-[var(--panel-border)] text-[15px] leading-none text-[var(--text-muted)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
                             onClick={() => createGraph()}
                             title="New graph"
                         >
                             +
                         </button>
                     </div>
-                    <div className="flex flex-wrap items-center justify-end gap-2">
+                    <div className="ui-topbar-actions flex flex-wrap items-center justify-end gap-2">
+                        <button
+                            type="button"
+                            onClick={togglePalette}
+                            className="ui-collapse-button rounded-xl border border-[var(--panel-border)] px-3 py-1 text-[11px] font-semibold text-[var(--text-subtle)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
+                            title={isPaletteCollapsed ? 'Show palette' : 'Hide palette'}
+                            aria-label={isPaletteCollapsed ? 'Expand palette' : 'Collapse palette'}
+                        >
+                            {isPaletteCollapsed ? '>' : '<'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={toggleInspector}
+                            className="ui-collapse-button rounded-xl border border-[var(--panel-border)] px-3 py-1 text-[11px] font-semibold text-[var(--text-subtle)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
+                            title={isInspectorCollapsed ? 'Show inspector' : 'Hide inspector'}
+                            aria-label={isInspectorCollapsed ? 'Expand inspector' : 'Collapse inspector'}
+                        >
+                            {isInspectorCollapsed ? '<' : '>'}
+                        </button>
                         <label className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-subtle)]">
                             Graph
                         </label>
@@ -721,70 +818,92 @@ export const PlaygroundDemo: FC = () => {
                     </div>
                 </div>
 
-                <div
-                    ref={canvasRef}
-                    className="relative flex-1"
-                    onDrop={onDrop}
-                    onDragOver={onDragOver}
-                >
-                    <ConnectionAssistMenu
-                        isOpen={assistMenuOpen}
-                        position={assistMenuPosition}
-                        query={assistMenuQuery}
-                        suggestions={filteredAssistSuggestions}
-                        onClose={resetConnectionAssist}
-                        onQueryChange={setAssistMenuQuery}
-                        onSelect={handleAssistSuggestionSelect}
-                    />
-                    <ReactFlow
-                        className="h-full"
-                        nodes={nodes as unknown as Node[]}
-                        edges={edges}
-                        onNodesChange={onNodesChange as unknown as OnNodesChange}
-                        onEdgesChange={onEdgesChange}
-                        onConnect={onConnect}
-                        onConnectStart={handleConnectStart}
-                        onConnectEnd={handleConnectEnd}
-                        onInit={(instance) => {
-                            flowRef.current = instance;
-                        }}
-                        isValidConnection={isValidConnection}
-                        onNodeClick={onNodeClick}
-                        onPaneClick={onPaneClick}
-                        nodeTypes={nodeTypes}
-                        fitView
-                        snapToGrid
-                        snapGrid={[15, 15]}
-                        defaultEdgeOptions={{
-                            type: 'smoothstep',
-                            animated: true,
-                        }}
+                <div className="ui-canvas-stage flex-1 p-3 pt-2">
+                    <div
+                        ref={canvasRef}
+                        className="relative h-full overflow-hidden rounded-[14px] border border-[var(--panel-border)] bg-[var(--canvas-bg)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                        onDrop={onDrop}
+                        onDragOver={onDragOver}
                     >
-                        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--canvas-grid)" />
-                        <Controls />
-                        <MiniMap
-                            nodeColor={(node) => {
-                                switch (node.type) {
-                                    case 'oscNode': return '#ff8844';
-                                    case 'gainNode': return '#44cc44';
-                                    case 'filterNode': return '#aa44ff';
-                                    case 'outputNode': return '#ff4466';
-                                    case 'noiseNode': return '#666666';
-                                    case 'delayNode': return '#4488ff';
-                                    case 'reverbNode': return '#8844ff';
-                                    case 'pannerNode': return '#44cccc';
-                                    case 'mixerNode': return '#ffaa44';
-                                    default: return '#888';
-                                }
-                            }}
-                            maskColor="var(--minimap-mask)"
+                        <ConnectionAssistMenu
+                            isOpen={assistMenuOpen}
+                            position={assistMenuPosition}
+                            query={assistMenuQuery}
+                            suggestions={filteredAssistSuggestions}
+                            onClose={resetConnectionAssist}
+                            onQueryChange={setAssistMenuQuery}
+                            onSelect={handleAssistSuggestionSelect}
                         />
-                    </ReactFlow>
+                        <ReactFlow
+                            className="h-full"
+                            nodes={nodes as unknown as Node[]}
+                            edges={edges}
+                            onNodesChange={onNodesChange as unknown as OnNodesChange}
+                            onEdgesChange={onEdgesChange}
+                            onConnect={onConnect}
+                            onConnectStart={handleConnectStart}
+                            onConnectEnd={handleConnectEnd}
+                            onInit={(instance) => {
+                                flowRef.current = instance;
+                            }}
+                            isValidConnection={isValidConnection}
+                            onNodeClick={onNodeClick}
+                            onPaneClick={onPaneClick}
+                            nodeTypes={nodeTypes}
+                            fitView
+                            snapToGrid
+                            snapGrid={[15, 15]}
+                            defaultEdgeOptions={{
+                                type: 'smoothstep',
+                                animated: true,
+                            }}
+                        >
+                            <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--canvas-grid)" />
+                            <Controls />
+                            <MiniMap
+                                nodeColor={(node) => {
+                                    switch (node.type) {
+                                        case 'oscNode': return '#ff8844';
+                                        case 'gainNode': return '#44cc44';
+                                        case 'filterNode': return '#aa44ff';
+                                        case 'outputNode': return '#ff4466';
+                                        case 'noiseNode': return '#666666';
+                                        case 'delayNode': return '#4488ff';
+                                        case 'reverbNode': return '#8844ff';
+                                        case 'pannerNode': return '#44cccc';
+                                        case 'mixerNode': return '#ffaa44';
+                                        default: return '#888';
+                                    }
+                                }}
+                                maskColor="var(--minimap-mask)"
+                            />
+                        </ReactFlow>
+                    </div>
                 </div>
             </section>
 
-            <aside className="flex h-full flex-col border-l border-[var(--panel-border)] bg-[var(--panel-bg)]">
-                <Inspector />
+            <aside className="ui-panel ui-panel-right flex h-full min-h-0 flex-col border-l border-[var(--panel-border)]">
+                <div className="ui-panel-header border-b border-[var(--panel-border)] px-3 py-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--text-subtle)]">
+                        Inspect
+                    </span>
+                    <button
+                        type="button"
+                        onClick={toggleInspector}
+                        className="ui-collapse-button rounded-xl border border-[var(--panel-border)] bg-[var(--panel-muted)] px-3 py-1 text-[11px] font-semibold text-[var(--text-subtle)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
+                        aria-pressed={!isInspectorCollapsed}
+                        title={isInspectorCollapsed ? 'Expand inspector' : 'Collapse inspector'}
+                    >
+                        {isInspectorCollapsed ? '<' : '>'}
+                    </button>
+                </div>
+                {isInspectorCollapsed ? (
+                    <div className="flex flex-1 items-center justify-center px-2 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)]">
+                        Select a node
+                    </div>
+                ) : (
+                    <Inspector />
+                )}
             </aside>
         </div>
     );

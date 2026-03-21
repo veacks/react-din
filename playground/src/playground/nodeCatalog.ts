@@ -104,15 +104,24 @@ const DEFAULT_HANDLES_BY_TYPE: Record<PlaygroundNodeType, HandleDescriptor[]> = 
         { id: 'transport', direction: 'target', label: 'Transport' },
         { id: 'trigger', direction: 'source', label: 'Trigger' },
     ],
-    lfo: [{ id: 'out', direction: 'source', label: 'Out' }],
+    lfo: [
+        { id: 'out', direction: 'source', label: 'Out' },
+        { id: 'rate', direction: 'target', label: 'Rate' },
+        { id: 'depth', direction: 'target', label: 'Depth' },
+    ],
     voice: [
         { id: 'trigger', direction: 'target', label: 'Trigger' },
+        { id: 'portamento', direction: 'target', label: 'Portamento' },
         { id: 'note', direction: 'source', label: 'Freq' },
         { id: 'gate', direction: 'source', label: 'Gate' },
         { id: 'velocity', direction: 'source', label: 'Velocity' },
     ],
     adsr: [
         { id: 'gate', direction: 'target', label: 'Gate' },
+        { id: 'attack', direction: 'target', label: 'Attack' },
+        { id: 'decay', direction: 'target', label: 'Decay' },
+        { id: 'sustain', direction: 'target', label: 'Sustain' },
+        { id: 'release', direction: 'target', label: 'Release' },
         { id: 'envelope', direction: 'source', label: 'Envelope' },
     ],
     note: [{ id: 'freq', direction: 'source', label: 'Frequency' }],
@@ -125,6 +134,8 @@ const DEFAULT_HANDLES_BY_TYPE: Record<PlaygroundNodeType, HandleDescriptor[]> = 
     sampler: [
         { id: 'out', direction: 'source', label: 'Out' },
         { id: 'trigger', direction: 'target', label: 'Trigger' },
+        { id: 'playbackRate', direction: 'target', label: 'Speed' },
+        { id: 'detune', direction: 'target', label: 'Detune' },
     ],
     gain: [
         { id: 'in', direction: 'target', label: 'In' },
@@ -148,10 +159,13 @@ const DEFAULT_HANDLES_BY_TYPE: Record<PlaygroundNodeType, HandleDescriptor[]> = 
     reverb: [
         { id: 'in', direction: 'target', label: 'In' },
         { id: 'out', direction: 'source', label: 'Out' },
+        { id: 'decay', direction: 'target', label: 'Decay' },
+        { id: 'mix', direction: 'target', label: 'Mix' },
     ],
     panner: [
         { id: 'in', direction: 'target', label: 'In' },
         { id: 'out', direction: 'source', label: 'Out' },
+        { id: 'pan', direction: 'target', label: 'Pan' },
     ],
     mixer: [
         { id: 'in1', direction: 'target', label: 'In 1' },
@@ -159,7 +173,10 @@ const DEFAULT_HANDLES_BY_TYPE: Record<PlaygroundNodeType, HandleDescriptor[]> = 
         { id: 'in3', direction: 'target', label: 'In 3' },
         { id: 'out', direction: 'source', label: 'Out' },
     ],
-    output: [{ id: 'in', direction: 'target', label: 'In' }],
+    output: [
+        { id: 'in', direction: 'target', label: 'In' },
+        { id: 'masterGain', direction: 'target', label: 'Master' },
+    ],
     math: [{ id: 'out', direction: 'source', label: 'Out' }, { id: 'a', direction: 'target', label: 'A' }, { id: 'b', direction: 'target', label: 'B' }],
     compare: [
         { id: 'out', direction: 'source', label: 'Out' },

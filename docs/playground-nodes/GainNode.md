@@ -11,10 +11,12 @@ Control audio level in the playground graph.
 - Added from the store with `gain 0.5` and label `Gain`.
 
 ## Integration Notes
+- Every numeric parameter exposes a dedicated target pin and uses connected-value mode when wired.
 - Keep UI, store defaults, engine updates, and code generation aligned.
 - Use downstream from sources and upstream from `OutputNode`.
 
 ## Failure Modes
+- Missing live routing updates can leave connected pins visually updated but sonically stale.
 - Missing control-handle updates can desync slider changes from generated code.
 - Gain set incorrectly can hide whether an upstream node is working.
 

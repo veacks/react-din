@@ -11,10 +11,12 @@ Expose a simple delay effect in the visual graph editor.
 - Added from the store with `delayTime 0.3`, `feedback 0.4`, and label `Delay`.
 
 ## Integration Notes
+- Every numeric parameter exposes a dedicated target pin and uses connected-value mode when wired.
 - Keep parameter labels, defaults, runtime feedback wiring, and code generation props synchronized.
 - Route it between a source chain and `OutputNode`.
 
 ## Failure Modes
+- Missing live routing updates can leave connected pins visually updated but sonically stale.
 - Engine feedback wiring drift can make the UI lie about the audible result.
 - Invalid parameter ranges can cause unstable repeats or silence.
 

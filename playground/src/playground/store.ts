@@ -739,6 +739,13 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
                 // Deletions handled in onEdgesChange/removeNode
             }
         });
+
+        const hasStructuralChange = changes.some((change) => change.type === 'add' || change.type === 'remove' || change.type === 'replace');
+        if (hasStructuralChange) {
+            audioEngine.refreshConnections(nextNodes, get().edges);
+        } else if (changes.length > 0) {
+            audioEngine.refreshDataValues(nextNodes, get().edges);
+        }
     },
 
     onEdgesChange: (changes) => {
@@ -756,8 +763,7 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
             return { edges: nextEdges, graphs };
         });
 
-        const hasStructuralChange = changes.some(c => c.type === 'add' || c.type === 'remove');
-        if (hasStructuralChange) {
+        if (changes.length > 0) {
             audioEngine.refreshConnections(get().nodes, nextEdges);
         }
     },

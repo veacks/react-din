@@ -1,41 +1,16 @@
 import { memo } from 'react';
-import { Handle, Position, type NodeProps, useHandleConnections, useNodesData } from '@xyflow/react';
+import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { useAudioGraphStore, type OscNodeData } from '../store';
 import { audioEngine } from '../AudioEngine';
+import { formatConnectedValue, useTargetHandleConnection } from '../paramConnections';
 
 const waveforms: OscillatorType[] = ['sine', 'square', 'sawtooth', 'triangle'];
 
 const OscNode = memo(({ id, data, selected }: NodeProps) => {
     const oscData = data as OscNodeData;
     const updateNodeData = useAudioGraphStore((s) => s.updateNodeData);
-
-    // Check for connections to frequency handle
-    const connections = useHandleConnections({
-        type: 'target',
-        id: 'frequency',
-    });
-
-    // Get connected node data to display value (visual feedback)
-    const connectedNodeData = useNodesData(connections[0]?.source);
-
-    const isFreqConnected = connections.length > 0;
-
-    // Determine display frequency: if connected to NoteNode, show its note/freq
-    let displayFreq = oscData.frequency;
-    let displayNote = '';
-
-    if (isFreqConnected && connectedNodeData) {
-        // If connected to NoteNode, show its frequency
-        if (connectedNodeData.data.type === 'note') {
-            // @ts-ignore - we know structure
-            displayFreq = connectedNodeData.data.frequency;
-            // @ts-ignore
-            displayNote = `(${connectedNodeData.data.note}${connectedNodeData.data.octave})`;
-        }
-        // If connected to InputNode param... tricky to get value without more logic, 
-        // so we might just show "Modulated" or keep base. 
-        // For now, handling NoteNode covers the user's specific complaint.
-    }
+    const frequencyConnection = useTargetHandleConnection(id, 'frequency');
+    const detuneConnection = useTargetHandleConnection(id, 'detune');
 
     const handleFrequencyChange = (value: number) => {
         updateNodeData(id, { frequency: value });
@@ -54,15 +29,15 @@ const OscNode = memo(({ id, data, selected }: NodeProps) => {
 
     return (
         <div className={`audio-node osc-node ${selected ? 'selected' : ''}`}>
-            <div className="node-header" style={{ justifyContent: 'space-between' }}>
+            <div className="node-header" style={{ justifyContent: 'space-between', position: 'relative' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span className="node-icon">◐</span>
                     <span className="node-title">Oscillator</span>
                 </div>
                 {/* Audio Out aligned with header/top */}
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
                     <span className="handle-label-static" style={{ fontSize: '9px', color: '#888', marginRight: '8px', textTransform: 'uppercase' }}>Audio Out</span>
-                    <Handle type="source" position={Position.Right} id="out" className="handle handle-out handle-audio" style={{ right: '0px' }} />
+                    <Handle type="source" position={Position.Right} id="out" className="handle handle-out handle-audio" />
                 </div>
             </div>
             <div className="node-content">
@@ -79,22 +54,22 @@ const OscNode = memo(({ id, data, selected }: NodeProps) => {
                     </select>
                 </div>
                 <div className="node-control">
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <label>Freq {displayNote && <span style={{ color: '#44cc44' }}>{displayNote}</span>}</label>
-                    </div>
-                    <input
-                        type="range"
-                        min="20"
-                        max="2000"
-                        value={isFreqConnected ? displayFreq : oscData.frequency}
-                        onChange={(e) => handleFrequencyChange(Number(e.target.value))}
-                        title="Frequency in Hz"
-                        disabled={isFreqConnected}
-                        style={{ opacity: isFreqConnected ? 0.5 : 1 }}
-                    />
-                    <span className="value" style={{ color: isFreqConnected ? '#44cc44' : '#aaa' }}>
-                        {Math.round(displayFreq)} Hz
-                    </span>
+                    <label>Freq</label>
+                    {frequencyConnection.connected ? (
+                        <div className="node-connected-value">
+                            {formatConnectedValue(frequencyConnection.value, (value) => `${Math.round(value)} Hz`)}
+                        </div>
+                    ) : (
+                        <input
+                            type="range"
+                            min="20"
+                            max="2000"
+                            value={oscData.frequency}
+                            onChange={(e) => handleFrequencyChange(Number(e.target.value))}
+                            title="Frequency in Hz"
+                        />
+                    )}
+                    {!frequencyConnection.connected && <span className="value">{Math.round(oscData.frequency)} Hz</span>}
                     <Handle
                         type="target"
                         position={Position.Left}
@@ -104,16 +79,22 @@ const OscNode = memo(({ id, data, selected }: NodeProps) => {
                 </div>
                 <div className="node-control">
                     <label>Detune</label>
-                    <input
-                        type="range"
-                        min="-1200"
-                        max="1200"
-                        step="10"
-                        value={oscData.detune}
-                        onChange={(e) => handleDetuneChange(Number(e.target.value))}
-                        title="Detune in cents"
-                    />
-                    <span className="value">{oscData.detune} c</span>
+                    {detuneConnection.connected ? (
+                        <div className="node-connected-value">
+                            {formatConnectedValue(detuneConnection.value, (value) => `${Math.round(value)} c`)}
+                        </div>
+                    ) : (
+                        <input
+                            type="range"
+                            min="-1200"
+                            max="1200"
+                            step="10"
+                            value={oscData.detune}
+                            onChange={(e) => handleDetuneChange(Number(e.target.value))}
+                            title="Detune in cents"
+                        />
+                    )}
+                    {!detuneConnection.connected && <span className="value">{oscData.detune} c</span>}
                     <Handle
                         type="target"
                         position={Position.Left}

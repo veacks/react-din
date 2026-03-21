@@ -1,10 +1,12 @@
 import React, { memo } from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { useAudioGraphStore, type VoiceNodeData } from '../store';
+import { formatConnectedValue, useTargetHandleConnection } from '../paramConnections';
 import '../playground.css';
 
 export const VoiceNode: React.FC<NodeProps<Node<VoiceNodeData>>> = memo(({ id, data, selected }) => {
     const updateNodeData = useAudioGraphStore((s) => s.updateNodeData);
+    const portamentoConnection = useTargetHandleConnection(id, 'portamento');
 
     const handlePortamentoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const portamento = parseFloat(e.target.value);
@@ -21,15 +23,22 @@ export const VoiceNode: React.FC<NodeProps<Node<VoiceNodeData>>> = memo(({ id, d
             <div className="node-content">
                 <div className="node-control">
                     <label>Portamento: {data.portamento}s</label>
-                    <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={data.portamento}
-                        onChange={handlePortamentoChange}
-                        onDragStart={(e) => e.stopPropagation()}
-                    />
+                    {portamentoConnection.connected ? (
+                        <div className="node-connected-value">
+                            {formatConnectedValue(portamentoConnection.value, (value) => `${value.toFixed(2)}s`)}
+                        </div>
+                    ) : (
+                        <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value={data.portamento}
+                            onChange={handlePortamentoChange}
+                            onDragStart={(e) => e.stopPropagation()}
+                        />
+                    )}
+                    <Handle type="target" position={Position.Left} id="portamento" className="handle handle-in handle-param" />
                 </div>
             </div>
 

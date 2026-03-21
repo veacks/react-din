@@ -3,10 +3,13 @@ import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { useAudioGraphStore, type SamplerNodeData } from '../store';
 import { audioEngine } from '../AudioEngine';
 import { saveAudioToCache } from '../audioCache';
+import { formatConnectedValue, useTargetHandleConnection } from '../paramConnections';
 import '../playground.css';
 
 export const SamplerNode: React.FC<NodeProps<Node<SamplerNodeData>>> = memo(({ id, data, selected }) => {
     const updateNodeData = useAudioGraphStore((s) => s.updateNodeData);
+    const playbackRateConnection = useTargetHandleConnection(id, 'playbackRate');
+    const detuneConnection = useTargetHandleConnection(id, 'detune');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const localObjectUrlRef = useRef<string | null>(null);
@@ -97,14 +100,14 @@ export const SamplerNode: React.FC<NodeProps<Node<SamplerNodeData>>> = memo(({ i
 
     return (
         <div className={`audio-node sampler-node ${selected ? 'selected' : ''}`}>
-            <div className="node-header" style={{ background: '#44ccff', justifyContent: 'space-between' }}>
+            <div className="node-header" style={{ background: '#44ccff', justifyContent: 'space-between', position: 'relative' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span className="node-icon">🎹</span>
                     <span className="node-title">{data.label}</span>
                 </div>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
                     <span className="handle-label-static" style={{ fontSize: '9px', color: '#fff', marginRight: '8px', textTransform: 'uppercase' }}>Out</span>
-                    <Handle type="source" position={Position.Right} id="out" className="handle handle-out handle-audio" style={{ right: '0px' }} />
+                    <Handle type="source" position={Position.Right} id="out" className="handle handle-out handle-audio" />
                 </div>
             </div>
 
@@ -173,29 +176,43 @@ export const SamplerNode: React.FC<NodeProps<Node<SamplerNodeData>>> = memo(({ i
                 </div>
 
                 <div className="node-control">
-                    <label>Speed {data.playbackRate.toFixed(2)}x</label>
-                    <input
-                        type="range"
-                        min="0.25"
-                        max="4"
-                        step="0.01"
-                        value={data.playbackRate}
-                        onChange={handlePlaybackRate}
-                        title="Playback rate"
-                    />
+                    <label>Speed</label>
+                    {playbackRateConnection.connected ? (
+                        <div className="node-connected-value">
+                            {formatConnectedValue(playbackRateConnection.value, (value) => `${value.toFixed(2)}x`)}
+                        </div>
+                    ) : (
+                        <input
+                            type="range"
+                            min="0.25"
+                            max="4"
+                            step="0.01"
+                            value={data.playbackRate}
+                            onChange={handlePlaybackRate}
+                            title="Playback rate"
+                        />
+                    )}
+                    <Handle type="target" position={Position.Left} id="playbackRate" className="handle handle-in handle-param" />
                 </div>
 
                 <div className="node-control">
-                    <label>Detune {data.detune}¢</label>
-                    <input
-                        type="range"
-                        min="-1200"
-                        max="1200"
-                        step="10"
-                        value={data.detune}
-                        onChange={handleDetune}
-                        title="Detune in cents"
-                    />
+                    <label>Detune</label>
+                    {detuneConnection.connected ? (
+                        <div className="node-connected-value">
+                            {formatConnectedValue(detuneConnection.value, (value) => `${Math.round(value)}¢`)}
+                        </div>
+                    ) : (
+                        <input
+                            type="range"
+                            min="-1200"
+                            max="1200"
+                            step="10"
+                            value={data.detune}
+                            onChange={handleDetune}
+                            title="Detune in cents"
+                        />
+                    )}
+                    <Handle type="target" position={Position.Left} id="detune" className="handle handle-in handle-param" />
                 </div>
             </div>
 

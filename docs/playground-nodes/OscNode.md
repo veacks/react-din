@@ -11,10 +11,12 @@ Expose oscillator waveform, frequency, and detune controls in the playground can
 - Added from the store with `waveform "sine"`, `frequency 440`, `detune 0`, and label `Oscillator`.
 
 ## Integration Notes
+- Every numeric parameter exposes a dedicated target pin and uses connected-value mode when wired.
 - Keep `OscNode` aligned with `nodes/index.ts`, the palette in `PlaygroundDemo`, store defaults, `AudioEngine`, and `CodeGenerator`.
 - Use it with `NoteNode`, `LFONode`, or `VoiceNode` control outputs.
 
 ## Failure Modes
+- Missing live routing updates can leave connected pins visually updated but sonically stale.
 - Missing registry or code generation updates cause stale UI or invalid generated code.
 - Broken control handles make pitch automation look connected while doing nothing.
 

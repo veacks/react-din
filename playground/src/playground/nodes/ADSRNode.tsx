@@ -1,10 +1,15 @@
 import React, { memo, useRef, useState } from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { useAudioGraphStore, type ADSRNodeData } from '../store';
+import { formatConnectedValue, useTargetHandleConnection } from '../paramConnections';
 import '../playground.css';
 
 export const ADSRNode: React.FC<NodeProps<Node<ADSRNodeData>>> = memo(({ id, data, selected }) => {
     const updateNodeData = useAudioGraphStore((s) => s.updateNodeData);
+    const attackConnection = useTargetHandleConnection(id, 'attack');
+    const decayConnection = useTargetHandleConnection(id, 'decay');
+    const sustainConnection = useTargetHandleConnection(id, 'sustain');
+    const releaseConnection = useTargetHandleConnection(id, 'release');
 
     const attack = data.attack ?? 0.1;
     const decay = data.decay ?? 0.2;
@@ -135,45 +140,73 @@ export const ADSRNode: React.FC<NodeProps<Node<ADSRNodeData>>> = memo(({ id, dat
 
                 {/* Controls */}
                 <div className="adsr-controls">
-                    <div className="control-group">
+                    <div className="control-group node-control">
                         <label>Attack ({attack.toFixed(2)}s)</label>
-                        <input
-                            type="range"
-                            min="0.01" max="2" step="0.01"
-                            value={attack}
-                            title="Attack"
-                            onChange={(e) => handleSliderChange('attack', Number(e.target.value))}
-                        />
+                        {attackConnection.connected ? (
+                            <div className="node-connected-value">
+                                {formatConnectedValue(attackConnection.value, (value) => `${value.toFixed(2)}s`)}
+                            </div>
+                        ) : (
+                            <input
+                                type="range"
+                                min="0.01" max="2" step="0.01"
+                                value={attack}
+                                title="Attack"
+                                onChange={(e) => handleSliderChange('attack', Number(e.target.value))}
+                            />
+                        )}
+                        <Handle type="target" position={Position.Left} id="attack" className="handle handle-in handle-param" />
                     </div>
-                    <div className="control-group">
+                    <div className="control-group node-control">
                         <label>Decay ({decay.toFixed(2)}s)</label>
-                        <input
-                            type="range"
-                            min="0.01" max="2" step="0.01"
-                            value={decay}
-                            title="Decay"
-                            onChange={(e) => handleSliderChange('decay', Number(e.target.value))}
-                        />
+                        {decayConnection.connected ? (
+                            <div className="node-connected-value">
+                                {formatConnectedValue(decayConnection.value, (value) => `${value.toFixed(2)}s`)}
+                            </div>
+                        ) : (
+                            <input
+                                type="range"
+                                min="0.01" max="2" step="0.01"
+                                value={decay}
+                                title="Decay"
+                                onChange={(e) => handleSliderChange('decay', Number(e.target.value))}
+                            />
+                        )}
+                        <Handle type="target" position={Position.Left} id="decay" className="handle handle-in handle-param" />
                     </div>
-                    <div className="control-group">
+                    <div className="control-group node-control">
                         <label>Sustain ({sustain.toFixed(2)})</label>
-                        <input
-                            type="range"
-                            min="0" max="1" step="0.01"
-                            value={sustain}
-                            title="Sustain"
-                            onChange={(e) => handleSliderChange('sustain', Number(e.target.value))}
-                        />
+                        {sustainConnection.connected ? (
+                            <div className="node-connected-value">
+                                {formatConnectedValue(sustainConnection.value)}
+                            </div>
+                        ) : (
+                            <input
+                                type="range"
+                                min="0" max="1" step="0.01"
+                                value={sustain}
+                                title="Sustain"
+                                onChange={(e) => handleSliderChange('sustain', Number(e.target.value))}
+                            />
+                        )}
+                        <Handle type="target" position={Position.Left} id="sustain" className="handle handle-in handle-param" />
                     </div>
-                    <div className="control-group">
+                    <div className="control-group node-control">
                         <label>Release ({release.toFixed(2)}s)</label>
-                        <input
-                            type="range"
-                            min="0.01" max="5" step="0.01"
-                            value={release}
-                            title="Release"
-                            onChange={(e) => handleSliderChange('release', Number(e.target.value))}
-                        />
+                        {releaseConnection.connected ? (
+                            <div className="node-connected-value">
+                                {formatConnectedValue(releaseConnection.value, (value) => `${value.toFixed(2)}s`)}
+                            </div>
+                        ) : (
+                            <input
+                                type="range"
+                                min="0.01" max="5" step="0.01"
+                                value={release}
+                                title="Release"
+                                onChange={(e) => handleSliderChange('release', Number(e.target.value))}
+                            />
+                        )}
+                        <Handle type="target" position={Position.Left} id="release" className="handle handle-in handle-param" />
                     </div>
                 </div>
             </div>

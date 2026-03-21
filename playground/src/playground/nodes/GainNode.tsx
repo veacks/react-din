@@ -2,10 +2,12 @@ import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { useAudioGraphStore, type GainNodeData } from '../store';
 import { audioEngine } from '../AudioEngine';
+import { formatConnectedValue, useTargetHandleConnection } from '../paramConnections';
 
 const GainNode = memo(({ id, data, selected }: NodeProps) => {
     const gainData = data as GainNodeData;
     const updateNodeData = useAudioGraphStore((s) => s.updateNodeData);
+    const gainConnection = useTargetHandleConnection(id, 'gain');
 
     const handleGainChange = (value: number) => {
         updateNodeData(id, { gain: value });
@@ -28,16 +30,22 @@ const GainNode = memo(({ id, data, selected }: NodeProps) => {
             <div className="node-content">
                 <div className="node-control">
                     <label>Level</label>
-                    <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={gainData.gain}
-                        onChange={(e) => handleGainChange(Number(e.target.value))}
-                        title="Gain level"
-                    />
-                    <span className="value">{Math.round(gainData.gain * 100)}%</span>
+                    {gainConnection.connected ? (
+                        <div className="node-connected-value">
+                            {formatConnectedValue(gainConnection.value, (value) => `${Math.round(value * 100)}%`)}
+                        </div>
+                    ) : (
+                        <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value={gainData.gain}
+                            onChange={(e) => handleGainChange(Number(e.target.value))}
+                            title="Gain level"
+                        />
+                    )}
+                    {!gainConnection.connected && <span className="value">{Math.round(gainData.gain * 100)}%</span>}
                     <Handle
                         type="target"
                         position={Position.Left}

@@ -5,16 +5,18 @@ Own playback start/stop and master gain for the current playground graph.
 
 ## Props / Handles
 - Data fields: `playing`, `masterGain`, `label`.
-- Handles: audio `in`.
+- Handles: audio `in` and master gain control input `masterGain`.
 
 ## Defaults
 - Added from the store with `playing false`, `masterGain 0.5`, and label `Output`.
 
 ## Integration Notes
+- Every numeric parameter exposes a dedicated target pin and uses connected-value mode when wired.
 - `OutputNode` must remain aligned with store playback state and `audioEngine.start/stop`.
 - Integration coverage should keep graph persistence resetting `playing` to `false`.
 
 ## Failure Modes
+- Missing live routing updates can leave connected pins visually updated but sonically stale.
 - Persisting transient playback state can reload graphs in a broken state.
 - Starting output without a valid graph can create confusing no-audio behavior.
 

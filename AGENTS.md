@@ -33,6 +33,14 @@
   - `playground/src/playground/AudioEngine.ts`
   - `playground/src/playground/CodeGenerator.tsx`
   - docs, tests, and `project/COVERAGE_MANIFEST.json`
+- Every modulate-able numeric node parameter must expose a dedicated target handle (pin) with a stable handle id.
+- When a target handle is connected for a slider-backed parameter, the UI must hide or disable the slider and show the connected value instead.
+- Every node parameter control must render on its own row. Multi-column parameter grids are not allowed for node parameter sections.
+- Every pin must overlap the node border by exactly 50% of the pin diameter.
+- Connected pin values shown in the UI must auto-refresh from the live input signal while audio is running.
+- Any node addition or change that affects parameters or handles must preserve real-time audible updates while output is playing:
+  - parameter edits update sound immediately
+  - connection add/remove/rewire updates routing immediately
 
 ## Required Checks
 
