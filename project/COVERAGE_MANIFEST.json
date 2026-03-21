@@ -92,6 +92,15 @@
       "scenarios": ["F01-S02", "F04-S02"]
     },
     {
+      "id": "component:PresetWaveShaper",
+      "kind": "public-component",
+      "name": "PresetWaveShaper",
+      "source": "src/nodes/PresetWaveShaper.tsx",
+      "docs": "docs/components/nodes/PresetWaveShaper.md",
+      "tests": ["tests/library/audio-nodes.spec.tsx"],
+      "scenarios": ["F01-S03", "F04-S02"]
+    },
+    {
       "id": "component:ADSR",
       "kind": "public-component",
       "name": "ADSR",
@@ -151,6 +160,15 @@
       "name": "Sampler",
       "source": "src/sources/Sampler.tsx",
       "docs": "docs/components/sources/Sampler.md",
+      "tests": ["tests/library/sources-effects.spec.tsx"],
+      "scenarios": ["F01-S03", "F04-S02"]
+    },
+    {
+      "id": "component:TriggeredSampler",
+      "kind": "public-component",
+      "name": "TriggeredSampler",
+      "source": "src/sources/TriggeredSampler.tsx",
+      "docs": "docs/components/sources/TriggeredSampler.md",
       "tests": ["tests/library/sources-effects.spec.tsx"],
       "scenarios": ["F01-S03", "F04-S02"]
     },

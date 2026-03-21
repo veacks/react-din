@@ -11,6 +11,7 @@ import {
     NoiseBurst,
     Reverb,
     Sampler,
+    TriggeredSampler,
 } from 'react-din';
 
 describe('sources and effects', () => {
@@ -26,6 +27,9 @@ describe('sources and effects', () => {
                                 <Noise autoStart />
                                 <EventTrigger token={1} trackId="ui-feedback">
                                     <NoiseBurst type="white" duration={0.05} />
+                                </EventTrigger>
+                                <EventTrigger token={2} trackId="ui-triggered-sampler">
+                                    <TriggeredSampler src="/samples/kick.wav" />
                                 </EventTrigger>
                                 <ConstantSource offset={0.5} />
                                 <LFO rate={2} depth={0.2} />

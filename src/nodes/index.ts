@@ -20,6 +20,7 @@ export type {
 } from './types';
 
 export type { ADSRProps, ADSRConfig } from './ADSR';
+export type { WaveShaperPreset, PresetWaveShaperProps } from './PresetWaveShaper';
 
 // Components
 export { Gain } from './Gain';
@@ -31,6 +32,7 @@ export { Convolver } from './Convolver';
 export { Panner } from './Panner';
 export { StereoPanner } from './StereoPanner';
 export { WaveShaper } from './WaveShaper';
+export { PresetWaveShaper } from './PresetWaveShaper';
 export { ADSR, DEFAULT_ADSR } from './ADSR';
 
 // Hooks

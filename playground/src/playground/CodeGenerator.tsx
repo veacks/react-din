@@ -61,10 +61,12 @@ import {
     NoiseBurst,
     Osc,
     Panner,
+    PresetWaveShaper,
     Reverb,
     Sampler,
     Sequencer,
     StereoPanner,
+    TriggeredSampler,
     WaveShaper,
     switchValue,
     Track,
@@ -73,7 +75,6 @@ import {
     useAudio,
     useAudioOut,
     useLFO,
-    useTrigger,
 } from 'react-din';
 import type { LFOOutput, VoiceRenderProps } from 'react-din';
 import {
@@ -383,8 +384,6 @@ export function generateCode(
     const trackSourcesUsed = new Set<string>();
     const trackInfoById = new Map<string, TrackInfo>();
     let usesFeedbackDelay = false;
-    let usesTriggeredSampler = false;
-    let usesPresetWaveShaper = false;
     const buildContext = {
         controlEdgesByTarget,
         nodeById,
@@ -507,11 +506,8 @@ export function generateCode(
         const importedComponentName = getAudioComponentName(node.data.type);
         if (componentName === 'FeedbackDelay') {
             usesFeedbackDelay = true;
-        } else if (componentName === 'TriggeredSampler') {
-            usesTriggeredSampler = true;
-        } else if (componentName === 'PresetWaveShaper') {
-            usesPresetWaveShaper = true;
-            usedImports.add('WaveShaper');
+        } else if (componentName === 'TriggeredSampler' || componentName === 'PresetWaveShaper') {
+            usedImports.add(componentName);
         } else if (importedComponentName) {
             usedImports.add(importedComponentName);
         }
@@ -710,18 +706,15 @@ export function generateCode(
         usedImports.add('useLFO');
     }
 
-    if (usesFeedbackDelay || usesTriggeredSampler) {
+    if (usesFeedbackDelay) {
         usedImports.add('AudioOutProvider');
         usedImports.add('useAudio');
         usedImports.add('useAudioOut');
     }
-    if (usesTriggeredSampler) {
-        usedImports.add('useTrigger');
-    }
 
     const importList = Array.from(usedImports).sort();
-    const usesReactHooks = usesFeedbackDelay || usesTriggeredSampler;
-    const needsReactNodeType = usesReactHooks || usesPresetWaveShaper;
+    const usesReactHooks = usesFeedbackDelay;
+    const needsReactNodeType = usesReactHooks;
     let code = '';
     if (usesReactHooks) {
         code = `import { useEffect, useRef, useState, type ReactNode } from 'react';\n`;
@@ -742,14 +735,6 @@ export function generateCode(
 
     if (usesFeedbackDelay) {
         code += `${generateFeedbackDelayHelper()}\n\n`;
-    }
-
-    if (usesTriggeredSampler) {
-        code += `${generateTriggeredSamplerHelper()}\n\n`;
-    }
-
-    if (usesPresetWaveShaper) {
-        code += `${generatePresetWaveShaperHelper()}\n\n`;
     }
 
     const lfoDeclarations = Array.from(lfoVarsById.entries()).map(([id, varName]) => {
@@ -880,8 +865,8 @@ function getGeneratedComponentName(node: Node<AudioNodeData>, controlEdges: Edge
 
 function getPreviewComponent(node: Node<AudioNodeData>, controlEdges: Edge[]): React.ComponentType<any> | null {
     if (shouldUseFeedbackDelay(node)) return PreviewFeedbackDelay;
-    if (shouldUseTriggeredSampler(node, controlEdges)) return PreviewTriggeredSampler;
-    if (shouldUsePresetWaveShaper(node)) return PreviewPresetWaveShaper;
+    if (shouldUseTriggeredSampler(node, controlEdges)) return TriggeredSampler;
+    if (shouldUsePresetWaveShaper(node)) return PresetWaveShaper;
     return AUDIO_NODE_COMPONENTS[node.data.type] ?? null;
 }
 
@@ -2184,46 +2169,6 @@ function buildPreviewAdsrProps(
     return props;
 }
 
-function createPreviewWaveShaperCurve(amount: number, preset: 'softClip' | 'hardClip' | 'saturate'): Float32Array {
-    const samples = 512;
-    const curve = new Float32Array(samples);
-    const k = Math.max(0, amount) * 100;
-
-    for (let i = 0; i < samples; i++) {
-        const x = (i * 2) / samples - 1;
-        if (preset === 'hardClip') {
-            curve[i] = Math.max(-1, Math.min(1, x * (1 + k / 8)));
-        } else if (preset === 'saturate') {
-            const amt = 1 + k / 20;
-            curve[i] = ((3 + amt) * x * 20) / (Math.PI + (amt * Math.abs(x * 20)));
-        } else {
-            curve[i] = Math.tanh(x * (1 + k / 12));
-        }
-    }
-
-    return curve;
-}
-
-interface PreviewPresetWaveShaperProps {
-    children?: React.ReactNode;
-    amount?: number;
-    preset?: 'softClip' | 'hardClip' | 'saturate';
-    oversample?: 'none' | '2x' | '4x';
-}
-
-function PreviewPresetWaveShaper({
-    children,
-    amount = 0.5,
-    preset = 'softClip',
-    oversample = '2x',
-}: PreviewPresetWaveShaperProps) {
-    return (
-        <WaveShaper curve={createPreviewWaveShaperCurve(amount, preset)} oversample={oversample}>
-            {children}
-        </WaveShaper>
-    );
-}
-
 interface PreviewFeedbackDelayProps {
     children?: React.ReactNode;
     delayTime?: number;
@@ -2296,152 +2241,6 @@ function PreviewFeedbackDelay({
 
     return (
         <AudioOutProvider node={bypass ? outputNode : inputRef.current}>
-            {children}
-        </AudioOutProvider>
-    );
-}
-
-interface PreviewTriggeredSamplerProps {
-    children?: React.ReactNode;
-    src?: string | AudioBuffer;
-    autoStart?: boolean;
-    active?: boolean;
-    loop?: boolean;
-    playbackRate?: number;
-    detune?: number;
-    offset?: number;
-    duration?: number;
-}
-
-function PreviewTriggeredSampler({
-    children,
-    src,
-    autoStart = false,
-    active,
-    loop = false,
-    playbackRate = 1,
-    detune = 0,
-    offset = 0,
-    duration,
-}: PreviewTriggeredSamplerProps) {
-    const { context, isUnlocked } = useAudio();
-    const { outputNode } = useAudioOut();
-    const trigger = useTrigger();
-    const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
-    const sourceRef = useRef<AudioBufferSourceNode | null>(null);
-    const activeRef = useRef(false);
-
-    useEffect(() => {
-        if (!context || !src) return;
-
-        let cancelled = false;
-
-        if (typeof src === 'string') {
-            fetch(src)
-                .then((response) => {
-                    if (!response.ok) {
-                        throw new Error(`Failed to load sampler source: ${src}`);
-                    }
-                    return response.arrayBuffer();
-                })
-                .then((arrayBuffer) => context.decodeAudioData(arrayBuffer))
-                .then((decodedBuffer) => {
-                    if (!cancelled) {
-                        setBuffer(decodedBuffer);
-                    }
-                })
-                .catch(() => {
-                    if (!cancelled) {
-                        setBuffer(null);
-                    }
-                });
-        } else {
-            setBuffer(src);
-        }
-
-        return () => {
-            cancelled = true;
-        };
-    }, [context, src]);
-
-    const stop = () => {
-        const source = sourceRef.current;
-        if (!source) return;
-        try {
-            source.stop();
-        } catch {
-            // Ignore stop races during retriggering.
-        }
-        sourceRef.current = null;
-    };
-
-    const play = (playDuration?: number) => {
-        if (!context || !outputNode || !buffer || !isUnlocked) return;
-
-        stop();
-
-        const source = context.createBufferSource();
-        source.buffer = buffer;
-        source.loop = loop;
-        source.playbackRate.value = playbackRate;
-        source.detune.value = detune;
-        source.connect(outputNode);
-        source.onended = () => {
-            if (sourceRef.current === source) {
-                sourceRef.current = null;
-            }
-        };
-
-        sourceRef.current = source;
-
-        if (loop || !playDuration) {
-            source.start(context.currentTime, offset);
-        } else {
-            source.start(context.currentTime, offset, playDuration);
-        }
-
-        if (loop && playDuration) {
-            window.setTimeout(() => {
-                if (sourceRef.current === source) {
-                    stop();
-                }
-            }, playDuration * 1000);
-        }
-    };
-
-    useEffect(() => {
-        if (autoStart && active === undefined && buffer && isUnlocked) {
-            play(duration);
-        }
-        // Intentionally scoped to source/loading changes.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [autoStart, active, buffer, isUnlocked, src]);
-
-    useEffect(() => {
-        if (!trigger || active !== undefined) return;
-        play(trigger.duration);
-        // Intentionally scoped to trigger edges.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [trigger, active]);
-
-    useEffect(() => {
-        if (active === undefined) return;
-
-        if (active && !activeRef.current) {
-            play(duration);
-        } else if (!active && activeRef.current && loop) {
-            stop();
-        }
-
-        activeRef.current = active;
-        // Intentionally scoped to active edge changes.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [active, duration, loop]);
-
-    useEffect(() => () => stop(), []);
-
-    return (
-        <AudioOutProvider node={outputNode}>
             {children}
         </AudioOutProvider>
     );
@@ -2521,192 +2320,6 @@ function generateFeedbackDelayHelper(): string {
         '        <AudioOutProvider node={bypass ? outputNode : inputRef.current}>',
         '            {children}',
         '        </AudioOutProvider>',
-        '    );',
-        '};',
-    ].join('\n');
-}
-
-function generateTriggeredSamplerHelper(): string {
-    return [
-        'type TriggeredSamplerProps = {',
-        '    children?: ReactNode;',
-        '    src?: string | AudioBuffer;',
-        '    autoStart?: boolean;',
-        '    active?: boolean;',
-        '    loop?: boolean;',
-        '    playbackRate?: number;',
-        '    detune?: number;',
-        '    offset?: number;',
-        '    duration?: number;',
-        '};',
-        '',
-        'const TriggeredSampler = ({',
-        '    children,',
-        '    src,',
-        '    autoStart = false,',
-        '    active,',
-        '    loop = false,',
-        '    playbackRate = 1,',
-        '    detune = 0,',
-        '    offset = 0,',
-        '    duration,',
-        '}: TriggeredSamplerProps) => {',
-        '    const { context, isUnlocked } = useAudio();',
-        '    const { outputNode } = useAudioOut();',
-        '    const trigger = useTrigger();',
-        '    const [buffer, setBuffer] = useState<AudioBuffer | null>(null);',
-        '    const sourceRef = useRef<AudioBufferSourceNode | null>(null);',
-        '    const activeRef = useRef(false);',
-        '',
-        '    useEffect(() => {',
-        '        if (!context || !src) return;',
-        '',
-        '        let cancelled = false;',
-        '',
-        '        if (typeof src === "string") {',
-        '            fetch(src)',
-        '                .then((response) => {',
-        '                    if (!response.ok) throw new Error(`Failed to load sampler source: ${src}`);',
-        '                    return response.arrayBuffer();',
-        '                })',
-        '                .then((arrayBuffer) => context.decodeAudioData(arrayBuffer))',
-        '                .then((decodedBuffer) => {',
-        '                    if (!cancelled) {',
-        '                        setBuffer(decodedBuffer);',
-        '                    }',
-        '                })',
-        '                .catch(() => {',
-        '                    if (!cancelled) {',
-        '                        setBuffer(null);',
-        '                    }',
-        '                });',
-        '        } else {',
-        '            setBuffer(src);',
-        '        }',
-        '',
-        '        return () => {',
-        '            cancelled = true;',
-        '        };',
-        '    }, [context, src]);',
-        '',
-        '    const stop = () => {',
-        '        const source = sourceRef.current;',
-        '        if (!source) return;',
-        '        try {',
-        '            source.stop();',
-        '        } catch {}',
-        '        sourceRef.current = null;',
-        '    };',
-        '',
-        '    const play = (playDuration?: number) => {',
-        '        if (!context || !outputNode || !buffer || !isUnlocked) return;',
-        '',
-        '        stop();',
-        '',
-        '        const source = context.createBufferSource();',
-        '        source.buffer = buffer;',
-        '        source.loop = loop;',
-        '        source.playbackRate.value = playbackRate;',
-        '        source.detune.value = detune;',
-        '        source.connect(outputNode);',
-        '        source.onended = () => {',
-        '            if (sourceRef.current === source) {',
-        '                sourceRef.current = null;',
-        '            }',
-        '        };',
-        '',
-        '        sourceRef.current = source;',
-        '',
-        '        if (loop || !playDuration) {',
-        '            source.start(context.currentTime, offset);',
-        '        } else {',
-        '            source.start(context.currentTime, offset, playDuration);',
-        '        }',
-        '',
-        '        if (loop && playDuration) {',
-        '            window.setTimeout(() => {',
-        '                if (sourceRef.current === source) {',
-        '                    stop();',
-        '                }',
-        '            }, playDuration * 1000);',
-        '        }',
-        '    };',
-        '',
-        '    useEffect(() => {',
-        '        if (autoStart && active === undefined && buffer && isUnlocked) {',
-        '            play(duration);',
-        '        }',
-        '    }, [autoStart, active, buffer, isUnlocked, src]);',
-        '',
-        '    useEffect(() => {',
-        '        if (!trigger || active !== undefined) return;',
-        '        play(trigger.duration);',
-        '    }, [trigger, active]);',
-        '',
-        '    useEffect(() => {',
-        '        if (active === undefined) return;',
-        '',
-        '        if (active && !activeRef.current) {',
-        '            play(duration);',
-        '        } else if (!active && activeRef.current && loop) {',
-        '            stop();',
-        '        }',
-        '',
-        '        activeRef.current = active;',
-        '    }, [active, duration, loop]);',
-        '',
-        '    useEffect(() => () => stop(), []);',
-        '',
-        '    return (',
-        '        <AudioOutProvider node={outputNode}>',
-        '            {children}',
-        '        </AudioOutProvider>',
-        '    );',
-        '};',
-    ].join('\n');
-}
-
-function generatePresetWaveShaperHelper(): string {
-    return [
-        "type WaveShaperPreset = 'softClip' | 'hardClip' | 'saturate';",
-        '',
-        'type PresetWaveShaperProps = {',
-        '    children?: ReactNode;',
-        '    amount?: number;',
-        '    preset?: WaveShaperPreset;',
-        "    oversample?: 'none' | '2x' | '4x';",
-        '};',
-        '',
-        'const createPresetWaveShaperCurve = (amount: number, preset: WaveShaperPreset): Float32Array => {',
-        '    const samples = 512;',
-        '    const curve = new Float32Array(samples);',
-        '    const k = Math.max(0, amount) * 100;',
-        '',
-        '    for (let i = 0; i < samples; i++) {',
-        '        const x = (i * 2) / samples - 1;',
-        '        if (preset === "hardClip") {',
-        '            curve[i] = Math.max(-1, Math.min(1, x * (1 + k / 8)));',
-        '        } else if (preset === "saturate") {',
-        '            const amt = 1 + k / 20;',
-        '            curve[i] = ((3 + amt) * x * 20) / (Math.PI + (amt * Math.abs(x * 20)));',
-        '        } else {',
-        '            curve[i] = Math.tanh(x * (1 + k / 12));',
-        '        }',
-        '    }',
-        '',
-        '    return curve;',
-        '};',
-        '',
-        'const PresetWaveShaper = ({',
-        '    children,',
-        '    amount = 0.5,',
-        '    preset = "softClip",',
-        '    oversample = "2x",',
-        '}: PresetWaveShaperProps) => {',
-        '    return (',
-        '        <WaveShaper curve={createPresetWaveShaperCurve(amount, preset)} oversample={oversample}>',
-        '            {children}',
-        '        </WaveShaper>',
         '    );',
         '};',
     ].join('\n');

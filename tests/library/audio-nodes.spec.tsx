@@ -9,6 +9,7 @@ import {
     Gain,
     Osc,
     Panner,
+    PresetWaveShaper,
     StereoPanner,
     WaveShaper,
     useLFO,
@@ -24,9 +25,11 @@ const FilterHarness = () => {
                     <Panner positionX={1}>
                         <StereoPanner pan={-0.1}>
                             <WaveShaper curve={new Float32Array([-1, -0.2, 0, 0.2, 1])}>
-                                <ADSR trigger>
-                                    <Osc nodeRef={createRef<OscillatorNode>()} autoStart type="sawtooth" />
-                                </ADSR>
+                                <PresetWaveShaper amount={0.45} preset="saturate" oversample="2x">
+                                    <ADSR trigger>
+                                        <Osc nodeRef={createRef<OscillatorNode>()} autoStart type="sawtooth" />
+                                    </ADSR>
+                                </PresetWaveShaper>
                             </WaveShaper>
                         </StereoPanner>
                     </Panner>

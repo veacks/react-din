@@ -295,7 +295,8 @@ describe('playground store and code generation', () => {
         const disconnectedCode = generateCode(nodes as any, edges.filter((edge) => edge.id !== 'transport') as any, true, 'Bass Lab');
 
         expect(connectedCode).toContain('const FeedbackDelay');
-        expect(connectedCode).toContain('const TriggeredSampler');
+        expect(connectedCode).toContain('TriggeredSampler');
+        expect(connectedCode).not.toContain('const TriggeredSampler');
         expect(connectedCode).toContain('cutoff?: number;');
         expect(connectedCode).toContain('<Sequencer');
         expect(connectedCode).toContain('<TransportProvider');
@@ -395,7 +396,8 @@ describe('playground store and code generation', () => {
         expect(code).toContain('Chorus');
         expect(code).toContain('Panner');
         expect(code).toContain('Analyzer');
-        expect(code).toContain('const PresetWaveShaper');
+        expect(code).toContain('PresetWaveShaper');
+        expect(code).not.toContain('const PresetWaveShaper');
         expect(code).toContain('<EventTrigger token={hoverToken}');
     });
 });

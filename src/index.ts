@@ -46,6 +46,7 @@ export {
     Panner,
     StereoPanner,
     WaveShaper,
+    PresetWaveShaper,
     ADSR,
     DEFAULT_ADSR,
     // Hooks
@@ -66,6 +67,8 @@ export type {
     StereoPannerProps,
     WaveShaperProps,
     OversampleType,
+    WaveShaperPreset,
+    PresetWaveShaperProps,
     ADSRProps,
     ADSRConfig,
 } from './nodes';
@@ -148,6 +151,7 @@ export type {
 // -----------------------------------------------------------------------------
 export {
     Sampler,
+    TriggeredSampler,
     Noise,
     NoiseBurst,
     MediaStream,
@@ -160,6 +164,7 @@ export {
 export type {
     SourceNodeProps,
     SamplerProps,
+    TriggeredSamplerProps,
     NoiseProps,
     NoiseType,
     NoiseBurstProps,

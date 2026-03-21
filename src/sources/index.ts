@@ -20,9 +20,10 @@ export type { UseLFOOptions } from './useLFO';
 
 // Components
 export { Sampler } from './Sampler';
+export { TriggeredSampler } from './TriggeredSampler';
+export type { TriggeredSamplerProps } from './TriggeredSampler';
 export { Noise } from './Noise';
 export { NoiseBurst } from './NoiseBurst';
 export type { NoiseBurstProps } from './NoiseBurst';
 export { MediaStream } from './MediaStream';
 export { ConstantSource } from './ConstantSource';
-
