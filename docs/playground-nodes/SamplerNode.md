@@ -12,12 +12,15 @@ Load and trigger audio files directly from the playground.
 
 ## Integration Notes
 - Every numeric parameter exposes a dedicated target pin and uses connected-value mode when wired.
+- Uploads create or reuse a global audio-library asset in cache storage and persist only the `sampleId` in graph documents.
 - Keep cache IDs, object URLs, trigger semantics, and generated code semantics aligned across UI, storage, and engine loading.
+- The node exposes a searchable library dropdown and can also be populated from the bottom audio-library panel.
 - Use after a trigger-capable source or with manual playback from the node UI.
 
 ## Failure Modes
 - Missing live routing updates can leave connected pins visually updated but sonically stale.
 - File-cache drift can leave orphaned object URLs or stale `loaded` state.
+- Missing or deleted library assets clear `src` and keep the node silent until a new asset is selected.
 - Rising-edge retrigger and loop-stop behavior must stay aligned between runtime and preview/export helpers.
 - Engine load failures make the node appear configured while staying silent.
 

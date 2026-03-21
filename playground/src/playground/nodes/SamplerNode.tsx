@@ -1,8 +1,8 @@
-import React, { memo, useCallback, useRef, useState, useEffect } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { useAudioGraphStore, type SamplerNodeData } from '../store';
 import { audioEngine } from '../AudioEngine';
-import { saveAudioToCache } from '../audioCache';
+import { addAssetFromFile, getAssetObjectUrl, listAssets, subscribeAssets, type AudioLibraryAsset } from '../audioLibrary';
 import { formatConnectedValue, useTargetHandleConnection } from '../paramConnections';
 import '../playground.css';
 
@@ -12,37 +12,79 @@ export const SamplerNode: React.FC<NodeProps<Node<SamplerNodeData>>> = memo(({ i
     const detuneConnection = useTargetHandleConnection(id, 'detune');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
-    const localObjectUrlRef = useRef<string | null>(null);
+    const [libraryAssets, setLibraryAssets] = useState<AudioLibraryAsset[]>([]);
+    const [libraryQuery, setLibraryQuery] = useState('');
+    const [libraryError, setLibraryError] = useState<string | null>(null);
+
+    const selectedSampleId = typeof data.sampleId === 'string' ? data.sampleId : '';
+
+    const refreshAssets = useCallback(() => {
+        listAssets()
+            .then((assets) => setLibraryAssets(assets))
+            .catch(() => setLibraryAssets([]));
+    }, []);
+
+    useEffect(() => {
+        refreshAssets();
+        return subscribeAssets(refreshAssets);
+    }, [refreshAssets]);
+
+    const filteredAssets = useMemo(() => {
+        const query = libraryQuery.trim().toLowerCase();
+        if (!query) return libraryAssets;
+        return libraryAssets.filter((asset) => asset.name.toLowerCase().includes(query));
+    }, [libraryAssets, libraryQuery]);
+
+    const applyAssetSelection = useCallback(async (assetId: string, fallbackName?: string) => {
+        if (!assetId) {
+            updateNodeData(id, {
+                src: '',
+                sampleId: '',
+                fileName: '',
+                loaded: false,
+            });
+            setLibraryError(null);
+            return;
+        }
+
+        const objectUrl = await getAssetObjectUrl(assetId);
+        if (!objectUrl) {
+            setLibraryError('Failed to read cached asset.');
+            updateNodeData(id, { loaded: false });
+            return;
+        }
+
+        const asset = libraryAssets.find((entry) => entry.id === assetId);
+        updateNodeData(id, {
+            src: objectUrl,
+            sampleId: assetId,
+            fileName: asset?.name || fallbackName || data.fileName || 'Cached sample',
+            loaded: true,
+        });
+        setLibraryError(null);
+        audioEngine.loadSamplerBuffer(id, objectUrl);
+    }, [data.fileName, id, libraryAssets, updateNodeData]);
 
     const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        const sampleId = crypto.randomUUID();
-        const objectUrl = URL.createObjectURL(file);
-
-        if (localObjectUrlRef.current) {
-            URL.revokeObjectURL(localObjectUrlRef.current);
-        }
-        localObjectUrlRef.current = objectUrl;
-
-        updateNodeData(id, {
-            src: objectUrl,
-            sampleId,
-            fileName: file.name,
-            loaded: false,
-        });
-
-        saveAudioToCache(sampleId, file)
-            .then(() => {
-                updateNodeData(id, { loaded: true });
-            })
+        addAssetFromFile(file)
+            .then((asset) => applyAssetSelection(asset.id, asset.name))
             .catch(() => {
+                setLibraryError('Failed to cache file.');
                 updateNodeData(id, { loaded: false });
+            })
+            .finally(() => {
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                }
             });
+    }, [applyAssetSelection, id, updateNodeData]);
 
-        audioEngine.loadSamplerBuffer(id, objectUrl);
-    }, [id, updateNodeData]);
+    const handleLibrarySelect = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
+        void applyAssetSelection(event.target.value);
+    }, [applyAssetSelection]);
 
     const handleBrowseClick = useCallback(() => {
         fileInputRef.current?.click();
@@ -87,15 +129,6 @@ export const SamplerNode: React.FC<NodeProps<Node<SamplerNodeData>>> = memo(({ i
         return unsubscribe;
     }, [id]);
 
-    useEffect(() => {
-        return () => {
-            if (localObjectUrlRef.current) {
-                URL.revokeObjectURL(localObjectUrlRef.current);
-                localObjectUrlRef.current = null;
-            }
-        };
-    }, []);
-
     const fileLabel = data.fileName || (data.src ? 'Loaded' : 'No file selected');
 
     return (
@@ -136,13 +169,40 @@ export const SamplerNode: React.FC<NodeProps<Node<SamplerNodeData>>> = memo(({ i
                             fontSize: '11px',
                         }}
                     >
-                        📁 Browse...
+                        📁 Upload...
                     </button>
+                </div>
+
+                <div className="node-control">
+                    <label>Library</label>
+                    <input
+                        type="text"
+                        value={libraryQuery}
+                        onChange={(event) => setLibraryQuery(event.target.value)}
+                        placeholder="Search assets"
+                        title="Search audio assets"
+                    />
+                    <select
+                        value={selectedSampleId}
+                        onChange={handleLibrarySelect}
+                        title="Select cached sample"
+                    >
+                        <option value="">Select cached file</option>
+                        {filteredAssets.map((asset) => (
+                            <option key={asset.id} value={asset.id}>{asset.name}</option>
+                        ))}
+                    </select>
                 </div>
 
                 <div className="node-control" style={{ fontSize: '10px', color: data.src ? '#44cc44' : '#888' }}>
                     {data.src ? `✅ ${fileLabel}` : '⚪ No file selected'}
                 </div>
+
+                {libraryError && (
+                    <div className="node-control" style={{ fontSize: '10px', color: '#ff6b6b' }}>
+                        {libraryError}
+                    </div>
+                )}
 
                 <div className="node-control">
                     <button

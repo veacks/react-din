@@ -147,6 +147,60 @@ describe('playground store and code generation', () => {
         expect(code).toContain('<AudioProvider>');
     });
 
+    it('sanitizes convolver asset URLs and exports file-based sampler/convolver paths', async () => {
+        vi.resetModules();
+        const { generateCode } = await import('../../src/playground/CodeGenerator');
+        const { sanitizeGraphForStorage } = await import('../../src/playground/graphUtils');
+
+        const graph = sanitizeGraphForStorage({
+            id: 'graph-assets',
+            name: 'Assets',
+            nodes: [
+                {
+                    id: 'sampler-1',
+                    type: 'samplerNode',
+                    position: { x: 0, y: 0 },
+                    data: {
+                        type: 'sampler',
+                        src: 'blob:sampler-asset',
+                        sampleId: 'sample-1',
+                        fileName: 'kick.wav',
+                        loop: false,
+                        playbackRate: 1,
+                        detune: 0,
+                        loaded: true,
+                        label: 'Sampler',
+                    },
+                },
+                {
+                    id: 'convolver-1',
+                    type: 'convolverNode',
+                    position: { x: 0, y: 0 },
+                    data: {
+                        type: 'convolver',
+                        impulseSrc: 'blob:impulse-asset',
+                        impulseId: 'impulse-1',
+                        impulseFileName: 'plate.wav',
+                        normalize: true,
+                        label: 'Convolver',
+                    },
+                },
+            ] as any,
+            edges: [],
+            createdAt: 0,
+            updatedAt: 0,
+            order: 0,
+        });
+
+        const sanitizedConvolver = graph.nodes.find((node) => node.id === 'convolver-1');
+        expect((sanitizedConvolver?.data as any).impulseSrc).toBe('');
+
+        const code = generateCode(graph.nodes as any, graph.edges as any, false, 'Assets');
+        expect(code).toContain('src="/samples/kick.wav"');
+        expect(code).toContain('impulse="/impulses/plate.wav"');
+        expect(code).not.toContain('blob:');
+    });
+
     it('migrates legacy handles, rejects removed note triggers, and keeps singleton transport/output nodes', async () => {
         vi.resetModules();
         const { useAudioGraphStore } = await import('../../src/playground/store');

@@ -148,7 +148,7 @@ export function createPlaygroundNode(
                 type: 'convolverNode',
                 position,
                 dragHandle: '.node-header',
-                data: { type: 'convolver', impulseSrc: '', impulseFileName: '', normalize: true, label: 'Convolver' } as AudioNodeData,
+                data: { type: 'convolver', impulseSrc: '', impulseId: '', impulseFileName: '', normalize: true, label: 'Convolver' } as AudioNodeData,
             };
         case 'analyzer':
             return {

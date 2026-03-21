@@ -82,9 +82,27 @@ vi.mock('../../src/playground/graphStorage', () => ({
     saveGraph: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../src/playground/audioCache', () => ({
-    deleteAudioFromCache: vi.fn().mockResolvedValue(undefined),
-    getAudioObjectUrl: vi.fn().mockResolvedValue(null),
+vi.mock('../../src/playground/audioLibrary', () => ({
+    addAssetFromBlob: vi.fn().mockResolvedValue({
+        id: 'asset-blob',
+        name: 'imported.wav',
+        mimeType: 'audio/wav',
+        size: 100,
+        createdAt: 1,
+        updatedAt: 1,
+    }),
+    addAssetFromFile: vi.fn().mockResolvedValue({
+        id: 'asset-file',
+        name: 'uploaded.wav',
+        mimeType: 'audio/wav',
+        size: 100,
+        createdAt: 1,
+        updatedAt: 1,
+    }),
+    deleteAsset: vi.fn().mockResolvedValue(undefined),
+    getAssetObjectUrl: vi.fn().mockResolvedValue(null),
+    listAssets: vi.fn().mockResolvedValue([]),
+    subscribeAssets: vi.fn(() => () => {}),
 }));
 
 vi.mock('../../src/playground/AudioEngine', () => ({
@@ -191,5 +209,128 @@ describe('Playground connection assist', () => {
 
         expect(screen.queryByLabelText('Search nodes')).not.toBeInTheDocument();
         expect(document.querySelector('.connection-assist-handle')).toBeNull();
+    });
+
+    it('keeps the audio library panel collapsed by default and expands it on demand', async () => {
+        const audioLibrary = await import('../../src/playground/audioLibrary');
+        vi.mocked(audioLibrary.listAssets).mockResolvedValue([]);
+
+        const { PlaygroundDemo } = await import('../../src/PlaygroundDemo');
+        render(<PlaygroundDemo />);
+
+        expect(screen.queryByLabelText('Search library files')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByTitle('Expand audio library'));
+
+        await waitFor(() => {
+            expect(screen.getByLabelText('Search library files')).toBeInTheDocument();
+        });
+        expect(screen.getByText('No audio files found.')).toBeInTheDocument();
+    });
+
+    it('deletes an audio-library asset and clears sampler references across graphs', async () => {
+        const audioLibrary = await import('../../src/playground/audioLibrary');
+        vi.mocked(audioLibrary.listAssets).mockResolvedValue([
+            {
+                id: 'asset-kick',
+                name: 'kick.wav',
+                mimeType: 'audio/wav',
+                size: 100,
+                createdAt: 1,
+                updatedAt: 1,
+            },
+        ]);
+
+        const { useAudioGraphStore } = await import('../../src/playground/store');
+        const { PlaygroundDemo } = await import('../../src/PlaygroundDemo');
+        render(<PlaygroundDemo />);
+
+        act(() => {
+            useAudioGraphStore.getState().loadGraph(
+                [
+                    {
+                        id: 'sampler-1',
+                        type: 'samplerNode',
+                        position: { x: 0, y: 0 },
+                        data: {
+                            type: 'sampler',
+                            src: 'blob:asset-kick',
+                            sampleId: 'asset-kick',
+                            fileName: 'kick.wav',
+                            loop: false,
+                            playbackRate: 1,
+                            detune: 0,
+                            loaded: true,
+                            label: 'Sampler',
+                        },
+                    } as any,
+                    {
+                        id: 'output-1',
+                        type: 'outputNode',
+                        position: { x: 0, y: 0 },
+                        data: { type: 'output', playing: false, masterGain: 0.5, label: 'Output' },
+                    } as any,
+                ],
+                []
+            );
+        });
+
+        fireEvent.click(screen.getByTitle('Expand audio library'));
+        await waitFor(() => {
+            expect(screen.getAllByText('kick.wav').length).toBeGreaterThan(0);
+        });
+
+        vi.spyOn(window, 'confirm').mockReturnValue(true);
+        fireEvent.click(screen.getByTitle('Delete file from library'));
+
+        await waitFor(() => {
+            expect(audioLibrary.deleteAsset).toHaveBeenCalledWith('asset-kick');
+        });
+
+        const samplerNode = useAudioGraphStore.getState().nodes.find((node) => node.id === 'sampler-1');
+        expect((samplerNode?.data as any).sampleId).toBe('');
+        expect((samplerNode?.data as any).src).toBe('');
+    });
+
+    it('supports drag-and-drop upload for audio files in the library panel', async () => {
+        const audioLibrary = await import('../../src/playground/audioLibrary');
+        vi.mocked(audioLibrary.listAssets).mockResolvedValue([]);
+        vi.spyOn(HTMLMediaElement.prototype, 'canPlayType').mockReturnValue('probably');
+
+        const { PlaygroundDemo } = await import('../../src/PlaygroundDemo');
+        render(<PlaygroundDemo />);
+
+        fireEvent.click(screen.getByTitle('Expand audio library'));
+        const dropzone = screen.getByText('Drag and drop audio files here').closest('.ui-library-dropzone') as HTMLElement;
+        expect(dropzone).toBeTruthy();
+
+        const file = new File(['audio-data'], 'kick.mp3', { type: 'audio/mpeg' });
+        fireEvent.dragOver(dropzone, { dataTransfer: { files: [file], dropEffect: 'copy' } });
+        fireEvent.drop(dropzone, { dataTransfer: { files: [file] } });
+
+        await waitFor(() => {
+            expect(audioLibrary.addAssetFromFile).toHaveBeenCalledWith(file);
+        });
+    });
+
+    it('rejects non-audio drag-and-drop uploads in the library panel', async () => {
+        const audioLibrary = await import('../../src/playground/audioLibrary');
+        vi.mocked(audioLibrary.listAssets).mockResolvedValue([]);
+        vi.mocked(audioLibrary.addAssetFromFile).mockClear();
+
+        const { PlaygroundDemo } = await import('../../src/PlaygroundDemo');
+        render(<PlaygroundDemo />);
+
+        fireEvent.click(screen.getByTitle('Expand audio library'));
+        const dropzone = screen.getByText('Drag and drop audio files here').closest('.ui-library-dropzone') as HTMLElement;
+        expect(dropzone).toBeTruthy();
+
+        const file = new File(['not-audio'], 'notes.txt', { type: 'text/plain' });
+        fireEvent.drop(dropzone, { dataTransfer: { files: [file] } });
+
+        await waitFor(() => {
+            expect(screen.getByText(/Only audio files are accepted\./i)).toBeInTheDocument();
+        });
+        expect(audioLibrary.addAssetFromFile).not.toHaveBeenCalled();
     });
 });

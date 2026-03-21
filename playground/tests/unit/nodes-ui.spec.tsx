@@ -25,6 +25,7 @@ import ConstantSourceNode from '../../src/playground/nodes/ConstantSourceNode';
 import MediaStreamNode from '../../src/playground/nodes/MediaStreamNode';
 import EventTriggerNode from '../../src/playground/nodes/EventTriggerNode';
 import CompressorNode from '../../src/playground/nodes/CompressorNode';
+import SamplerNode from '../../src/playground/nodes/SamplerNode';
 import { getInputParamHandleId } from '../../src/playground/handleIds';
 import { audioEngine } from '../../src/playground/AudioEngine';
 
@@ -39,6 +40,22 @@ const audioEngineMock = vi.hoisted(() => ({
         callback(2);
         return () => {};
     }),
+}));
+const audioLibraryMock = vi.hoisted(() => ({
+    addAssetFromFile: vi.fn(async (file: File) => ({
+        id: `asset-${file.name}`,
+        name: file.name,
+        mimeType: file.type || 'audio/wav',
+        size: file.size,
+        createdAt: 1,
+        updatedAt: 1,
+    })),
+    getAssetObjectUrl: vi.fn(async (assetId: string) => `blob:${assetId}`),
+    listAssets: vi.fn(async () => ([
+        { id: 'asset-kick', name: 'kick.wav', mimeType: 'audio/wav', size: 256, createdAt: 1, updatedAt: 1 },
+        { id: 'asset-plate.wav', name: 'plate.wav', mimeType: 'audio/wav', size: 512, createdAt: 1, updatedAt: 1 },
+    ])),
+    subscribeAssets: vi.fn(() => () => {}),
 }));
 
 vi.mock('@xyflow/react', () => ({
@@ -62,9 +79,12 @@ vi.mock('../../src/playground/AudioEngine', () => ({
         updateSamplerParam: vi.fn(),
         playSampler: vi.fn(),
         stopSampler: vi.fn(),
+        loadSamplerBuffer: vi.fn(),
         onSamplerEnd: () => () => {},
     },
 }));
+
+vi.mock('../../src/playground/audioLibrary', () => audioLibraryMock);
 
 describe('playground node UIs', () => {
     afterEach(() => {
@@ -72,6 +92,10 @@ describe('playground node UIs', () => {
         storeState.edges = [];
         updateNodeData.mockClear();
         vi.mocked(audioEngine.updateNode).mockClear();
+        audioLibraryMock.addAssetFromFile.mockClear();
+        audioLibraryMock.getAssetObjectUrl.mockClear();
+        audioLibraryMock.listAssets.mockClear();
+        audioLibraryMock.subscribeAssets.mockClear();
         vi.unstubAllGlobals();
     });
 
@@ -259,22 +283,7 @@ describe('playground node UIs', () => {
         expect(screen.getByText('Convolver')).toBeInTheDocument();
     });
 
-    it('uploads an impulse audio file on ConvolverNode instead of manual path input', async () => {
-        class MockFileReader {
-            result: string | ArrayBuffer | null = null;
-            onload: ((this: FileReader, ev: ProgressEvent<FileReader>) => unknown) | null = null;
-            onerror: ((this: FileReader, ev: ProgressEvent<FileReader>) => unknown) | null = null;
-
-            readAsDataURL(_blob: Blob) {
-                this.result = 'data:audio/wav;base64,ZmFrZS1pcg==';
-                if (this.onload) {
-                    this.onload.call(this as unknown as FileReader, {} as ProgressEvent<FileReader>);
-                }
-            }
-        }
-
-        vi.stubGlobal('FileReader', MockFileReader as unknown as typeof FileReader);
-
+    it('uploads an impulse audio file on ConvolverNode and stores a library asset reference', async () => {
         const sharedProps = {
             dragging: false,
             selected: false,
@@ -309,8 +318,9 @@ describe('playground node UIs', () => {
             expect(updateNodeData).toHaveBeenCalledWith(
                 'convolver-upload',
                 expect.objectContaining({
+                    impulseId: 'asset-plate.wav',
                     impulseFileName: 'plate.wav',
-                    impulseSrc: expect.stringContaining('data:audio/wav;base64'),
+                    impulseSrc: 'blob:asset-plate.wav',
                 })
             );
         });
@@ -318,10 +328,54 @@ describe('playground node UIs', () => {
         expect(audioEngine.updateNode).toHaveBeenCalledWith(
             'convolver-upload',
             expect.objectContaining({
+                impulseId: 'asset-plate.wav',
                 impulseFileName: 'plate.wav',
-                impulseSrc: expect.stringContaining('data:audio/wav;base64'),
+                impulseSrc: 'blob:asset-plate.wav',
             })
         );
         expect(screen.getByText('Impulse File')).toBeInTheDocument();
+    });
+
+    it('selects a cached sample from the sampler dropdown search', async () => {
+        cleanup();
+
+        const sharedProps = {
+            dragging: false,
+            selected: false,
+            zIndex: 0,
+            selectable: true,
+            draggable: true,
+            isConnectable: true,
+            positionAbsoluteX: 0,
+            positionAbsoluteY: 0,
+            xPos: 0,
+            yPos: 0,
+        } as const;
+
+        render(
+            <SamplerNode
+                {...(sharedProps as any)}
+                id="sampler-select"
+                data={{ type: 'sampler', src: '', sampleId: '', fileName: '', loop: false, playbackRate: 1, detune: 0, loaded: false, label: 'Sampler' }}
+            />
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTitle('Select cached sample')).toBeInTheDocument();
+        });
+
+        fireEvent.change(screen.getByTitle('Select cached sample'), { target: { value: 'asset-kick' } });
+
+        await waitFor(() => {
+            expect(updateNodeData).toHaveBeenCalledWith(
+                'sampler-select',
+                expect.objectContaining({
+                    sampleId: 'asset-kick',
+                    src: 'blob:asset-kick',
+                    fileName: 'kick.wav',
+                    loaded: true,
+                })
+            );
+        });
     });
 });

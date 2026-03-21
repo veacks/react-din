@@ -186,6 +186,16 @@
     width: 100%;
 }
 
+.node-control input[type="text"] {
+    background: var(--control-bg);
+    color: var(--text);
+    border: 1px solid var(--control-border);
+    padding: 4px;
+    border-radius: 4px;
+    font-size: 11px;
+    width: 100%;
+}
+
 .node-control .value {
     font-size: 10px;
     color: var(--accent);
@@ -539,6 +549,62 @@
     padding: 16px 12px;
     text-align: center;
     font-size: 11px;
+}
+
+.ui-library-dropzone {
+    border-color: color-mix(in srgb, var(--panel-border) 80%, transparent);
+    background: color-mix(in srgb, var(--panel-bg) 82%, transparent);
+}
+
+.ui-library-dropzone.is-drag-over {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent-soft) 70%, var(--panel-bg));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.ui-library-tile {
+    background: transparent;
+}
+
+.ui-library-icon {
+    position: relative;
+    background: linear-gradient(180deg, #f2f2f4 0%, #dedee1 100%);
+    box-shadow: 0 8px 16px rgba(5, 9, 20, 0.18);
+}
+
+.light .ui-library-icon {
+    background: linear-gradient(180deg, #f4f4f5 0%, #e5e5e7 100%);
+}
+
+.ui-library-note-glyph {
+    font-size: 40px;
+    color: rgba(120, 120, 124, 0.35);
+    line-height: 1;
+    transform: translateY(2px);
+}
+
+.ui-library-play-overlay {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: #fff;
+    background: rgba(120, 124, 136, 0.68);
+    box-shadow: 0 6px 12px rgba(16, 20, 36, 0.28);
+}
+
+.ui-library-icon:hover .ui-library-play-overlay {
+    background: rgba(68, 136, 255, 0.78);
+}
+
+.ui-library-delete {
+    opacity: 0.85;
 }
 
 

@@ -147,6 +147,7 @@ export interface WaveShaperNodeData {
 export interface ConvolverNodeData {
     type: 'convolver';
     impulseSrc: string;
+    impulseId?: string;
     impulseFileName?: string;
     normalize: boolean;
     label: string;

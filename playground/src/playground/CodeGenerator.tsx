@@ -917,7 +917,14 @@ function ensureUniqueName(base: string, usedNames: Set<string>): string {
 
 function resolveConvolverImpulseForExport(convolver: ConvolverNodeData): string | undefined {
     const rawImpulse = typeof convolver.impulseSrc === 'string' ? convolver.impulseSrc.trim() : '';
-    if (!rawImpulse) return undefined;
+    if (!rawImpulse) {
+        const rawFileName = typeof convolver.impulseFileName === 'string' ? convolver.impulseFileName.trim() : '';
+        if (!rawFileName) return undefined;
+        const fileNameCandidate = rawFileName.split(/[\\/]/).pop() || '';
+        const safeFileName = fileNameCandidate.replace(/[^a-zA-Z0-9._-]+/g, '-');
+        const finalFileName = safeFileName || 'impulse.wav';
+        return `/impulses/${finalFileName}`;
+    }
 
     const isInlineOrEphemeralSource = rawImpulse.startsWith('data:') || rawImpulse.startsWith('blob:');
     if (!isInlineOrEphemeralSource) {
@@ -929,6 +936,20 @@ function resolveConvolverImpulseForExport(convolver: ConvolverNodeData): string 
     const safeFileName = fileNameCandidate.replace(/[^a-zA-Z0-9._-]+/g, '-');
     const finalFileName = safeFileName || 'impulse.wav';
     return `/impulses/${finalFileName}`;
+}
+
+function resolveSamplerSrcForExport(sampler: SamplerNodeData): string {
+    const rawSrc = typeof sampler.src === 'string' ? sampler.src.trim() : '';
+    const isEphemeralSource = rawSrc.startsWith('blob:') || rawSrc.startsWith('data:');
+    if (rawSrc && !isEphemeralSource) {
+        return rawSrc;
+    }
+
+    const rawFileName = typeof sampler.fileName === 'string' ? sampler.fileName.trim() : '';
+    const fileNameCandidate = rawFileName.split(/[\\/]/).pop() || '';
+    const safeFileName = fileNameCandidate.replace(/[^a-zA-Z0-9._-]+/g, '-');
+    const finalFileName = safeFileName || 'sample.wav';
+    return `/samples/${finalFileName}`;
 }
 
 const RESERVED_IDENTIFIERS = new Set([
@@ -1282,7 +1303,7 @@ function buildNodeProps(
         }
         case 'sampler': {
             const sampler = nodeData as SamplerNodeData;
-            const src = sampler.src && !sampler.src.startsWith('blob:') ? sampler.src : '/path/to/sample.wav';
+            const src = resolveSamplerSrcForExport(sampler);
             props.push(`src=${JSON.stringify(src)}`);
             addBooleanProp('loop', sampler.loop);
             if (sampler.playbackRate !== undefined && sampler.playbackRate !== 1) {
@@ -2081,8 +2102,9 @@ function buildPreviewProps(
         }
         case 'convolver': {
             const convolver = nodeData as ConvolverNodeData;
-            if (convolver.impulseSrc) {
-                props.impulse = convolver.impulseSrc;
+            const impulseForExport = resolveConvolverImpulseForExport(convolver);
+            if (impulseForExport) {
+                props.impulse = impulseForExport;
             }
             props.normalize = convolver.normalize;
             break;
@@ -2138,9 +2160,7 @@ function buildPreviewProps(
         }
         case 'sampler': {
             const sampler = nodeData as SamplerNodeData;
-            if (sampler.src) {
-                props.src = sampler.src;
-            }
+            props.src = resolveSamplerSrcForExport(sampler);
             if (sampler.loop) props.loop = sampler.loop;
             if (sampler.playbackRate !== undefined && sampler.playbackRate !== 1) {
                 props.playbackRate = sampler.playbackRate;

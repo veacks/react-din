@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, type FC } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, type ChangeEvent, type FC } from 'react';
 import {
     ReactFlow,
     Background,
@@ -18,7 +18,7 @@ import './playground/playground.css';
 import Inspector from './playground/Inspector';
 import ConnectionAssistMenu from './playground/ConnectionAssistMenu';
 
-import { useAudioGraphStore, type AudioNodeData, type SamplerNodeData } from './playground/store';
+import { useAudioGraphStore, type AudioNodeData, type ConvolverNodeData, type SamplerNodeData } from './playground/store';
 import {
     OscNode,
     GainNode,
@@ -56,7 +56,15 @@ import {
     SwitchNode,
 } from './playground/nodes';
 import { deleteGraph as deleteStoredGraph, loadActiveGraphId, loadGraphs, saveActiveGraphId, saveGraph } from './playground/graphStorage';
-import { deleteAudioFromCache, getAudioObjectUrl } from './playground/audioCache';
+import {
+    addAssetFromBlob,
+    addAssetFromFile,
+    deleteAsset,
+    getAssetObjectUrl,
+    listAssets,
+    subscribeAssets,
+    type AudioLibraryAsset,
+} from './playground/audioLibrary';
 import { sanitizeGraphForStorage, toPascalCase } from './playground/graphUtils';
 import { audioEngine } from './playground/AudioEngine';
 import {
@@ -117,6 +125,97 @@ const CONTROL_EDGE_STYLE = { stroke: '#4488ff', strokeWidth: 2, strokeDasharray:
 const TRIGGER_EDGE_STYLE = { stroke: '#ff4466', strokeWidth: 2, strokeDasharray: '6,4' };
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const formatBytes = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const formatDuration = (durationSec?: number): string => {
+    if (!Number.isFinite(durationSec) || !durationSec || durationSec <= 0) {
+        return '--:--';
+    }
+    const totalSeconds = Math.max(0, Math.round(durationSec));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
+
+const SAFE_AUDIO_EXTENSIONS = new Set([
+    'mp3',
+    'wav',
+    'wave',
+    'm4a',
+    'aac',
+    'flac',
+    'ogg',
+    'oga',
+    'opus',
+    'webm',
+    'mp4',
+]);
+
+const EXTENSION_TO_MIME_CANDIDATES: Record<string, string[]> = {
+    mp3: ['audio/mpeg'],
+    wav: ['audio/wav', 'audio/x-wav', 'audio/wave'],
+    wave: ['audio/wav', 'audio/x-wav', 'audio/wave'],
+    m4a: ['audio/mp4', 'audio/x-m4a', 'audio/aac'],
+    aac: ['audio/aac', 'audio/mp4'],
+    flac: ['audio/flac', 'audio/x-flac'],
+    ogg: ['audio/ogg'],
+    oga: ['audio/ogg'],
+    opus: ['audio/ogg; codecs=opus', 'audio/opus'],
+    webm: ['audio/webm'],
+    mp4: ['audio/mp4'],
+};
+
+const MAINSTREAM_CROSS_BROWSER_HINT = 'Use MP3, WAV, or M4A/AAC for best cross-browser compatibility.';
+
+const getFileExtension = (name: string): string => {
+    const trimmed = name.trim();
+    const lastDot = trimmed.lastIndexOf('.');
+    if (lastDot < 0 || lastDot === trimmed.length - 1) return '';
+    return trimmed.slice(lastDot + 1).toLowerCase();
+};
+
+const isLikelyAudioFile = (file: File): boolean => {
+    if (file.type.startsWith('audio/')) return true;
+    return SAFE_AUDIO_EXTENSIONS.has(getFileExtension(file.name));
+};
+
+const canCurrentBrowserPlayFile = (file: File): boolean => {
+    if (typeof document === 'undefined') return true;
+    const audio = document.createElement('audio');
+    if (typeof audio.canPlayType !== 'function') return true;
+
+    const mimeCandidates = new Set<string>();
+    if (file.type) {
+        mimeCandidates.add(file.type);
+    }
+
+    const extension = getFileExtension(file.name);
+    (EXTENSION_TO_MIME_CANDIDATES[extension] ?? []).forEach((value) => mimeCandidates.add(value));
+
+    if (mimeCandidates.size === 0) return false;
+    for (const mime of mimeCandidates) {
+        const support = audio.canPlayType(mime).toLowerCase();
+        if (support === 'probably' || support === 'maybe') {
+            return true;
+        }
+    }
+    return false;
+};
+
+async function dataUrlToBlob(dataUrl: string): Promise<Blob | null> {
+    try {
+        const response = await fetch(dataUrl);
+        if (!response.ok) return null;
+        return response.blob();
+    } catch {
+        return null;
+    }
+}
 
 const getClientPosition = (event: MouseEvent | TouchEvent): XYPosition | null => {
     if ('clientX' in event) {
@@ -400,6 +499,14 @@ export const PlaygroundDemo: FC = () => {
     const [assistMenuQuery, setAssistMenuQuery] = useState('');
     const [assistMenuPosition, setAssistMenuPosition] = useState<XYPosition>({ x: ASSIST_MENU_MARGIN, y: ASSIST_MENU_MARGIN });
     const [assistDropClientPosition, setAssistDropClientPosition] = useState<XYPosition | null>(null);
+    const [isLibraryPanelCollapsed, setLibraryPanelCollapsed] = useState(true);
+    const [libraryAssets, setLibraryAssets] = useState<AudioLibraryAsset[]>([]);
+    const [librarySearch, setLibrarySearch] = useState('');
+    const [previewAssetId, setPreviewAssetId] = useState<string | null>(null);
+    const [libraryPanelError, setLibraryPanelError] = useState<string | null>(null);
+    const [isLibraryDragOver, setLibraryDragOver] = useState(false);
+    const libraryUploadRef = useRef<HTMLInputElement | null>(null);
+    const previewAudioRef = useRef<HTMLAudioElement | null>(null);
     const [uiTokenCounters, setUiTokenCounters] = useState<Record<'hoverToken' | 'successToken' | 'errorToken', number>>({
         hoverToken: 0,
         successToken: 0,
@@ -409,6 +516,12 @@ export const PlaygroundDemo: FC = () => {
     const filteredAssistSuggestions = assistSuggestions.filter((suggestion) =>
         suggestion.title.toLowerCase().includes(assistMenuQuery.trim().toLowerCase())
     );
+
+    const filteredLibraryAssets = useMemo(() => {
+        const query = librarySearch.trim().toLowerCase();
+        if (!query) return libraryAssets;
+        return libraryAssets.filter((asset) => asset.name.toLowerCase().includes(query));
+    }, [libraryAssets, librarySearch]);
 
     const graphDiagnostics = (() => {
         const nodeById = new Map(nodes.map((node) => [node.id, node]));
@@ -479,6 +592,26 @@ export const PlaygroundDemo: FC = () => {
 
         window.addEventListener('resize', onResize);
         return () => window.removeEventListener('resize', onResize);
+    }, []);
+
+    useEffect(() => {
+        const refreshLibraryAssets = () => {
+            listAssets()
+                .then((assets) => setLibraryAssets(assets))
+                .catch(() => setLibraryAssets([]));
+        };
+
+        refreshLibraryAssets();
+        return subscribeAssets(refreshLibraryAssets);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (previewAudioRef.current) {
+                previewAudioRef.current.pause();
+                previewAudioRef.current = null;
+            }
+        };
     }, []);
 
     useEffect(() => {
@@ -555,22 +688,58 @@ export const PlaygroundDemo: FC = () => {
 
     useEffect(() => {
         if (!isHydrated) return;
+        let cancelled = false;
 
-        nodes.forEach((node) => {
-            if (node.data.type !== 'sampler') return;
-            const sampler = node.data as SamplerNodeData;
-            if (!sampler.sampleId || sampler.src) return;
+        const hydrateAudioAssets = async () => {
+            for (const node of nodes) {
+                if (cancelled) return;
 
-            getAudioObjectUrl(sampler.sampleId)
-                .then((url) => {
-                    if (!url) return;
+                if (node.data.type === 'sampler') {
+                    const sampler = node.data as SamplerNodeData;
+                    if (!sampler.sampleId || sampler.src) continue;
+
+                    const url = await getAssetObjectUrl(sampler.sampleId).catch(() => null);
+                    if (!url || cancelled) continue;
+
                     updateNodeData(node.id, { src: url, loaded: true });
                     audioEngine.loadSamplerBuffer(node.id, url);
-                })
-                .catch(() => {
-                    // Ignore cache errors for now
-                });
-        });
+                    continue;
+                }
+
+                if (node.data.type !== 'convolver') continue;
+                const convolver = node.data as ConvolverNodeData;
+
+                if (convolver.impulseId && !convolver.impulseSrc) {
+                    const url = await getAssetObjectUrl(convolver.impulseId).catch(() => null);
+                    if (!url || cancelled) continue;
+                    updateNodeData(node.id, { impulseSrc: url });
+                    continue;
+                }
+
+                if (!convolver.impulseId && typeof convolver.impulseSrc === 'string' && convolver.impulseSrc.startsWith('data:')) {
+                    const blob = await dataUrlToBlob(convolver.impulseSrc);
+                    if (!blob || cancelled) continue;
+
+                    const fileName = convolver.impulseFileName || 'impulse.wav';
+                    const asset = await addAssetFromBlob(blob, fileName).catch(() => null);
+                    if (!asset || cancelled) continue;
+
+                    const objectUrl = await getAssetObjectUrl(asset.id).catch(() => null);
+                    if (!objectUrl || cancelled) continue;
+
+                    updateNodeData(node.id, {
+                        impulseId: asset.id,
+                        impulseSrc: objectUrl,
+                        impulseFileName: asset.name,
+                    });
+                }
+            }
+        };
+
+        void hydrateAudioAssets();
+        return () => {
+            cancelled = true;
+        };
     }, [nodes, isHydrated, updateNodeData]);
 
     const clearDragAssist = useCallback(() => {
@@ -771,22 +940,196 @@ export const PlaygroundDemo: FC = () => {
             console.warn('[Playground] Failed to delete graph', error);
         });
 
-        const sampleIds = removedGraph.nodes
-            .filter((node) => node.data.type === 'sampler')
-            .map((node) => (node.data as SamplerNodeData).sampleId)
-            .filter((sampleId): sampleId is string => Boolean(sampleId));
-
-        if (sampleIds.length > 0) {
-            Promise.all(sampleIds.map((sampleId) => deleteAudioFromCache(sampleId))).catch((error) => {
-                console.warn('[Playground] Failed to delete cached audio', error);
-            });
-        }
-
         const nextActiveId = useAudioGraphStore.getState().activeGraphId ?? null;
         saveActiveGraphId(nextActiveId).catch((error) => {
             console.warn('[Playground] Failed to save active graph id', error);
         });
     }, [graphs, removeGraph]);
+
+    const stopPreviewAudio = useCallback(() => {
+        if (!previewAudioRef.current) return;
+        previewAudioRef.current.pause();
+        previewAudioRef.current.currentTime = 0;
+        previewAudioRef.current = null;
+        setPreviewAssetId(null);
+    }, []);
+
+    const clearAssetReferences = useCallback((assetId: string) => {
+        const state = useAudioGraphStore.getState();
+        const activeId = state.activeGraphId ?? null;
+        const updatedGraphs = state.graphs.map((graph) => ({
+            ...graph,
+            nodes: graph.nodes.map((node) => {
+                if (node.data.type === 'sampler') {
+                    const sampler = node.data as SamplerNodeData;
+                    if (sampler.sampleId === assetId) {
+                        return {
+                            ...node,
+                            data: {
+                                ...sampler,
+                                sampleId: '',
+                                src: '',
+                                fileName: '',
+                                loaded: false,
+                            } as AudioNodeData,
+                        };
+                    }
+                    return node;
+                }
+
+                if (node.data.type === 'convolver') {
+                    const convolver = node.data as ConvolverNodeData;
+                    if (convolver.impulseId === assetId) {
+                        return {
+                            ...node,
+                            data: {
+                                ...convolver,
+                                impulseId: '',
+                                impulseSrc: '',
+                                impulseFileName: '',
+                            } as AudioNodeData,
+                        };
+                    }
+                }
+
+                return node;
+            }),
+            updatedAt: Date.now(),
+        }));
+
+        setGraphs(updatedGraphs, activeId);
+    }, [setGraphs]);
+
+    const getAssetUsageCount = useCallback((assetId: string): number => {
+        let usageCount = 0;
+        graphs.forEach((graph) => {
+            graph.nodes.forEach((node) => {
+                if (node.data.type === 'sampler' && (node.data as SamplerNodeData).sampleId === assetId) {
+                    usageCount += 1;
+                }
+                if (node.data.type === 'convolver' && (node.data as ConvolverNodeData).impulseId === assetId) {
+                    usageCount += 1;
+                }
+            });
+        });
+        return usageCount;
+    }, [graphs]);
+
+    const uploadLibraryFiles = useCallback((files: File[]) => {
+        if (files.length === 0) return;
+
+        const invalidTypeFiles = files.filter((file) => !isLikelyAudioFile(file));
+        if (invalidTypeFiles.length > 0) {
+            setLibraryPanelError(`Only audio files are accepted. ${MAINSTREAM_CROSS_BROWSER_HINT}`);
+            return;
+        }
+
+        const unsupportedFiles = files.filter((file) => !canCurrentBrowserPlayFile(file));
+        if (unsupportedFiles.length > 0) {
+            setLibraryPanelError(`This browser cannot decode one or more dropped formats. ${MAINSTREAM_CROSS_BROWSER_HINT}`);
+            return;
+        }
+
+        setLibraryPanelError(null);
+        Promise.all(files.map((file) => addAssetFromFile(file)))
+            .catch(() => {
+                setLibraryPanelError('Failed to upload one or more files.');
+            })
+            .finally(() => {
+                if (libraryUploadRef.current) {
+                    libraryUploadRef.current.value = '';
+                }
+            });
+    }, []);
+
+    const handleLibraryUpload = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(event.target.files ?? []);
+        uploadLibraryFiles(files);
+    }, [uploadLibraryFiles]);
+
+    const handleLibraryDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setLibraryDragOver(true);
+        event.dataTransfer.dropEffect = 'copy';
+    }, []);
+
+    const handleLibraryDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setLibraryDragOver(false);
+    }, []);
+
+    const handleLibraryDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setLibraryDragOver(false);
+        const files = Array.from(event.dataTransfer.files ?? []);
+        uploadLibraryFiles(files);
+    }, [uploadLibraryFiles]);
+
+    const handleLibraryDelete = useCallback((asset: AudioLibraryAsset) => {
+        const usageCount = getAssetUsageCount(asset.id);
+        const message = usageCount > 0
+            ? `Delete "${asset.name}"? It is still used by ${usageCount} node(s).`
+            : `Delete "${asset.name}" from the audio library?`;
+
+        if (!window.confirm(message)) return;
+        if (previewAssetId === asset.id) {
+            stopPreviewAudio();
+        }
+
+        deleteAsset(asset.id)
+            .then(() => {
+                clearAssetReferences(asset.id);
+            })
+            .catch(() => {
+                setLibraryPanelError('Failed to delete library file.');
+            });
+    }, [clearAssetReferences, getAssetUsageCount, previewAssetId, stopPreviewAudio]);
+
+    const handlePreviewToggle = useCallback((assetId: string) => {
+        if (previewAssetId === assetId) {
+            stopPreviewAudio();
+            return;
+        }
+
+        setLibraryPanelError(null);
+        getAssetObjectUrl(assetId)
+            .then((url) => {
+                if (!url) {
+                    setLibraryPanelError('Failed to preview file.');
+                    return;
+                }
+
+                if (previewAudioRef.current) {
+                    previewAudioRef.current.pause();
+                    previewAudioRef.current.currentTime = 0;
+                }
+
+                const audio = new Audio(url);
+                previewAudioRef.current = audio;
+                setPreviewAssetId(assetId);
+
+                audio.onended = () => {
+                    if (previewAudioRef.current === audio) {
+                        previewAudioRef.current = null;
+                        setPreviewAssetId(null);
+                    }
+                };
+
+                audio.play().catch(() => {
+                    if (previewAudioRef.current === audio) {
+                        previewAudioRef.current = null;
+                        setPreviewAssetId(null);
+                    }
+                    setLibraryPanelError('Failed to start preview playback.');
+                });
+            })
+            .catch(() => {
+                setLibraryPanelError('Failed to preview file.');
+            });
+    }, [previewAssetId, stopPreviewAudio]);
 
     const onDrop = useCallback(
         (event: React.DragEvent) => {
@@ -845,6 +1188,16 @@ export const PlaygroundDemo: FC = () => {
         hasManualPanelLayoutRef.current = true;
         setInspectorCollapsed((previous) => !previous);
     }, []);
+
+    const toggleLibraryPanel = useCallback(() => {
+        setLibraryPanelCollapsed((previous) => {
+            const next = !previous;
+            if (next) {
+                stopPreviewAudio();
+            }
+            return next;
+        });
+    }, [stopPreviewAudio]);
 
     return (
         <div
@@ -1251,6 +1604,116 @@ export const PlaygroundDemo: FC = () => {
                             />
                         </ReactFlow>
                     </div>
+                </div>
+
+                <div className="ui-library-panel border-t border-[var(--panel-border)] bg-[var(--panel-muted)]/65">
+                    <div className="flex items-center justify-between gap-3 px-4 py-2">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-subtle)]">
+                                Audio Library
+                            </span>
+                            <span className="rounded border border-[var(--panel-border)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]">
+                                {libraryAssets.length}
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={toggleLibraryPanel}
+                            className="ui-collapse-button rounded-xl border border-[var(--panel-border)] px-3 py-1 text-[11px] font-semibold text-[var(--text-subtle)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
+                            aria-pressed={!isLibraryPanelCollapsed}
+                            title={isLibraryPanelCollapsed ? 'Expand audio library' : 'Collapse audio library'}
+                        >
+                            {isLibraryPanelCollapsed ? '^' : 'v'}
+                        </button>
+                    </div>
+
+                    {!isLibraryPanelCollapsed && (
+                        <div className="px-4 pb-3">
+                            <input
+                                ref={libraryUploadRef}
+                                type="file"
+                                accept="audio/*"
+                                multiple
+                                onChange={handleLibraryUpload}
+                                style={{ display: 'none' }}
+                            />
+                            <div
+                                className={`ui-library-dropzone mb-2 rounded-md border border-dashed px-3 py-3 transition ${isLibraryDragOver ? 'is-drag-over' : ''}`}
+                                onDragOver={handleLibraryDragOver}
+                                onDragLeave={handleLibraryDragLeave}
+                                onDrop={handleLibraryDrop}
+                            >
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="text-[11px] text-[var(--text-subtle)]">
+                                        Drag and drop audio files here
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => libraryUploadRef.current?.click()}
+                                        className="rounded border border-[var(--panel-border)] bg-[var(--panel-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                                    >
+                                        Browse Files
+                                    </button>
+                                </div>
+                                <div className="mt-2">
+                                    <input
+                                        type="text"
+                                        value={librarySearch}
+                                        onChange={(event) => setLibrarySearch(event.target.value)}
+                                        placeholder="Search library files"
+                                        aria-label="Search library files"
+                                        className="h-8 w-full rounded-md border border-[var(--panel-border)] bg-[var(--panel-bg)] px-2 text-[11px] text-[var(--text)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-soft)]"
+                                    />
+                                </div>
+                            </div>
+
+                            {libraryPanelError && (
+                                <div className="mb-2 rounded border border-[var(--danger)]/45 bg-[var(--danger-soft)] px-2 py-1 text-[10px] text-[var(--danger)]">
+                                    {libraryPanelError}
+                                </div>
+                            )}
+
+                            <div className="ui-library-list max-h-[260px] overflow-y-auto rounded-md border border-[var(--panel-border)] bg-[var(--panel-bg)] px-2 py-3">
+                                {filteredLibraryAssets.length === 0 ? (
+                                    <div className="px-3 py-6 text-center text-[11px] text-[var(--text-subtle)]">
+                                        No audio files found.
+                                    </div>
+                                ) : (
+                                    <div className="ui-library-grid grid grid-cols-[repeat(auto-fill,minmax(118px,1fr))] gap-3">
+                                        {filteredLibraryAssets.map((asset) => (
+                                            <div key={asset.id} className="ui-library-tile relative rounded-lg px-1 py-1 text-center">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleLibraryDelete(asset)}
+                                                    className="ui-library-delete absolute right-1 top-1 z-10 rounded-full border border-[var(--danger)]/50 bg-[var(--panel-bg)] px-1.5 py-0.5 text-[10px] text-[var(--danger)] transition hover:bg-[var(--danger-soft)]"
+                                                    title="Delete file from library"
+                                                >
+                                                    x
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handlePreviewToggle(asset.id)}
+                                                    className="ui-library-icon mx-auto mb-2 flex h-[106px] w-[96px] items-center justify-center rounded-xl border border-[var(--panel-border)]"
+                                                    title={previewAssetId === asset.id ? 'Stop preview' : 'Preview audio'}
+                                                >
+                                                    <span className="ui-library-note-glyph">♪</span>
+                                                    <span className="ui-library-play-overlay" aria-hidden="true">
+                                                        {previewAssetId === asset.id ? '■' : '▶'}
+                                                    </span>
+                                                </button>
+                                                <div className="truncate px-1 text-[11px] font-semibold text-[var(--text)]" title={asset.name}>
+                                                    {asset.name}
+                                                </div>
+                                                <div className="text-[10px] text-[var(--text-subtle)]">
+                                                    {formatBytes(asset.size)} · {formatDuration(asset.durationSec)}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </section>
 

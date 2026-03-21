@@ -4,19 +4,21 @@
 Load and apply impulse responses for UI reverb and spatial coloration using uploaded audio files.
 
 ## Props / Handles
-- Data fields: `impulseSrc`, `impulseFileName`, `normalize`, `label`.
+- Data fields: `impulseSrc`, `impulseId`, `impulseFileName`, `normalize`, `label`.
 - Handles: audio input `in`, audio output `out`.
 
 ## Defaults
-- Added with empty `impulseSrc`, empty `impulseFileName`, `normalize true`, and label `Convolver`.
+- Added with empty `impulseSrc`, empty `impulseId`, empty `impulseFileName`, `normalize true`, and label `Convolver`.
 
 ## Integration Notes
 - Keep async impulse loading behavior aligned across node UI, engine, and generated `Convolver` props.
-- File uploads are converted to data URLs and stored in `impulseSrc` so the loaded impulse can be replayed without a manual path field.
+- Uploads create or reuse a global audio-library asset and persist only `impulseId` in stored graph documents.
+- The node exposes a searchable library dropdown and can also consume assets managed in the bottom audio-library panel.
 - Use with short IR files for low-latency UI feedback sounds.
 
 ## Failure Modes
 - Missing or invalid uploaded files keep the node silent or dry.
+- Missing or deleted library assets clear `impulseSrc` and keep the convolver dry.
 - Loading race conditions can swap IRs during rapid edits.
 
 ## Example

@@ -1,4 +1,4 @@
-import type { AudioNodeData, GraphDocument, SamplerNodeData } from './store';
+import type { AudioNodeData, ConvolverNodeData, GraphDocument, SamplerNodeData } from './store';
 
 const DEFAULT_GRAPH_NAME = 'Untitled Graph';
 const DEFAULT_COMPONENT_NAME = 'AudioGraph';
@@ -38,6 +38,14 @@ export function sanitizeGraphForStorage(graph: GraphDocument): GraphDocument {
                 loaded: Boolean(sampler.sampleId),
                 src: sampler.sampleId ? '' : sampler.src,
             } as SamplerNodeData;
+        }
+
+        if (data.type === 'convolver') {
+            const convolver = data as ConvolverNodeData;
+            data = {
+                ...convolver,
+                impulseSrc: convolver.impulseId ? '' : convolver.impulseSrc,
+            } as ConvolverNodeData;
         }
 
         if (data.type === 'output') {

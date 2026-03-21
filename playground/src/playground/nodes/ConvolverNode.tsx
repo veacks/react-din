@@ -1,18 +1,66 @@
-import React, { memo, useCallback, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { useAudioGraphStore, type ConvolverNodeData } from '../store';
 import { audioEngine } from '../AudioEngine';
+import { addAssetFromFile, getAssetObjectUrl, listAssets, subscribeAssets, type AudioLibraryAsset } from '../audioLibrary';
 
 const ConvolverNode = memo(({ id, data, selected }: NodeProps) => {
     const convolverData = data as ConvolverNodeData;
     const updateNodeData = useAudioGraphStore((s) => s.updateNodeData);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [uploadError, setUploadError] = useState<string | null>(null);
+    const [libraryAssets, setLibraryAssets] = useState<AudioLibraryAsset[]>([]);
+    const [libraryQuery, setLibraryQuery] = useState('');
+
+    const selectedImpulseId = typeof convolverData.impulseId === 'string' ? convolverData.impulseId : '';
+
+    const refreshAssets = useCallback(() => {
+        listAssets()
+            .then((assets) => setLibraryAssets(assets))
+            .catch(() => setLibraryAssets([]));
+    }, []);
+
+    useEffect(() => {
+        refreshAssets();
+        return subscribeAssets(refreshAssets);
+    }, [refreshAssets]);
+
+    const filteredAssets = useMemo(() => {
+        const query = libraryQuery.trim().toLowerCase();
+        if (!query) return libraryAssets;
+        return libraryAssets.filter((asset) => asset.name.toLowerCase().includes(query));
+    }, [libraryAssets, libraryQuery]);
 
     const applyImpulseUpdate = useCallback((payload: Partial<ConvolverNodeData>) => {
         updateNodeData(id, payload);
         audioEngine.updateNode(id, payload);
     }, [id, updateNodeData]);
+
+    const applyImpulseAsset = useCallback(async (assetId: string, fallbackName?: string) => {
+        if (!assetId) {
+            setUploadError(null);
+            applyImpulseUpdate({
+                impulseId: '',
+                impulseSrc: '',
+                impulseFileName: '',
+            });
+            return;
+        }
+
+        const objectUrl = await getAssetObjectUrl(assetId);
+        if (!objectUrl) {
+            setUploadError('Failed to read cached asset.');
+            return;
+        }
+
+        const asset = libraryAssets.find((entry) => entry.id === assetId);
+        setUploadError(null);
+        applyImpulseUpdate({
+            impulseId: assetId,
+            impulseSrc: objectUrl,
+            impulseFileName: asset?.name || fallbackName || convolverData.impulseFileName || 'Impulse',
+        });
+    }, [applyImpulseUpdate, convolverData.impulseFileName, libraryAssets]);
 
     const handleNormalizeChange = useCallback((normalize: boolean) => {
         applyImpulseUpdate({ normalize });
@@ -27,29 +75,26 @@ const ConvolverNode = memo(({ id, data, selected }: NodeProps) => {
         if (!file) return;
 
         setUploadError(null);
-
-        const reader = new FileReader();
-        reader.onload = () => {
-            const result = typeof reader.result === 'string' ? reader.result : '';
-            if (!result) {
-                setUploadError('Failed to read audio file.');
-                return;
-            }
-
-            applyImpulseUpdate({
-                impulseSrc: result,
-                impulseFileName: file.name,
+        addAssetFromFile(file)
+            .then((asset) => applyImpulseAsset(asset.id, asset.name))
+            .catch(() => {
+                setUploadError('Failed to cache audio file.');
+            })
+            .finally(() => {
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                }
             });
-        };
-        reader.onerror = () => {
-            setUploadError('Failed to read audio file.');
-        };
-        reader.readAsDataURL(file);
-    }, [applyImpulseUpdate]);
+    }, [applyImpulseAsset]);
+
+    const handleLibrarySelect = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
+        void applyImpulseAsset(event.target.value);
+    }, [applyImpulseAsset]);
 
     const handleClearFile = useCallback(() => {
         setUploadError(null);
         applyImpulseUpdate({
+            impulseId: '',
             impulseSrc: '',
             impulseFileName: '',
         });
@@ -95,8 +140,28 @@ const ConvolverNode = memo(({ id, data, selected }: NodeProps) => {
                             fontSize: '11px',
                         }}
                     >
-                        📁 Browse...
+                        📁 Upload...
                     </button>
+                </div>
+                <div className="node-control">
+                    <label>Library</label>
+                    <input
+                        type="text"
+                        value={libraryQuery}
+                        onChange={(event) => setLibraryQuery(event.target.value)}
+                        placeholder="Search assets"
+                        title="Search impulse assets"
+                    />
+                    <select
+                        value={selectedImpulseId}
+                        onChange={handleLibrarySelect}
+                        title="Select cached impulse response"
+                    >
+                        <option value="">Select cached file</option>
+                        {filteredAssets.map((asset) => (
+                            <option key={asset.id} value={asset.id}>{asset.name}</option>
+                        ))}
+                    </select>
                 </div>
                 <div className="node-control" style={{ fontSize: '10px', color: hasImpulse ? '#44cc44' : '#888' }}>
                     {hasImpulse ? `✅ ${fileLabel}` : '⚪ No file selected'}

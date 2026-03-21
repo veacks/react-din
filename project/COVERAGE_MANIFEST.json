@@ -349,7 +349,7 @@
       "name": "ConvolverNode",
       "source": "playground/src/playground/nodes/ConvolverNode.tsx",
       "docs": "docs/playground-nodes/ConvolverNode.md",
-      "tests": ["playground/tests/unit/nodes-ui.spec.tsx", "playground/tests/unit/store-and-codegen.spec.ts"],
+      "tests": ["playground/tests/unit/nodes-ui.spec.tsx", "playground/tests/unit/store-and-codegen.spec.ts", "playground/tests/unit/audio-library.spec.ts", "playground/tests/unit/playground-connection-assist.spec.tsx"],
       "scenarios": ["F02-S01", "F04-S02"]
     },
     {
@@ -502,7 +502,7 @@
       "name": "SamplerNode",
       "source": "playground/src/playground/nodes/SamplerNode.tsx",
       "docs": "docs/playground-nodes/SamplerNode.md",
-      "tests": ["playground/tests/unit/nodes-ui.spec.tsx", "playground/tests/unit/store-and-codegen.spec.ts"],
+      "tests": ["playground/tests/unit/nodes-ui.spec.tsx", "playground/tests/unit/store-and-codegen.spec.ts", "playground/tests/unit/audio-library.spec.ts", "playground/tests/unit/playground-connection-assist.spec.tsx"],
       "scenarios": ["F02-S01", "F04-S02"]
     },
     {
