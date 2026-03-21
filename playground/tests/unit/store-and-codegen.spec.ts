@@ -531,4 +531,79 @@ describe('playground store and code generation', () => {
         expect(code).toContain('sidechainBusId="sc-osc-sc-compressor-1"');
         expect(code).toContain('<AuxSend busId="sc-osc-sc-compressor-1" sendGain={1}>');
     });
+
+    it('generates atmospheric piano-roll sidechain graph with matrix routing and event trigger wrappers', async () => {
+        vi.resetModules();
+        const { generateCode } = await import('../../src/playground/CodeGenerator');
+
+        const notes = [
+            { pitch: 60, step: 0, duration: 4, velocity: 0.62 },
+            { pitch: 67, step: 6, duration: 6, velocity: 0.58 },
+            { pitch: 64, step: 14, duration: 5, velocity: 0.54 },
+            { pitch: 71, step: 22, duration: 6, velocity: 0.5 },
+        ];
+
+        const nodes = [
+            { id: 'transport', type: 'transportNode', position: { x: 0, y: 0 }, data: { type: 'transport', bpm: 84, playing: false, label: 'Transport' } },
+            { id: 'pianoroll', type: 'pianoRollNode', position: { x: 0, y: 0 }, data: { type: 'pianoRoll', steps: 32, octaves: 3, baseNote: 48, notes, label: 'Piano Roll' } },
+            { id: 'voice', type: 'voiceNode', position: { x: 0, y: 0 }, data: { type: 'voice', portamento: 0.08, label: 'Voice' } },
+            { id: 'osc-pad-a', type: 'oscNode', position: { x: 0, y: 0 }, data: { type: 'osc', frequency: 0, detune: -6, waveform: 'sine', label: 'Osc Pad A' } },
+            { id: 'osc-pad-b', type: 'oscNode', position: { x: 0, y: 0 }, data: { type: 'osc', frequency: 0, detune: 5, waveform: 'triangle', label: 'Osc Pad B' } },
+            { id: 'adsr-pad', type: 'adsrNode', position: { x: 0, y: 0 }, data: { type: 'adsr', attack: 0.35, decay: 1.8, sustain: 0.72, release: 2.8, label: 'ADSR Pad' } },
+            { id: 'gain-a', type: 'gainNode', position: { x: 0, y: 0 }, data: { type: 'gain', gain: 0, label: 'Gain A' } },
+            { id: 'gain-b', type: 'gainNode', position: { x: 0, y: 0 }, data: { type: 'gain', gain: 0, label: 'Gain B' } },
+            {
+                id: 'input-ui',
+                type: 'uiTokensNode',
+                position: { x: 0, y: 0 },
+                data: {
+                    type: 'uiTokens',
+                    params: [
+                        { id: 'hoverToken', name: 'hoverToken', label: 'Hover Token', type: 'float', value: 0, defaultValue: 0, min: 0, max: 9999 },
+                        { id: 'successToken', name: 'successToken', label: 'Success Token', type: 'float', value: 0, defaultValue: 0, min: 0, max: 9999 },
+                        { id: 'errorToken', name: 'errorToken', label: 'Error Token', type: 'float', value: 0, defaultValue: 0, min: 0, max: 9999 },
+                    ],
+                    label: 'UI Tokens',
+                },
+            },
+            { id: 'evt-hover', type: 'eventTriggerNode', position: { x: 0, y: 0 }, data: { type: 'eventTrigger', token: 0, mode: 'change', cooldownMs: 120, velocity: 0.5, duration: 0.18, note: 79, trackId: 'hover', label: 'Event Trigger' } },
+            { id: 'noise-accent', type: 'noiseBurstNode', position: { x: 0, y: 0 }, data: { type: 'noiseBurst', noiseType: 'pink', duration: 0.12, gain: 0.35, attack: 0.004, release: 0.08, label: 'Noise Burst Accent' } },
+            { id: 'pump-seq', type: 'stepSequencerNode', position: { x: 0, y: 0 }, data: { type: 'stepSequencer', steps: 16, pattern: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], activeSteps: [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false], label: 'Step Sequencer Pump' } },
+            { id: 'noise-pump', type: 'noiseBurstNode', position: { x: 0, y: 0 }, data: { type: 'noiseBurst', noiseType: 'white', duration: 0.05, gain: 1, attack: 0.001, release: 0.025, label: 'Noise Burst Pump' } },
+            { id: 'matrix', type: 'matrixMixerNode', position: { x: 0, y: 0 }, data: { type: 'matrixMixer', inputs: 3, outputs: 3, matrix: [[0.9, 0.08, 0.04], [0.84, 0.06, 0.03], [0.22, 0.02, 0.01]], label: 'Matrix Mixer' } },
+            { id: 'compressor', type: 'compressorNode', position: { x: 0, y: 0 }, data: { type: 'compressor', threshold: -28, knee: 20, ratio: 8, attack: 0.012, release: 0.24, sidechainStrength: 0.86, label: 'Compressor' } },
+            { id: 'reverb', type: 'reverbNode', position: { x: 0, y: 0 }, data: { type: 'reverb', decay: 3.6, mix: 0.42, label: 'Reverb' } },
+            { id: 'output', type: 'outputNode', position: { x: 0, y: 0 }, data: { type: 'output', playing: false, masterGain: 0.45, label: 'Output' } },
+        ];
+
+        const edges = [
+            { id: 'e-t-pr', source: 'transport', sourceHandle: 'out', target: 'pianoroll', targetHandle: 'transport' },
+            { id: 'e-pr-v', source: 'pianoroll', sourceHandle: 'trigger', target: 'voice', targetHandle: 'trigger' },
+            { id: 'e-v-osc-a', source: 'voice', sourceHandle: 'note', target: 'osc-pad-a', targetHandle: 'frequency' },
+            { id: 'e-v-osc-b', source: 'voice', sourceHandle: 'note', target: 'osc-pad-b', targetHandle: 'frequency' },
+            { id: 'e-v-adsr', source: 'voice', sourceHandle: 'gate', target: 'adsr-pad', targetHandle: 'gate' },
+            { id: 'e-osc-a-gain-a', source: 'osc-pad-a', sourceHandle: 'out', target: 'gain-a', targetHandle: 'in' },
+            { id: 'e-osc-b-gain-b', source: 'osc-pad-b', sourceHandle: 'out', target: 'gain-b', targetHandle: 'in' },
+            { id: 'e-adsr-gain-a', source: 'adsr-pad', sourceHandle: 'envelope', target: 'gain-a', targetHandle: 'gain' },
+            { id: 'e-adsr-gain-b', source: 'adsr-pad', sourceHandle: 'envelope', target: 'gain-b', targetHandle: 'gain' },
+            { id: 'e-gain-a-matrix', source: 'gain-a', sourceHandle: 'out', target: 'matrix', targetHandle: 'in1' },
+            { id: 'e-gain-b-matrix', source: 'gain-b', sourceHandle: 'out', target: 'matrix', targetHandle: 'in2' },
+            { id: 'e-ui-hover-token', source: 'input-ui', sourceHandle: 'param:hoverToken', target: 'evt-hover', targetHandle: 'token' },
+            { id: 'e-evt-accent', source: 'evt-hover', sourceHandle: 'trigger', target: 'noise-accent', targetHandle: 'trigger' },
+            { id: 'e-accent-matrix', source: 'noise-accent', sourceHandle: 'out', target: 'matrix', targetHandle: 'in3' },
+            { id: 'e-t-pump', source: 'transport', sourceHandle: 'out', target: 'pump-seq', targetHandle: 'transport' },
+            { id: 'e-pump-trigger', source: 'pump-seq', sourceHandle: 'trigger', target: 'noise-pump', targetHandle: 'trigger' },
+            { id: 'e-sidechain', source: 'noise-pump', sourceHandle: 'out', target: 'compressor', targetHandle: 'sidechainIn' },
+            { id: 'e-matrix-comp', source: 'matrix', sourceHandle: 'out', target: 'compressor', targetHandle: 'in' },
+            { id: 'e-comp-reverb', source: 'compressor', sourceHandle: 'out', target: 'reverb', targetHandle: 'in' },
+            { id: 'e-reverb-output', source: 'reverb', sourceHandle: 'out', target: 'output', targetHandle: 'in' },
+        ];
+
+        const code = generateCode(nodes as any, edges as any, true, 'Atmospheric Sidechain');
+
+        expect(code).toContain('Track id="pianoroll"');
+        expect(code).toContain('EventTrigger');
+        expect(code).toContain('MatrixMixer');
+        expect(code).toContain('sidechainBusId="sc-noise-pump-compressor"');
+    });
 });

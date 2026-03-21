@@ -257,7 +257,9 @@ export function isAudioConnection(
 ): boolean {
     const sourceNode = connection.source ? nodeById.get(connection.source) : null;
     if (!sourceNode || !isAudioNodeType(sourceNode.data.type)) return false;
-    return connection.sourceHandle === 'out'
+    const sourceHandle = connection.sourceHandle ?? '';
+    const isAudioOutHandle = sourceHandle === 'out' || /^out\d+$/.test(sourceHandle);
+    return isAudioOutHandle
         && !!connection.target
         && (connection.targetHandle === 'in' || connection.targetHandle?.startsWith('in') === true);
 }
@@ -283,7 +285,7 @@ export function canConnect(
 
     if (
         isAudioNodeType(sourceType)
-        && sourceHandle === 'out'
+        && (sourceHandle === 'out' || /^out\d+$/.test(sourceHandle))
         && targetType === 'compressor'
         && targetHandle === 'sidechainIn'
     ) {

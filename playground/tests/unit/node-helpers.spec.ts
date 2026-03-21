@@ -254,6 +254,13 @@ describe('playground connection assist helpers', () => {
         }, nodeById)).toBe(true);
 
         expect(canConnect({
+            source: 'matrix-1',
+            sourceHandle: 'out2',
+            target: 'compressor-1',
+            targetHandle: 'in',
+        }, nodeById)).toBe(true);
+
+        expect(canConnect({
             source: 'lfo-1',
             sourceHandle: 'out',
             target: 'matrix-1',

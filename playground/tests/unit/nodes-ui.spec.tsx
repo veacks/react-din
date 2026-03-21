@@ -393,6 +393,8 @@ describe('playground node UIs', () => {
         expect(screen.getAllByTestId('handle-gain').length).toBeGreaterThan(0);
         expect(screen.getByTestId('handle-in1')).toBeInTheDocument();
         expect(screen.getByTestId('handle-in2')).toBeInTheDocument();
+        expect(screen.getByTestId('handle-out1')).toBeInTheDocument();
+        expect(screen.getByTestId('handle-out2')).toBeInTheDocument();
         expect(screen.getByTestId('handle-cell:0:0')).toBeInTheDocument();
         expect(screen.getByTestId('handle-cell:1:1')).toBeInTheDocument();
         expect(screen.getAllByTestId('handle-trigger').length).toBeGreaterThan(0);

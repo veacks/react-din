@@ -78,7 +78,6 @@ const MatrixMixerNode = memo(({ id, data, selected }: NodeProps) => {
                     <span className="node-icon">▦</span>
                     <span className="node-title">Matrix Mixer</span>
                 </div>
-                <Handle type="source" position={Position.Right} id="out" className="handle handle-out handle-audio" style={{ right: '0px' }} />
             </div>
             <div className="node-content">
                 <div className="node-control">
@@ -93,6 +92,16 @@ const MatrixMixerNode = memo(({ id, data, selected }: NodeProps) => {
                     <div className="node-control" key={`in-${index}`}>
                         <label>{`In ${index + 1}`}</label>
                         <Handle type="target" position={Position.Left} id={`in${index + 1}`} className="handle handle-in handle-audio" />
+                    </div>
+                ))}
+                <div className="node-control">
+                    <label>Out Mix</label>
+                    <Handle type="source" position={Position.Right} id="out" className="handle handle-out handle-audio" />
+                </div>
+                {Array.from({ length: outputs }, (_, index) => (
+                    <div className="node-control" key={`out-${index}`}>
+                        <label>{`Out ${index + 1}`}</label>
+                        <Handle type="source" position={Position.Right} id={`out${index + 1}`} className="handle handle-out handle-audio" />
                     </div>
                 ))}
                 {matrix.flatMap((rowValues, row) =>

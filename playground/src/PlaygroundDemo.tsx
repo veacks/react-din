@@ -1296,6 +1296,74 @@ export const PlaygroundDemo: FC = () => {
 
                         <button
                             onClick={() => {
+                                const notes = [
+                                    { pitch: 60, step: 0, duration: 4, velocity: 0.62 },  // C4
+                                    { pitch: 67, step: 6, duration: 6, velocity: 0.58 },  // G4
+                                    { pitch: 64, step: 14, duration: 5, velocity: 0.54 }, // E4
+                                    { pitch: 71, step: 22, duration: 6, velocity: 0.5 },  // B4
+                                ];
+                                const pumpPattern = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
+                                const nodes: Node<AudioNodeData>[] = [
+                                    { id: 'transport', type: 'transportNode', dragHandle: '.node-header', position: { x: 40, y: 60 }, data: { type: 'transport', bpm: 84, playing: true, label: 'Transport' } as any },
+                                    { id: 'pianoroll', type: 'pianoRollNode', dragHandle: '.node-header', position: { x: 40, y: 220 }, data: { type: 'pianoRoll', steps: 32, octaves: 3, baseNote: 48, notes, label: 'Piano Roll' } as any },
+                                    { id: 'voice', type: 'voiceNode', dragHandle: '.node-header', position: { x: 320, y: 220 }, data: { type: 'voice', portamento: 0.08, label: 'Voice' } as any },
+                                    { id: 'osc-pad-a', type: 'oscNode', dragHandle: '.node-header', position: { x: 570, y: 150 }, data: { type: 'osc', frequency: 0, waveform: 'sine', detune: -6, label: 'Osc Pad A' } as any },
+                                    { id: 'osc-pad-b', type: 'oscNode', dragHandle: '.node-header', position: { x: 570, y: 320 }, data: { type: 'osc', frequency: 0, waveform: 'triangle', detune: 5, label: 'Osc Pad B' } as any },
+                                    { id: 'adsr-pad', type: 'adsrNode', dragHandle: '.node-header', position: { x: 570, y: 470 }, data: { type: 'adsr', attack: 0.35, decay: 1.8, sustain: 0.72, release: 2.8, label: 'ADSR Pad' } as any },
+                                    { id: 'gain-a', type: 'gainNode', dragHandle: '.node-header', position: { x: 830, y: 150 }, data: { type: 'gain', gain: 0, label: 'Gain A' } as any },
+                                    { id: 'gain-b', type: 'gainNode', dragHandle: '.node-header', position: { x: 830, y: 320 }, data: { type: 'gain', gain: 0, label: 'Gain B' } as any },
+                                    { id: 'input-ui', type: 'uiTokensNode', dragHandle: '.node-header', position: { x: 40, y: 540 }, data: createUiTokensNodeData() as any },
+                                    { id: 'evt-hover', type: 'eventTriggerNode', dragHandle: '.node-header', position: { x: 320, y: 560 }, data: { type: 'eventTrigger', token: 0, mode: 'change', cooldownMs: 120, velocity: 0.5, duration: 0.18, note: 79, trackId: 'hover', label: 'Event Trigger' } as any },
+                                    { id: 'noise-accent', type: 'noiseBurstNode', dragHandle: '.node-header', position: { x: 570, y: 620 }, data: { type: 'noiseBurst', noiseType: 'pink', duration: 0.12, gain: 0.35, attack: 0.004, release: 0.08, label: 'Noise Burst Accent' } as any },
+                                    { id: 'pump-seq', type: 'stepSequencerNode', dragHandle: '.node-header', position: { x: 40, y: 720 }, data: { type: 'stepSequencer', steps: 16, pattern: pumpPattern, activeSteps: pumpPattern.map((value) => value > 0), label: 'Step Sequencer Pump' } as any },
+                                    { id: 'noise-pump', type: 'noiseBurstNode', dragHandle: '.node-header', position: { x: 320, y: 760 }, data: { type: 'noiseBurst', noiseType: 'white', duration: 0.05, gain: 0.45, attack: 0.001, release: 0.02, label: 'Noise Burst Pump' } as any },
+                                    { id: 'matrix', type: 'matrixMixerNode', dragHandle: '.node-header', position: { x: 1120, y: 260 }, data: { type: 'matrixMixer', inputs: 3, outputs: 3, matrix: [[0.72, 0.22, 0.06], [0.68, 0.2, 0.05], [0.12, 0.18, 0.55]], label: 'Matrix Mixer' } as any },
+                                    { id: 'lfo-air', type: 'lfoNode', dragHandle: '.node-header', position: { x: 1120, y: 40 }, data: { type: 'lfo', rate: 0.08, depth: 260, waveform: 'sine', label: 'LFO Air' } as any },
+                                    { id: 'pad-filter', type: 'filterNode', dragHandle: '.node-header', position: { x: 1370, y: 150 }, data: { type: 'filter', filterType: 'lowpass', frequency: 980, detune: 0, q: 0.85, gain: 0, label: 'Pad Filter' } as any },
+                                    { id: 'compressor', type: 'compressorNode', dragHandle: '.node-header', position: { x: 1610, y: 150 }, data: { type: 'compressor', threshold: -20, knee: 26, ratio: 3.5, attack: 0.01, release: 0.22, sidechainStrength: 0.38, label: 'Compressor' } as any },
+                                    { id: 'reverb', type: 'reverbNode', dragHandle: '.node-header', position: { x: 1610, y: 350 }, data: { type: 'reverb', decay: 4.2, mix: 0.85, label: 'Reverb' } as any },
+                                    { id: 'gain-spark', type: 'gainNode', dragHandle: '.node-header', position: { x: 1610, y: 520 }, data: { type: 'gain', gain: 0.25, label: 'Spark Gain' } as any },
+                                    { id: 'mixer-main', type: 'mixerNode', dragHandle: '.node-header', position: { x: 1870, y: 300 }, data: { type: 'mixer', inputs: 3, label: 'Final Mixer' } as any },
+                                    { id: 'output', type: 'outputNode', dragHandle: '.node-header', position: { x: 2120, y: 300 }, data: { type: 'output', masterGain: 0.5, playing: false, label: 'Output' } as any },
+                                ];
+                                const edges = [
+                                    { id: 'e-t-pr', source: 'transport', target: 'pianoroll', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-pr-v', source: 'pianoroll', target: 'voice', targetHandle: 'trigger', style: TRIGGER_EDGE_STYLE, animated: true },
+                                    { id: 'e-v-osc-a', source: 'voice', sourceHandle: 'note', target: 'osc-pad-a', targetHandle: 'frequency', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-v-osc-b', source: 'voice', sourceHandle: 'note', target: 'osc-pad-b', targetHandle: 'frequency', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-v-adsr', source: 'voice', sourceHandle: 'gate', target: 'adsr-pad', targetHandle: 'gate', style: TRIGGER_EDGE_STYLE, animated: true },
+                                    { id: 'e-osc-a-gain-a', source: 'osc-pad-a', sourceHandle: 'out', target: 'gain-a', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-osc-b-gain-b', source: 'osc-pad-b', sourceHandle: 'out', target: 'gain-b', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-adsr-gain-a', source: 'adsr-pad', sourceHandle: 'envelope', target: 'gain-a', targetHandle: 'gain', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-adsr-gain-b', source: 'adsr-pad', sourceHandle: 'envelope', target: 'gain-b', targetHandle: 'gain', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-gain-a-matrix', source: 'gain-a', sourceHandle: 'out', target: 'matrix', targetHandle: 'in1', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-gain-b-matrix', source: 'gain-b', sourceHandle: 'out', target: 'matrix', targetHandle: 'in2', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-ui-hover-token', source: 'input-ui', sourceHandle: getInputParamHandleId('hoverToken'), target: 'evt-hover', targetHandle: 'token', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-evt-accent', source: 'evt-hover', sourceHandle: 'trigger', target: 'noise-accent', targetHandle: 'trigger', style: TRIGGER_EDGE_STYLE, animated: true },
+                                    { id: 'e-accent-matrix', source: 'noise-accent', sourceHandle: 'out', target: 'matrix', targetHandle: 'in3', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-t-pump', source: 'transport', target: 'pump-seq', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-pump-trigger', source: 'pump-seq', sourceHandle: 'trigger', target: 'noise-pump', targetHandle: 'trigger', style: TRIGGER_EDGE_STYLE, animated: true },
+                                    { id: 'e-sidechain', source: 'noise-pump', sourceHandle: 'out', target: 'compressor', targetHandle: 'sidechainIn', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-lfo-filter', source: 'lfo-air', sourceHandle: 'out', target: 'pad-filter', targetHandle: 'frequency', style: CONTROL_EDGE_STYLE, animated: true },
+                                    { id: 'e-matrix-filter', source: 'matrix', sourceHandle: 'out1', target: 'pad-filter', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-filter-comp', source: 'pad-filter', sourceHandle: 'out', target: 'compressor', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-matrix-reverb', source: 'matrix', sourceHandle: 'out2', target: 'reverb', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-matrix-spark', source: 'matrix', sourceHandle: 'out3', target: 'gain-spark', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-comp-mix', source: 'compressor', sourceHandle: 'out', target: 'mixer-main', targetHandle: 'in1', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-reverb-mix', source: 'reverb', sourceHandle: 'out', target: 'mixer-main', targetHandle: 'in2', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-spark-mix', source: 'gain-spark', sourceHandle: 'out', target: 'mixer-main', targetHandle: 'in3', style: AUDIO_EDGE_STYLE, animated: false },
+                                    { id: 'e-mix-output', source: 'mixer-main', sourceHandle: 'out', target: 'output', targetHandle: 'in', style: AUDIO_EDGE_STYLE, animated: false },
+                                ];
+                                useAudioGraphStore.getState().loadGraph(nodes, edges);
+                            }}
+                            className={templateButtonBase}
+                        >
+                            <span className="text-sm">🌫️</span>
+                            <span>Atmospheric Sidechain</span>
+                        </button>
+
+                        <button
+                            onClick={() => {
                                 const nodes: Node<AudioNodeData>[] = [
                                     { id: 'transport', type: 'transportNode', dragHandle: '.node-header', position: { x: 50, y: 50 }, data: { type: 'transport', bpm: 140, playing: false, label: 'Transport' } as any },
                                     { id: 'sequencer', type: 'stepSequencerNode', dragHandle: '.node-header', position: { x: 50, y: 180 }, data: { type: 'stepSequencer', steps: 16, pattern: [1, 0.6, 0.8, 0.5, 1, 0.4, 0.9, 0.6, 1, 0.5, 0.7, 0.4, 1, 0.6, 0.8, 0.9], activeSteps: [true, true, true, false, true, true, true, false, true, false, true, true, true, true, false, true], label: 'Acid Seq' } as any },

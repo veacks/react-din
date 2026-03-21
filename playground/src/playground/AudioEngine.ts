@@ -100,7 +100,9 @@ interface AudioNodeInstance {
     matrixInputMerger?: ChannelMergerNode;
     matrixSplitter?: ChannelSplitterNode;
     matrixOutputMerger?: ChannelMergerNode;
+    matrixOutputSplitter?: ChannelSplitterNode;
     matrixCells?: GainNode[][];
+    matrixChannelOutputs?: GainNode[];
     compressorNode?: DynamicsCompressorNode;
     compressorDuckGain?: GainNode;
     sidechainAnalyser?: AnalyserNode;
@@ -545,6 +547,7 @@ export class AudioEngine {
         ) {
             instance.inputNode.connect(instance.compressorDuckGain);
             instance.compressorDuckGain.connect(instance.compressorNode);
+            instance.compressorNode.connect(instance.node);
         }
 
         if (
@@ -662,6 +665,12 @@ export class AudioEngine {
                 });
             });
             instance.matrixOutputMerger.connect(instance.node);
+            if (instance.matrixOutputSplitter && instance.matrixChannelOutputs) {
+                instance.matrixOutputMerger.connect(instance.matrixOutputSplitter);
+                instance.matrixChannelOutputs.forEach((channelGain, index) => {
+                    instance.matrixOutputSplitter?.connect(channelGain, index, 0);
+                });
+            }
         }
     }
 
@@ -1581,7 +1590,6 @@ export class AudioEngine {
                 params.set('ratio', compressor.ratio);
                 params.set('attack', compressor.attack);
                 params.set('release', compressor.release);
-                params.set('sidechainStrength', duckGain.gain);
 
                 return {
                     node: outputGain,
@@ -2041,9 +2049,12 @@ export class AudioEngine {
                 const inputMerger = ctx.createChannelMerger(inputCount);
                 const splitter = ctx.createChannelSplitter(inputCount);
                 const outputMerger = ctx.createChannelMerger(outputCount);
+                const outputSplitter = ctx.createChannelSplitter(outputCount);
                 const outputGain = ctx.createGain();
                 const cells: GainNode[][] = [];
+                const channelOutputs: GainNode[] = Array.from({ length: outputCount }, () => ctx.createGain());
                 const params = new Map<string, AudioParam>();
+                const outputs = new Map<string, AudioNode>();
 
                 inputMerger.connect(splitter);
                 for (let row = 0; row < inputCount; row++) {
@@ -2058,19 +2069,28 @@ export class AudioEngine {
                     }
                 }
                 outputMerger.connect(outputGain);
+                outputMerger.connect(outputSplitter);
+                channelOutputs.forEach((channelGain, index) => {
+                    outputSplitter.connect(channelGain, index, 0);
+                    outputs.set(`out${index + 1}`, channelGain);
+                });
+                outputs.set('out', outputGain);
 
                 return {
                     node: outputGain,
                     inputNode: inputMerger,
-                    internalNodes: [inputMerger, splitter, outputMerger, outputGain, ...cells.flat()],
+                    internalNodes: [inputMerger, splitter, outputMerger, outputSplitter, outputGain, ...channelOutputs, ...cells.flat()],
                     type: 'matrixMixer',
                     params,
+                    outputs,
                     matrixInputs: inputCount,
                     matrixOutputs: outputCount,
                     matrixInputMerger: inputMerger,
                     matrixSplitter: splitter,
                     matrixOutputMerger: outputMerger,
+                    matrixOutputSplitter: outputSplitter,
                     matrixCells: cells,
+                    matrixChannelOutputs: channelOutputs,
                 };
             }
             case 'input': {
@@ -2598,14 +2618,13 @@ export class AudioEngine {
             if ('ratio' in data && typeof data.ratio === 'number') compressor.ratio.setTargetAtTime(data.ratio, currentTime, 0.01);
             if ('attack' in data && typeof data.attack === 'number') compressor.attack.setTargetAtTime(data.attack, currentTime, 0.01);
             if ('release' in data && typeof data.release === 'number') compressor.release.setTargetAtTime(data.release, currentTime, 0.01);
-            if ('sidechainStrength' in data && typeof data.sidechainStrength === 'number' && instance.compressorDuckGain) {
-                const next = Math.max(0, Math.min(1, data.sidechainStrength));
-                instance.compressorDuckGain.gain.setTargetAtTime(Math.max(0.05, 1 - next), currentTime, 0.01);
-            }
             const visualData = this.nodeById.get(nodeId)?.data as CompressorNodeData | undefined;
             if (visualData && instance.sidechainConnectionCount && instance.sidechainConnectionCount > 0) {
                 this.clearCompressorSidechain(instance);
                 this.startCompressorSidechain(instance, visualData);
+            } else if ('sidechainStrength' in data && instance.compressorDuckGain) {
+                // Without an active sidechain input, compressor gain must stay transparent.
+                instance.compressorDuckGain.gain.setTargetAtTime(1, currentTime, 0.01);
             }
         } else if (instance.type === 'phaser') {
             if ('rate' in data && typeof data.rate === 'number' && instance.lfoOsc) {

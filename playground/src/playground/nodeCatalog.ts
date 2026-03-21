@@ -313,7 +313,11 @@ const DEFAULT_HANDLES_BY_TYPE: Record<PlaygroundNodeType, HandleDescriptor[]> = 
         { id: 'in2', direction: 'target', label: 'In 2' },
         { id: 'in3', direction: 'target', label: 'In 3' },
         { id: 'in4', direction: 'target', label: 'In 4' },
-        { id: 'out', direction: 'source', label: 'Out' },
+        { id: 'out', direction: 'source', label: 'Out Mix' },
+        { id: 'out1', direction: 'source', label: 'Out 1' },
+        { id: 'out2', direction: 'source', label: 'Out 2' },
+        { id: 'out3', direction: 'source', label: 'Out 3' },
+        { id: 'out4', direction: 'source', label: 'Out 4' },
     ],
     output: [
         { id: 'in', direction: 'target', label: 'In' },
@@ -409,7 +413,12 @@ export function getNodeHandleDescriptors(data: AudioNodeData): HandleDescriptor[
                     direction: 'target' as const,
                     label: `In ${index + 1}`,
                 })),
-                { id: 'out', direction: 'source', label: 'Out' },
+                { id: 'out', direction: 'source', label: 'Out Mix' },
+                ...Array.from({ length: outputs }, (_, index) => ({
+                    id: `out${index + 1}`,
+                    direction: 'source' as const,
+                    label: `Out ${index + 1}`,
+                })),
             ];
 
             for (let row = 0; row < inputs; row++) {

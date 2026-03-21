@@ -27,6 +27,23 @@ test('persists graph edits and refreshes generated code', async ({ page }) => {
     await expect(page.locator('textarea')).toContainText('BassLab');
 });
 
+test('loads atmospheric sidechain template and emits expected codegen building blocks', async ({ page }) => {
+    await page.goto('/');
+
+    await page.getByRole('button', { name: 'Atmospheric Sidechain' }).click();
+
+    await expect(page.getByText('Transport').first()).toBeVisible();
+    await expect(page.getByText('Piano Roll').first()).toBeVisible();
+    await expect(page.getByText('Matrix Mixer').first()).toBeVisible();
+    await expect(page.getByText('Compressor').first()).toBeVisible();
+    await expect(page.getByText('Event Trigger').first()).toBeVisible();
+
+    await expect(page.locator('textarea')).toContainText('Track id="pianoroll"');
+    await expect(page.locator('textarea')).toContainText('EventTrigger');
+    await expect(page.locator('textarea')).toContainText('MatrixMixer');
+    await expect(page.locator('textarea')).toContainText('sidechainBusId');
+});
+
 test('shows compatible handles during a drag and adds a connected node from the floating menu', async ({ page }) => {
     await page.goto('/');
 

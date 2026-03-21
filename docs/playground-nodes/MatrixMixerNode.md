@@ -5,7 +5,7 @@ Route multiple audio inputs through a gain matrix with per-cell control handles.
 
 ## Props / Handles
 - Data fields: `inputs`, `outputs`, `matrix`, `label`.
-- Handles: audio inputs `in1..inN`, audio output `out`, per-cell targets `cell:<row>:<column>`.
+- Handles: audio inputs `in1..inN`, audio outputs `out` (mixed) and `out1..outN` (per-channel), per-cell targets `cell:<row>:<column>`.
 
 ## Defaults
 - Added with `inputs 4`, `outputs 4`, an identity-like `matrix`, and label `Matrix Mixer`.
@@ -13,6 +13,7 @@ Route multiple audio inputs through a gain matrix with per-cell control handles.
 ## Integration Notes
 - Size is clamped to `2..8`; resizing rebuilds matrix handles and engine wiring.
 - Each matrix cell exposes a stable modulation handle id (`cell:r:c`).
+- `out` provides a summed mix bus; `out1..outN` expose individual output channels for explicit downstream routing.
 
 ## Failure Modes
 - Changing size without refresh desynchronizes UI handles and routing.
