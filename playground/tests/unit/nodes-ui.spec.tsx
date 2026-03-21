@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, vi } from 'vitest';
 
@@ -26,6 +26,7 @@ import MediaStreamNode from '../../src/playground/nodes/MediaStreamNode';
 import EventTriggerNode from '../../src/playground/nodes/EventTriggerNode';
 import CompressorNode from '../../src/playground/nodes/CompressorNode';
 import { getInputParamHandleId } from '../../src/playground/handleIds';
+import { audioEngine } from '../../src/playground/AudioEngine';
 
 const updateNodeData = vi.fn();
 const storeState = {
@@ -69,6 +70,9 @@ describe('playground node UIs', () => {
     afterEach(() => {
         storeState.nodes = [];
         storeState.edges = [];
+        updateNodeData.mockClear();
+        vi.mocked(audioEngine.updateNode).mockClear();
+        vi.unstubAllGlobals();
     });
 
     it('renders representative node families with their controls', () => {
@@ -253,5 +257,71 @@ describe('playground node UIs', () => {
         expect(screen.getByTestId('handle-token')).toBeInTheDocument();
         expect(screen.getByText('Media Stream')).toBeInTheDocument();
         expect(screen.getByText('Convolver')).toBeInTheDocument();
+    });
+
+    it('uploads an impulse audio file on ConvolverNode instead of manual path input', async () => {
+        class MockFileReader {
+            result: string | ArrayBuffer | null = null;
+            onload: ((this: FileReader, ev: ProgressEvent<FileReader>) => unknown) | null = null;
+            onerror: ((this: FileReader, ev: ProgressEvent<FileReader>) => unknown) | null = null;
+
+            readAsDataURL(_blob: Blob) {
+                this.result = 'data:audio/wav;base64,ZmFrZS1pcg==';
+                if (this.onload) {
+                    this.onload.call(this as unknown as FileReader, {} as ProgressEvent<FileReader>);
+                }
+            }
+        }
+
+        vi.stubGlobal('FileReader', MockFileReader as unknown as typeof FileReader);
+
+        const sharedProps = {
+            dragging: false,
+            selected: false,
+            zIndex: 0,
+            selectable: true,
+            draggable: true,
+            isConnectable: true,
+            positionAbsoluteX: 0,
+            positionAbsoluteY: 0,
+            xPos: 0,
+            yPos: 0,
+        } as const;
+
+        const { container } = render(
+            <ConvolverNode
+                {...(sharedProps as any)}
+                id="convolver-upload"
+                data={{ type: 'convolver', impulseSrc: '', impulseFileName: '', normalize: true, label: 'Convolver' }}
+            />
+        );
+
+        const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement | null;
+        expect(fileInput).not.toBeNull();
+
+        fireEvent.change(fileInput!, {
+            target: {
+                files: [new File(['fake-impulse'], 'plate.wav', { type: 'audio/wav' })],
+            },
+        });
+
+        await waitFor(() => {
+            expect(updateNodeData).toHaveBeenCalledWith(
+                'convolver-upload',
+                expect.objectContaining({
+                    impulseFileName: 'plate.wav',
+                    impulseSrc: expect.stringContaining('data:audio/wav;base64'),
+                })
+            );
+        });
+
+        expect(audioEngine.updateNode).toHaveBeenCalledWith(
+            'convolver-upload',
+            expect.objectContaining({
+                impulseFileName: 'plate.wav',
+                impulseSrc: expect.stringContaining('data:audio/wav;base64'),
+            })
+        );
+        expect(screen.getByText('Impulse File')).toBeInTheDocument();
     });
 });
