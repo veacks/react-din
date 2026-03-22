@@ -378,6 +378,7 @@ function SpatialAudio() {
 
 - Overview and contribution rules: [`AGENTS.md`](./AGENTS.md)
 - Component reference index: [`docs/README.md`](./docs/README.md)
+- Patch schema: [`schemas/patch.schema.json`](./schemas/patch.schema.json)
 - Product summary: [`project/SUMMARY.md`](./project/SUMMARY.md)
 - Contributor flow: [`project/USERFLOW.md`](./project/USERFLOW.md)
 - Coverage contract: [`project/COVERAGE_MANIFEST.json`](./project/COVERAGE_MANIFEST.json)
@@ -387,6 +388,7 @@ function SpatialAudio() {
 
 ```bash
 npm run validate:docs
+npm run validate:patch-schema
 npm run validate:coverage
 npm run validate:changes
 npm run test:library
@@ -394,7 +396,7 @@ npm run test:playground
 npm run test:e2e
 ```
 
-Every component and playground node in scope is mapped to a dedicated documentation page and at least one required automated test file in [`project/COVERAGE_MANIFEST.json`](./project/COVERAGE_MANIFEST.json). Any source change must update the mapped docs and tests in the same change set.
+Every component and playground node in scope is mapped to a dedicated documentation page and at least one required automated test file in [`project/COVERAGE_MANIFEST.json`](./project/COVERAGE_MANIFEST.json). Any source change must update the mapped docs and tests in the same change set. The public patch JSON contract is versioned and tracked separately in [`schemas/patch.schema.json`](./schemas/patch.schema.json).
 
 ## Spatial Audio with @react-three/drei
 

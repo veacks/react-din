@@ -112,10 +112,12 @@
         "types": "./dist/patch/index.d.cts",
         "default": "./dist/patch/index.cjs"
       }
-    }
+    },
+    "./patch/schema.json": "./schemas/patch.schema.json"
   },
   "files": [
     "dist",
+    "schemas",
     "README.md",
     "LICENSE"
   ],
@@ -131,9 +133,10 @@
     "test:playground": "npm -w playground run test:run",
     "test:e2e": "playwright test",
     "validate:docs": "node ./scripts/validate-docs.mjs",
+    "validate:patch-schema": "node ./scripts/validate-patch-schema.mjs",
     "validate:coverage": "node ./scripts/validate-coverage.mjs",
     "validate:changes": "node ./scripts/validate-changes.mjs",
-    "ci:check": "npm run validate:docs && npm run validate:coverage && npm run test:library && npm run test:playground",
+    "ci:check": "npm run validate:docs && npm run validate:patch-schema && npm run validate:coverage && npm run test:library && npm run test:playground",
     "prepublishOnly": "npm run build",
     "example:dev": "npm -w example run dev",
     "playground:dev": "npm -w playground run dev"

@@ -23,5 +23,6 @@
 ## Governance
 
 - Coverage manifest: [`project/COVERAGE_MANIFEST.json`](../project/COVERAGE_MANIFEST.json)
+- Patch schema: [`schemas/patch.schema.json`](../schemas/patch.schema.json)
 - BDD features: [`project/features`](../project/features)
 - Test matrix: [`project/TEST_MATRIX.md`](../project/TEST_MATRIX.md)

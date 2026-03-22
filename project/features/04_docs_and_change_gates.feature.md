@@ -21,3 +21,9 @@ Enforce documentation language and source-to-doc-test change gates for every map
 **Given** a contributor adds a new public component or playground node
 **When** validation runs
 **Then** registration files, docs, tests, and the coverage manifest are all updated
+
+### F04-S04 Patch schema stays aligned with the public patch contract
+
+**Given** a contributor changes the public patch JSON structure
+**When** validation runs
+**Then** `schemas/patch.schema.json` is updated in the same change and the published schema export remains valid

@@ -5,6 +5,11 @@ import { execFileSync } from 'node:child_process';
 const root = process.cwd();
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'project/COVERAGE_MANIFEST.json'), 'utf8'));
 const manifestBySource = new Map(manifest.items.map((item) => [item.source, item]));
+const patchSchemaPath = 'schemas/patch.schema.json';
+const patchContractSources = new Set([
+    'src/patch/types.ts',
+    'src/patch/document.ts',
+]);
 
 const ignoredComponentFiles = new Set([
     'src/core/index.ts',
@@ -82,6 +87,11 @@ const isPotentialPublicComponent = (file) => {
 const diffEntries = parseDiff();
 const changedFiles = new Set(diffEntries.map((entry) => entry.path));
 const errors = [];
+
+const patchContractChanged = [...patchContractSources].some((file) => changedFiles.has(file));
+if (patchContractChanged && !changedFiles.has(patchSchemaPath)) {
+    errors.push(`Patch contract changes must update ${patchSchemaPath} in the same diff`);
+}
 
 for (const entry of diffEntries) {
     const manifestItem = manifestBySource.get(entry.path);

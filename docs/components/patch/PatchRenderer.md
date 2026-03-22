@@ -20,6 +20,7 @@ Render a versioned `PatchDocument` as a live `react-din` graph, or derive a reus
 
 ## Integration Notes
 - Use `importPatch(patch, options?)` when you want a reusable typed component instead of passing `patch` on every render.
+- The public patch JSON contract is described by [`schemas/patch.schema.json`](../../../schemas/patch.schema.json) and published with the package at `react-din/patch/schema.json`.
 - Patch public props come only from playground `Input` and `EventTrigger` nodes.
 - Patch MIDI bindings stay explicit in host code so the app keeps ownership of permissions, selected ports, and `MidiProvider`.
 - When a patch contains a transport node or a bound MIDI sync output, `includeProvider` wraps the content in `TransportProvider`; `midi-master` sync forces transport `mode="manual"`.

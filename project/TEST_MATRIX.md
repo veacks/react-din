@@ -22,3 +22,4 @@
 | `F04-S01` | Docs And Change Gates | Documentation stays in English | unit | `node` validation scripts | baseline |
 | `F04-S02` | Docs And Change Gates | Mapped source changes update docs and tests | unit | `node` validation scripts | baseline |
 | `F04-S03` | Docs And Change Gates | New nodes and public components update all required touch points | unit | `node` validation scripts | baseline |
+| `F04-S04` | Docs And Change Gates | Patch schema stays aligned with the public patch contract | unit | `node` validation scripts | baseline |

@@ -23,6 +23,12 @@
 - Every mapped item must keep its `source`, `docs`, `tests`, and `scenarios` entries current.
 - A change to a mapped source file is incomplete until the mapped documentation file and at least one mapped test file change in the same branch.
 
+## Patch Schema Governance
+
+- `schemas/patch.schema.json` is the source of truth for the public JSON shape of `PatchDocument`.
+- Any change to the patch document structure, public patch interface entries, or serialized patch metadata is incomplete until `schemas/patch.schema.json` is updated in the same branch.
+- The published package must keep exporting the schema at `react-din/patch/schema.json`.
+
 ## Component And Node Rules
 
 - A new public component is incomplete until it updates exports, docs, tests, and `project/COVERAGE_MANIFEST.json`.
@@ -45,6 +51,7 @@
 ## Required Checks
 
 - Run `npm run validate:docs`.
+- Run `npm run validate:patch-schema`.
 - Run `npm run validate:coverage`.
 - Run `npm run test:library`.
 - Run `npm run test:playground`.
