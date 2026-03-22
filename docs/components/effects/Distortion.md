@@ -14,6 +14,7 @@ Apply non-linear drive, clipping, or saturation to child audio.
 ## Integration Notes
 - Use before reverb or after dynamics depending on the target sound.
 - Keep algorithm changes documented because presets can change audibly.
+- Curve generation now routes through the shared internal `din-core` adapter so library and playground distortion stay aligned.
 
 ## Failure Modes
 - High drive can clip aggressively or mask transients.

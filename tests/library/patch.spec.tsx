@@ -406,6 +406,64 @@ describe('patch import/export runtime', () => {
         });
     });
 
+    it('leaves absolute and inline patch asset paths untouched', async () => {
+        const fetchMock = vi.fn()
+            .mockResolvedValue({ ok: true, arrayBuffer: async () => new ArrayBuffer(16) });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const patch = graphDocumentToPatch({
+            name: 'Asset Path Modes',
+            nodes: [
+                {
+                    id: 'sampler-http',
+                    position: { x: 0, y: 0 },
+                    data: {
+                        type: 'sampler',
+                        label: 'Sampler HTTP',
+                        src: '',
+                        assetPath: 'https://cdn.example.test/samples/lead.wav',
+                        loop: false,
+                        playbackRate: 1,
+                        detune: 0,
+                        loaded: false,
+                    },
+                },
+                {
+                    id: 'convolver-data',
+                    position: { x: 140, y: 0 },
+                    data: {
+                        type: 'convolver',
+                        label: 'Convolver Data',
+                        impulseSrc: '',
+                        assetPath: 'data:audio/wav;base64,ZmFrZQ==',
+                        normalize: true,
+                    },
+                },
+                {
+                    id: 'output-1',
+                    position: { x: 280, y: 0 },
+                    data: {
+                        type: 'output',
+                        label: 'Output',
+                        playing: false,
+                        masterGain: 0.5,
+                    },
+                },
+            ],
+            edges: [
+                { id: 'sampler-out', source: 'sampler-http', sourceHandle: 'out', target: 'output-1', targetHandle: 'in' },
+                { id: 'convolver-out', source: 'convolver-data', sourceHandle: 'out', target: 'output-1', targetHandle: 'in' },
+            ],
+        });
+
+        render(<PatchRenderer patch={patch} includeProvider assetRoot="/public" />);
+
+        await waitFor(() => {
+            expect(fetchMock).toHaveBeenCalledWith('https://cdn.example.test/samples/lead.wav');
+            expect(fetchMock).toHaveBeenCalledWith('data:audio/wav;base64,ZmFrZQ==');
+        });
+    });
+
     it('rejects invalid patches', () => {
         const validPatch = graphDocumentToPatch({
             name: 'Valid',

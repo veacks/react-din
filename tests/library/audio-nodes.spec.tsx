@@ -63,4 +63,22 @@ describe('library audio node components', () => {
             expect(document.querySelectorAll('*').length).toBeGreaterThan(0);
         });
     });
+
+    it('keeps preset wave shaper graphs mountable with the shared curve helper', async () => {
+        const gainRef = createRef<AudioNode>();
+
+        render(
+            <AudioProvider>
+                <Gain gain={0.4} nodeRef={gainRef}>
+                    <PresetWaveShaper amount={0.8} preset="hardClip" oversample="4x">
+                        <Osc autoStart frequency={110} type="square" />
+                    </PresetWaveShaper>
+                </Gain>
+            </AudioProvider>
+        );
+
+        await waitFor(() => {
+            expect(gainRef.current).not.toBeNull();
+        });
+    });
 });

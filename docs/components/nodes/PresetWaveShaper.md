@@ -15,6 +15,7 @@ Provide a simplified `WaveShaper` interface with musical presets (`softClip`, `h
 ## Integration Notes
 - Use this component when UI-facing graphs need predictable distortion curves without manually authoring a `Float32Array` curve.
 - Keep `amount` in the lower range for UI feedback sound design to avoid harsh clipping.
+- Preset curve generation now routes through the shared internal `din-core` helper so node previews and library rendering stay aligned.
 
 ## Failure Modes
 - Very high `amount` with downstream gain can produce hard clipping.

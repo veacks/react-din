@@ -517,6 +517,12 @@ describe('playground store and code generation', () => {
         });
         expect(roundTripGraph.edges).toEqual(
             expect.arrayContaining([
+                expect.objectContaining({ id: 'input-cc', animated: true }),
+                expect.objectContaining({ id: 'event-note', animated: true }),
+            ])
+        );
+        expect(roundTripGraph.edges).toEqual(
+            expect.arrayContaining([
                 expect.objectContaining({ id: 'input-cc', sourceHandle: 'param:cutoff', targetHandle: 'value' }),
                 expect.objectContaining({ id: 'event-note', sourceHandle: 'trigger', targetHandle: 'trigger' }),
             ])

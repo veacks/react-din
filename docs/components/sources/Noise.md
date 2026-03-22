@@ -14,6 +14,7 @@ Generate continuous noise sources for textures, percussion, and modulation-like 
 ## Integration Notes
 - Pair with filters, envelopes, or samplers for drum and ambience patches.
 - Keep supported noise-type docs aligned with generator behavior.
+- Noise samples now come from the shared internal `din-core` helper used by the playground runtime as well.
 
 ## Failure Modes
 - Very small buffers can trade CPU for responsiveness.

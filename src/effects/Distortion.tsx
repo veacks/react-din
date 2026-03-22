@@ -2,61 +2,7 @@ import { useEffect, useRef, type FC } from 'react';
 import type { DistortionProps, DistortionType } from './types';
 import { useAudio } from '../core/AudioProvider';
 import { useAudioOut, AudioOutProvider } from '../core/AudioOutContext';
-
-/**
- * Generate a distortion curve based on the type.
- */
-function createDistortionCurve(
-    type: DistortionType,
-    drive: number,
-    samples = 256
-): Float32Array {
-    const curve = new Float32Array(samples);
-    const k = drive * 100;
-
-    for (let i = 0; i < samples; i++) {
-        const x = (i * 2) / samples - 1;
-
-        switch (type) {
-            case 'soft':
-                // Soft clipping (tanh)
-                curve[i] = Math.tanh(x * (1 + k / 10));
-                break;
-
-            case 'hard':
-                // Hard clipping
-                curve[i] = Math.max(-1, Math.min(1, x * (1 + k / 5)));
-                break;
-
-            case 'fuzz':
-                // Fuzz (asymmetric clipping)
-                if (x >= 0) {
-                    curve[i] = Math.min(1, x * (1 + k / 3));
-                } else {
-                    curve[i] = Math.max(-1, x * (1 + k / 2) + Math.sin(x * k) * 0.1);
-                }
-                break;
-
-            case 'bitcrush':
-                // Bit reduction effect
-                const bits = Math.max(2, 16 - Math.floor(k / 10));
-                const steps = Math.pow(2, bits);
-                curve[i] = Math.round(x * steps) / steps;
-                break;
-
-            case 'saturate':
-                // Soft saturation
-                const amt = 1 + k / 20;
-                curve[i] = (3 + amt) * x * 20 / (Math.PI + amt * Math.abs(x * 20));
-                break;
-
-            default:
-                curve[i] = x;
-        }
-    }
-
-    return curve;
-}
+import { dinCoreCreateDistortionCurve } from '../internal/dinCore';
 
 /**
  * Distortion effect component.
@@ -106,7 +52,7 @@ export const Distortion: FC<DistortionProps> = ({
 
         // Configure
         driveGain.gain.value = 1 + drive * 5; // Pre-gain for more drive
-        waveshaper.curve = createDistortionCurve(type, drive) as Float32Array<ArrayBuffer>;
+        waveshaper.curve = dinCoreCreateDistortionCurve(type as DistortionType, drive) as Float32Array<ArrayBuffer>;
         waveshaper.oversample = oversample;
         toneFilter.type = 'lowpass';
         toneFilter.frequency.value = tone;

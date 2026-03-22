@@ -3,6 +3,7 @@ import type { NoiseType } from './types';
 import { useAudio } from '../core/AudioProvider';
 import { useAudioOut, AudioOutProvider } from '../core/AudioOutContext';
 import { useTriggerContext } from '../sequencer/TriggerContext';
+import { dinCoreFillNoiseSamples } from '../internal/dinCore';
 
 /**
  * Props for NoiseBurst component.
@@ -40,60 +41,6 @@ export interface NoiseBurstProps {
      * @default 0.05
      */
     release?: number;
-}
-
-/**
- * Generate noise buffer of specified type.
- */
-function createNoiseBuffer(
-    context: AudioContext,
-    type: NoiseType,
-    sampleCount: number
-): AudioBuffer {
-    const buffer = context.createBuffer(1, sampleCount, context.sampleRate);
-    const data = buffer.getChannelData(0);
-
-    switch (type) {
-        case 'white':
-            for (let i = 0; i < sampleCount; i++) {
-                data[i] = Math.random() * 2 - 1;
-            }
-            break;
-
-        case 'pink': {
-            let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-            for (let i = 0; i < sampleCount; i++) {
-                const white = Math.random() * 2 - 1;
-                b0 = 0.99886 * b0 + white * 0.0555179;
-                b1 = 0.99332 * b1 + white * 0.0750759;
-                b2 = 0.96900 * b2 + white * 0.1538520;
-                b3 = 0.86650 * b3 + white * 0.3104856;
-                b4 = 0.55000 * b4 + white * 0.5329522;
-                b5 = -0.7616 * b5 - white * 0.0168980;
-                data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11;
-                b6 = white * 0.115926;
-            }
-            break;
-        }
-
-        case 'brown': {
-            let lastOut = 0;
-            for (let i = 0; i < sampleCount; i++) {
-                const white = Math.random() * 2 - 1;
-                data[i] = (lastOut + 0.02 * white) / 1.02;
-                lastOut = data[i];
-                data[i] *= 3.5;
-            }
-            break;
-        }
-
-        default:
-            for (let i = 0; i < sampleCount; i++) {
-                data[i] = Math.random() * 2 - 1;
-            }
-    }
-
-    return buffer;
 }
 
 /**
@@ -138,7 +85,9 @@ export const NoiseBurst: FC<NoiseBurstProps> = ({
         if (!bufferRef.current) {
             // Create buffer large enough for the duration
             const sampleCount = Math.ceil(context.sampleRate * (duration + attack + release));
-            bufferRef.current = createNoiseBuffer(context, type, sampleCount);
+            const buffer = context.createBuffer(1, sampleCount, context.sampleRate);
+            dinCoreFillNoiseSamples(type as NoiseType, sampleCount, buffer.getChannelData(0));
+            bufferRef.current = buffer;
         }
 
         return bufferRef.current;

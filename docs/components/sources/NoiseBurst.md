@@ -14,6 +14,7 @@ Create short triggered bursts of noise for hats, snares, and transient textures.
 ## Integration Notes
 - Use inside `Track` or any trigger-aware subtree.
 - Keep trigger-envelope behavior aligned with sequencer docs and tests.
+- Burst buffer generation now shares the same internal `din-core` noise helper as continuous sources and playground preview.
 
 ## Failure Modes
 - Without trigger context, no bursts are scheduled.

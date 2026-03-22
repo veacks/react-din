@@ -14,6 +14,7 @@ Apply algorithmic or impulse-based reverb to child audio.
 ## Integration Notes
 - Use for room, hall, or texture sends directly in the graph tree.
 - Align impulse-loading behavior with fetch and decode docs when changed.
+- Algorithmic impulse generation now uses the shared internal `din-core` helper so preview/runtime defaults drift less easily.
 
 ## Failure Modes
 - Failed impulse loads leave only the dry path.

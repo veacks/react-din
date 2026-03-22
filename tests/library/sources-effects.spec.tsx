@@ -62,4 +62,21 @@ describe('sources and effects', () => {
             )
         ).not.toThrow();
     });
+
+    it('keeps din-core-backed source and effect helpers mountable', () => {
+        expect(() =>
+            render(
+                <AudioProvider>
+                    <Reverb decay={1.5} preDelay={0.02} damping={0.35} mix={0.25}>
+                        <Distortion type="saturate" drive={0.6} tone={1800}>
+                            <Noise type="pink" autoStart />
+                            <EventTrigger token={1} trackId="accent">
+                                <NoiseBurst type="brown" duration={0.08} />
+                            </EventTrigger>
+                        </Distortion>
+                    </Reverb>
+                </AudioProvider>
+            )
+        ).not.toThrow();
+    });
 });
