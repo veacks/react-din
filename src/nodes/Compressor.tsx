@@ -1,8 +1,9 @@
-import { useEffect, useRef, type FC } from 'react';
+import { useEffect, useRef, useState, type FC } from 'react';
 import type { CompressorProps } from './types';
 import { useAudio } from '../core/AudioProvider';
 import { useAudioOut, AudioOutProvider } from '../core/AudioOutContext';
 import { getOrCreateBusNode } from '../routing/busRegistry';
+import { createCompressorGraph, updateCompressorGraph, type CompressorGraph } from '@din/vanilla';
 
 /**
  * DynamicsCompressor node component for dynamic range compression.
@@ -35,38 +36,25 @@ export const Compressor: FC<CompressorProps> = ({
 }) => {
     const { context } = useAudio();
     const { outputNode } = useAudioOut();
-    const inputRef = useRef<GainNode | null>(null);
-    const duckGainRef = useRef<GainNode | null>(null);
-    const compressorRef = useRef<DynamicsCompressorNode | null>(null);
+    const graphRef = useRef<CompressorGraph | null>(null);
+    const [inputNode, setInputNode] = useState<AudioNode | null>(null);
 
     useEffect(() => {
         if (!context || !outputNode) return;
 
-        const input = context.createGain();
-        const duckGain = context.createGain();
-        const compressor = context.createDynamicsCompressor();
-
-        duckGain.gain.value = 1;
-
-        input.connect(duckGain);
-        duckGain.connect(compressor);
-        compressor.connect(outputNode);
-
-        inputRef.current = input;
-        duckGainRef.current = duckGain;
-        compressorRef.current = compressor;
+        const graph = createCompressorGraph(context);
+        graph.output.connect(outputNode);
+        graphRef.current = graph;
+        setInputNode(bypass ? outputNode : graph.input);
 
         if (externalRef) {
-            (externalRef as React.MutableRefObject<DynamicsCompressorNode | null>).current = compressor;
+            (externalRef as React.MutableRefObject<DynamicsCompressorNode | null>).current = graph.compressor;
         }
 
         return () => {
-            try { input.disconnect(); } catch { /* noop */ }
-            try { duckGain.disconnect(); } catch { /* noop */ }
-            try { compressor.disconnect(); } catch { /* noop */ }
-            inputRef.current = null;
-            duckGainRef.current = null;
-            compressorRef.current = null;
+            graph.dispose();
+            graphRef.current = null;
+            setInputNode(null);
             if (externalRef) {
                 (externalRef as React.MutableRefObject<DynamicsCompressorNode | null>).current = null;
             }
@@ -74,32 +62,35 @@ export const Compressor: FC<CompressorProps> = ({
     }, [context, outputNode, externalRef]);
 
     useEffect(() => {
-        if (!context || !compressorRef.current) return;
-        const currentTime = context.currentTime;
-        compressorRef.current.threshold.setTargetAtTime(threshold, currentTime, 0.01);
-        compressorRef.current.knee.setTargetAtTime(knee, currentTime, 0.01);
-        compressorRef.current.ratio.setTargetAtTime(ratio, currentTime, 0.01);
-        compressorRef.current.attack.setTargetAtTime(attack, currentTime, 0.01);
-        compressorRef.current.release.setTargetAtTime(release, currentTime, 0.01);
+        if (!graphRef.current) return;
+        updateCompressorGraph(
+            graphRef.current,
+            {
+                threshold,
+                knee,
+                ratio,
+                attack,
+                release,
+            },
+            context?.currentTime
+        );
     }, [context, threshold, knee, ratio, attack, release]);
 
     useEffect(() => {
-        if (!context || !duckGainRef.current) return;
+        if (!context || !graphRef.current) return;
         if (!sidechainBusId) {
-            duckGainRef.current.gain.setTargetAtTime(1, context.currentTime, 0.02);
+            graphRef.current.duckGain.gain.setTargetAtTime(1, context.currentTime, 0.02);
             return;
         }
 
         const busNode = getOrCreateBusNode(context, sidechainBusId);
-        const analyser = context.createAnalyser();
-        analyser.fftSize = 256;
-        analyser.smoothingTimeConstant = 0.85;
+        const analyser = graphRef.current.sidechainAnalyser;
         const waveform = new Float32Array(analyser.fftSize);
 
         busNode.connect(analyser);
 
         const intervalId = window.setInterval(() => {
-            if (!duckGainRef.current) return;
+            if (!graphRef.current) return;
             analyser.getFloatTimeDomainData(waveform);
             let sumSquares = 0;
             for (let i = 0; i < waveform.length; i++) {
@@ -113,7 +104,7 @@ export const Compressor: FC<CompressorProps> = ({
             const normalized = Math.min(1, overThreshold / 24);
             const ducking = normalized * Math.max(0, Math.min(1, sidechainStrength));
             const targetGain = Math.max(0.05, 1 - ducking);
-            duckGainRef.current.gain.setTargetAtTime(
+            graphRef.current.duckGain.gain.setTargetAtTime(
                 targetGain,
                 context.currentTime,
                 Math.max(0.005, attack || 0.005)
@@ -123,15 +114,18 @@ export const Compressor: FC<CompressorProps> = ({
         return () => {
             window.clearInterval(intervalId);
             try { busNode.disconnect(analyser); } catch { /* noop */ }
-            try { analyser.disconnect(); } catch { /* noop */ }
-            if (duckGainRef.current) {
-                duckGainRef.current.gain.setTargetAtTime(1, context.currentTime, Math.max(0.005, release || 0.005));
+            if (graphRef.current) {
+                graphRef.current.duckGain.gain.setTargetAtTime(1, context.currentTime, Math.max(0.005, release || 0.005));
             }
         };
     }, [context, sidechainBusId, sidechainStrength, threshold, attack, release]);
 
+    useEffect(() => {
+        setInputNode(bypass ? outputNode : (graphRef.current?.input ?? null));
+    }, [bypass, outputNode]);
+
     return (
-        <AudioOutProvider node={bypass ? outputNode : inputRef.current}>
+        <AudioOutProvider node={inputNode}>
             {children}
         </AudioOutProvider>
     );

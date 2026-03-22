@@ -1,8 +1,8 @@
-import { useEffect, useRef, type FC } from 'react';
+import { useEffect, useRef, useState, type FC } from 'react';
 import type { DistortionProps, DistortionType } from './types';
 import { useAudio } from '../core/AudioProvider';
 import { useAudioOut, AudioOutProvider } from '../core/AudioOutContext';
-import { dinCoreCreateDistortionCurve } from '../internal/dinCore';
+import { createDistortionGraph, updateDistortionGraph, type DistortionGraph } from '@din/vanilla';
 
 /**
  * Distortion effect component.
@@ -35,57 +35,47 @@ export const Distortion: FC<DistortionProps> = ({
 }) => {
     const { context } = useAudio();
     const { outputNode } = useAudioOut();
-
-    const inputGainRef = useRef<GainNode | null>(null);
+    const graphRef = useRef<DistortionGraph | null>(null);
+    const [inputNode, setInputNode] = useState<AudioNode | null>(null);
 
     useEffect(() => {
         if (!context || !outputNode) return;
 
-        // Create nodes
-        const inputGain = context.createGain();
-        const driveGain = context.createGain();
-        const waveshaper = context.createWaveShaper();
-        const toneFilter = context.createBiquadFilter();
-        const outputGain = context.createGain();
-        const dryGain = context.createGain();
-        const wetGain = context.createGain();
-
-        // Configure
-        driveGain.gain.value = 1 + drive * 5; // Pre-gain for more drive
-        waveshaper.curve = dinCoreCreateDistortionCurve(type as DistortionType, drive) as Float32Array<ArrayBuffer>;
-        waveshaper.oversample = oversample;
-        toneFilter.type = 'lowpass';
-        toneFilter.frequency.value = tone;
-        outputGain.gain.value = level;
-        dryGain.gain.value = 1 - mix;
-        wetGain.gain.value = mix;
-
-        // Connect
-        inputGain.connect(dryGain);
-        dryGain.connect(outputNode);
-
-        inputGain.connect(driveGain);
-        driveGain.connect(waveshaper);
-        waveshaper.connect(toneFilter);
-        toneFilter.connect(outputGain);
-        outputGain.connect(wetGain);
-        wetGain.connect(outputNode);
-
-        inputGainRef.current = inputGain;
+        const graph = createDistortionGraph(context);
+        graph.output.connect(outputNode);
+        graphRef.current = graph;
+        setInputNode(bypass ? outputNode : graph.input);
 
         return () => {
-            inputGain.disconnect();
-            driveGain.disconnect();
-            waveshaper.disconnect();
-            toneFilter.disconnect();
-            outputGain.disconnect();
-            dryGain.disconnect();
-            wetGain.disconnect();
+            graph.dispose();
+            graphRef.current = null;
+            setInputNode(null);
         };
-    }, [context, outputNode, type, drive, level, oversample, tone, mix]);
+    }, [context, outputNode]);
+
+    useEffect(() => {
+        if (!graphRef.current) return;
+        updateDistortionGraph(
+            graphRef.current,
+            {
+                type: type as DistortionType,
+                drive,
+                level,
+                mix,
+                tone,
+                oversample,
+                bypass,
+            },
+            context?.currentTime
+        );
+    }, [context, type, drive, level, oversample, tone, mix, bypass]);
+
+    useEffect(() => {
+        setInputNode(bypass ? outputNode : (graphRef.current?.input ?? null));
+    }, [bypass, outputNode]);
 
     return (
-        <AudioOutProvider node={bypass ? outputNode : inputGainRef.current}>
+        <AudioOutProvider node={inputNode}>
             {children}
         </AudioOutProvider>
     );

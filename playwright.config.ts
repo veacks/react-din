@@ -9,7 +9,7 @@ export default defineConfig({
         trace: 'retain-on-failure',
     },
     webServer: {
-        command: 'npm -w playground run dev -- --host 127.0.0.1 --port 4173',
+        command: 'npm -w @din/editor run dev -- --host 127.0.0.1 --port 4173',
         url: 'http://127.0.0.1:4173',
         reuseExistingServer: !process.env.CI,
         timeout: 120000,

@@ -12,6 +12,7 @@ Add short modulated delay movement for widening and doubling effects.
 - `depth` defaults to `3.5`, `feedback` to `0.2`, `delay` to `20`, and `stereo` to `true`.
 
 ## Integration Notes
+- Shared browser-side audio behavior is routed through the workspace vanilla runtime where applicable.
 - Use before reverb or after tone-shaping stages depending on the sound target.
 - Keep audible movement changes aligned with docs and listening checks.
 

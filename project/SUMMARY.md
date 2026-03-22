@@ -1,10 +1,10 @@
 # Product Summary
 
-`react-din` helps React developers build and inspect declarative Web Audio graphs through a reusable library and a visual playground.
+The DIN workspace helps web audio developers build, bind, and inspect declarative audio graphs through a shared core, a vanilla runtime, React bindings, and a visual editor.
 
 ## Priority Features
 
-1. Public React audio components for graph composition.
-2. Sequencing, transport, analysis, sources, and effects for musical workflows.
-3. Visual playground nodes that mirror the audio graph concepts and generate code.
-4. Contributor governance that keeps documentation, test coverage, and node/component registration aligned.
+1. Shared `din-core` and `@din/vanilla` runtime primitives for graph and DSP behavior.
+2. Public React bindings in `@din/react`, with `react-din` kept as a compatibility layer.
+3. Visual editor flows in `@din/editor` that mirror runtime graph concepts and generate React code.
+4. Contributor governance that keeps documentation, package topology, test coverage, and node/component registration aligned.

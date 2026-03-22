@@ -3,7 +3,7 @@ import type { NoiseType } from './types';
 import { useAudio } from '../core/AudioProvider';
 import { useAudioOut, AudioOutProvider } from '../core/AudioOutContext';
 import { useTriggerContext } from '../sequencer/TriggerContext';
-import { dinCoreFillNoiseSamples } from '../internal/dinCore';
+import { createNoiseBuffer } from '@din/vanilla';
 
 /**
  * Props for NoiseBurst component.
@@ -85,9 +85,7 @@ export const NoiseBurst: FC<NoiseBurstProps> = ({
         if (!bufferRef.current) {
             // Create buffer large enough for the duration
             const sampleCount = Math.ceil(context.sampleRate * (duration + attack + release));
-            const buffer = context.createBuffer(1, sampleCount, context.sampleRate);
-            dinCoreFillNoiseSamples(type as NoiseType, sampleCount, buffer.getChannelData(0));
-            bufferRef.current = buffer;
+            bufferRef.current = createNoiseBuffer(context, type as NoiseType, sampleCount);
         }
 
         return bufferRef.current;

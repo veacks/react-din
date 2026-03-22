@@ -79,4 +79,22 @@ describe('sources and effects', () => {
             )
         ).not.toThrow();
     });
+
+    it('keeps vanilla-runtime-backed effect builders reusable across multiple mounts', () => {
+        expect(() =>
+            render(
+                <AudioProvider>
+                    <Chorus rate={0.8} depth={4} mix={0.4} stereo={false}>
+                        <Flanger delay={2} depth={1.5} feedback={0.35} mix={0.3}>
+                            <Tremolo rate={5} depth={0.4}>
+                                <EQ3 low={1} mid={-2} high={3} mix={0.8}>
+                                    <Noise type="white" autoStart />
+                                </EQ3>
+                            </Tremolo>
+                        </Flanger>
+                    </Chorus>
+                </AudioProvider>
+            )
+        ).not.toThrow();
+    });
 });

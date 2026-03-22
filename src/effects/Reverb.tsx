@@ -1,8 +1,8 @@
-import { useEffect, useRef, type FC } from 'react';
+import { useEffect, useRef, useState, type FC } from 'react';
 import type { ReverbProps } from './types';
 import { useAudio } from '../core/AudioProvider';
 import { useAudioOut, AudioOutProvider } from '../core/AudioOutContext';
-import { dinCoreCreateReverbImpulseFrames } from '../internal/dinCore';
+import { applyReverbImpulse, createReverbGraph, updateReverbMix, type ReverbGraph } from '@din/vanilla';
 
 /**
  * Reverb effect component.
@@ -33,86 +33,53 @@ export const Reverb: FC<ReverbProps> = ({
 }) => {
     const { context } = useAudio();
     const { outputNode } = useAudioOut();
-
-    const convolverRef = useRef<ConvolverNode | null>(null);
-    const dryGainRef = useRef<GainNode | null>(null);
-    const wetGainRef = useRef<GainNode | null>(null);
-    const inputGainRef = useRef<GainNode | null>(null);
+    const graphRef = useRef<ReverbGraph | null>(null);
+    const [inputNode, setInputNode] = useState<AudioNode | null>(null);
 
     // Create effect chain
     useEffect(() => {
         if (!context || !outputNode) return;
 
-        // Create nodes
-        const inputGain = context.createGain();
-        const convolver = context.createConvolver();
-        const dryGain = context.createGain();
-        const wetGain = context.createGain();
-
-        // Set mix
-        dryGain.gain.value = 1 - mix;
-        wetGain.gain.value = mix;
-
-        // Connect
-        // input -> dry -> output
-        // input -> convolver -> wet -> output
-        inputGain.connect(dryGain);
-        dryGain.connect(outputNode);
-
-        inputGain.connect(convolver);
-        convolver.connect(wetGain);
-        wetGain.connect(outputNode);
-
-        inputGainRef.current = inputGain;
-        convolverRef.current = convolver;
-        dryGainRef.current = dryGain;
-        wetGainRef.current = wetGain;
+        const graph = createReverbGraph(context, mix);
+        graph.output.connect(outputNode);
+        graphRef.current = graph;
+        setInputNode(bypass ? outputNode : graph.input);
 
         return () => {
-            inputGain.disconnect();
-            convolver.disconnect();
-            dryGain.disconnect();
-            wetGain.disconnect();
+            graph.dispose();
+            graphRef.current = null;
+            setInputNode(null);
         };
     }, [context, outputNode]);
 
     // Generate or load impulse response
     useEffect(() => {
-        if (!context || !convolverRef.current) return;
+        if (!context || !graphRef.current) return;
 
-        if (typeof impulse === 'string') {
-            // Load from URL
-            fetch(impulse)
-                .then((response) => response.arrayBuffer())
-                .then((arrayBuffer) => context.decodeAudioData(arrayBuffer))
-                .then((buffer) => {
-                    if (convolverRef.current) {
-                        convolverRef.current.buffer = buffer;
-                    }
-                })
-                .catch(console.error);
-        } else if (impulse instanceof AudioBuffer) {
-            convolverRef.current.buffer = impulse;
-        } else {
-            // Generate algorithmic IR
-            const frames = dinCoreCreateReverbImpulseFrames(context.sampleRate, decay, preDelay, damping);
-            const buffer = context.createBuffer(2, frames.left.length, context.sampleRate);
-            buffer.getChannelData(0).set(frames.left);
-            buffer.getChannelData(1).set(frames.right);
-            convolverRef.current.buffer = buffer;
-        }
+        let active = true;
+        void applyReverbImpulse(graphRef.current, context, impulse, decay, preDelay, damping)
+            .catch(console.error)
+            .then(() => {
+                if (!active) return;
+            });
+
+        return () => {
+            active = false;
+        };
     }, [context, impulse, decay, preDelay, damping]);
 
     // Update mix
     useEffect(() => {
-        if (dryGainRef.current && wetGainRef.current) {
-            dryGainRef.current.gain.value = bypass ? 1 : 1 - mix;
-            wetGainRef.current.gain.value = bypass ? 0 : mix;
-        }
-    }, [mix, bypass]);
+        if (!graphRef.current) return;
+        updateReverbMix(graphRef.current, mix, bypass, context?.currentTime);
+    }, [context, mix, bypass]);
+
+    useEffect(() => {
+        setInputNode(bypass ? outputNode : (graphRef.current?.input ?? null));
+    }, [bypass, outputNode]);
 
     return (
-        <AudioOutProvider node={bypass ? outputNode : inputGainRef.current}>
+        <AudioOutProvider node={inputNode}>
             {children}
         </AudioOutProvider>
     );

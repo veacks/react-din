@@ -11,8 +11,9 @@ export default defineConfig({
       // Ensure we use the same React instance everywhere
       'react': path.resolve(__dirname, '../node_modules/react'),
       'react-dom': path.resolve(__dirname, '../node_modules/react-dom'),
-      // Use local source for react-din during demo development
-      'react-din': path.resolve(__dirname, '../src/index.ts'),
+      '@din/react': path.resolve(__dirname, '../packages/react/src/index.ts'),
+      '@din/vanilla': path.resolve(__dirname, '../packages/vanilla/src/index.ts'),
+      'react-din': path.resolve(__dirname, '../packages/react-din/src/index.ts'),
     }
   },
   optimizeDeps: {

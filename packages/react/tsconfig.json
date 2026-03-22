@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "baseUrl": ".",
+    "paths": {
+      "@din/react": ["./src/index.ts"],
+      "@din/react/*": ["./src/*"],
+      "@din/vanilla": ["../vanilla/src/index.ts"],
+      "@din/vanilla/*": ["../vanilla/src/*"]
+    }
+  },
+  "include": [
+    "src",
+    "../../src"
+  ]
+}

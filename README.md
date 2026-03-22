@@ -1,12 +1,18 @@
 # react-din
 
-A React-first declarative WebAudio library for building audio graphs, focused for interactive sound design.
+`react-din` is now the compatibility package for the DIN workspace.
 
-Build complex audio graphs using React's declarative paradigm. Audio nodes are represented as React components that automatically connect based on their parent-child relationships.
+The active package layout is:
+
+- `din-core`: canonical Rust core and future multi-target bindings
+- `@din/vanilla`: web/WASM-facing runtime and shared audio graph builders
+- `@din/react`: React bindings for the vanilla runtime
+- `@din/editor`: visual editor and playground
+- `react-din`: compatibility shim that re-exports `@din/react`
 
 > [!WARNING]  
 > This is a work in progress. The API is not stable and may change in the future.
-> It as been published to reserve npm package name `react-din`.
+> Prefer `@din/react` for new code. Keep using `react-din` only when you need the compatibility layer.
 
 ## Features
 
@@ -23,18 +29,22 @@ Build complex audio graphs using React's declarative paradigm. Audio nodes are r
 
 ## Installation
 
+For new projects:
+
+```bash
+npm install @din/react
+```
+
+Compatibility install:
+
 ```bash
 npm install react-din
-# or
-yarn add react-din
-# or
-pnpm add react-din
 ```
 
 ## Quick Start
 
 ```tsx
-import { AudioProvider, Gain, Filter, Osc } from 'react-din';
+import { AudioProvider, Gain, Filter, Osc } from '@din/react';
 
 function App() {
   return (
@@ -70,7 +80,7 @@ Components automatically connect to their parent's output. The tree structure de
 Create step sequences with pattern-based triggering:
 
 ```tsx
-import { Sequencer, Track, useTrigger, Sampler } from 'react-din';
+import { Sequencer, Track, useTrigger, Sampler } from '@din/react';
 
 function DrumMachine() {
   return (
@@ -91,7 +101,7 @@ function DrumMachine() {
 Use musical timing with the transport system:
 
 ```tsx
-import { TransportProvider, useTransport, useBeat } from 'react-din';
+import { TransportProvider, useTransport, useBeat } from '@din/react';
 
 function PlayButton() {
   const { isPlaying, play, stop, bpm } = useTransport();
@@ -121,7 +131,7 @@ import {
   MidiCCOutput,
   MidiTransportSync,
   TransportProvider,
-} from 'react-din';
+} from '@din/react';
 
 function MidiPatch() {
   return (
@@ -146,7 +156,7 @@ function MidiPatch() {
 Analyze audio with FFT and metering:
 
 ```tsx
-import { useFFT, useMeter, Analyzer } from 'react-din';
+import { useFFT, useMeter, Analyzer } from '@din/react';
 
 function Visualizer() {
   const { bass, mid, high, spectrum } = useFFT({ fftSize: 512 });
@@ -165,7 +175,7 @@ function Visualizer() {
 Apply effects to audio:
 
 ```tsx
-import { Reverb, Chorus, Distortion } from 'react-din/effects';
+import { Reverb, Chorus, Distortion } from '@din/react/effects';
 
 function EffectsChain() {
   return (
@@ -185,7 +195,7 @@ function EffectsChain() {
 Use note strings (English or French) instead of raw MIDI numbers:
 
 ```tsx
-import { noteToMidi, midiToNote, noteToFreq, parseNote } from 'react-din';
+import { noteToMidi, midiToNote, noteToFreq, parseNote } from '@din/react';
 
 // English note names
 noteToMidi('C4');      // 60
@@ -210,7 +220,7 @@ parseNote('Eb4');      // { note: 'D#', octave: 4, midi: 63, frequency: 311.13 }
 Built-in synthesizer components inspired by Tone.js:
 
 ```tsx
-import { Synth, MonoSynth, FMSynth, AMSynth, NoiseSynth, Envelope } from 'react-din';
+import { Synth, MonoSynth, FMSynth, AMSynth, NoiseSynth, Envelope } from '@din/react';
 
 // Basic synth with ADSR envelope
 <Track id="lead" pattern={pattern}>
@@ -276,7 +286,7 @@ import { Synth, MonoSynth, FMSynth, AMSynth, NoiseSynth, Envelope } from 'react-
 Use the Panner component for 3D positional audio:
 
 ```tsx
-import { AudioProvider, Panner, Sampler } from 'react-din';
+import { AudioProvider, Panner, Sampler } from '@din/react';
 
 function SpatialAudio() {
   const [position, setPosition] = useState({ x: 0, y: 0, z: -5 });

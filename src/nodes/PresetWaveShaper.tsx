@@ -1,7 +1,7 @@
 import type { FC, ReactNode } from 'react';
 import { WaveShaper } from './WaveShaper';
 import type { OversampleType } from './types';
-import { dinCoreCreateWaveShaperCurve } from '../internal/dinCore';
+import { createSharedWaveShaperCurve } from '@din/vanilla';
 
 /**
  * Preset curve types for `PresetWaveShaper`.
@@ -31,7 +31,7 @@ export const PresetWaveShaper: FC<PresetWaveShaperProps> = ({
     oversample = '2x',
 }) => {
     return (
-        <WaveShaper curve={dinCoreCreateWaveShaperCurve(amount, preset)} oversample={oversample}>
+        <WaveShaper curve={createSharedWaveShaperCurve(amount, preset)} oversample={oversample}>
             {children}
         </WaveShaper>
     );

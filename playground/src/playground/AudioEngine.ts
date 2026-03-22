@@ -50,10 +50,29 @@ import type {
 } from './store';
 import { math, compare, mix, clamp, switchValue } from '../../../src/data/values';
 import {
-    dinCoreCreateReverbImpulseFrames,
-    dinCoreCreateWaveShaperCurve,
-    dinCoreFillNoiseSamples,
-} from '../../../src/internal/dinCore';
+    clampPhaserStageCount,
+    createChorusGraph,
+    createCompressorGraph,
+    createDistortionGraph,
+    createEq3Graph,
+    createFlangerGraph,
+    createNoiseBuffer as createSharedNoiseBuffer,
+    createPhaserGraph,
+    createReverbGraph,
+    createReverbImpulseBuffer,
+    createSharedWaveShaperCurve,
+    createTremoloGraph,
+    deriveDistortionPreset,
+    updateChorusGraph,
+    updateCompressorGraph,
+    updateDistortionGraph,
+    updateDryWetGraph,
+    updateEq3Graph,
+    updateFlangerGraph,
+    updatePhaserGraph,
+    updateReverbMix,
+    updateTremoloGraph,
+} from '@din/vanilla';
 import { playgroundMidiRuntime } from './midiRuntime';
 import {
     getInputParamHandleId,
@@ -179,26 +198,18 @@ function createNoiseBuffer(
     type: 'white' | 'pink' | 'brown',
     sampleCount?: number
 ): AudioBuffer {
-    const sampleRate = ctx.sampleRate;
-    const length = sampleCount ?? (sampleRate * 2); // 2 seconds default
-    const buffer = ctx.createBuffer(1, length, sampleRate);
-    dinCoreFillNoiseSamples(type, length, buffer.getChannelData(0));
-    return buffer;
+    return createSharedNoiseBuffer(ctx, type, sampleCount);
 }
 
 /**
  * Creates a simple impulse response for reverb
  */
 function createReverbImpulse(ctx: AudioContext, decay: number): AudioBuffer {
-    const frames = dinCoreCreateReverbImpulseFrames(ctx.sampleRate, decay);
-    const buffer = ctx.createBuffer(2, frames.left.length, ctx.sampleRate);
-    buffer.getChannelData(0).set(frames.left);
-    buffer.getChannelData(1).set(frames.right);
-    return buffer;
+    return createReverbImpulseBuffer(ctx, decay);
 }
 
 function createWaveShaperCurve(amount: number, preset: 'softClip' | 'hardClip' | 'saturate'): Float32Array {
-    return dinCoreCreateWaveShaperCurve(amount, preset);
+    return createSharedWaveShaperCurve(amount, preset);
 }
 
 const MIN_EQ3_GAP_HZ = 50;
@@ -209,8 +220,7 @@ function clampMatrixSize(value: number | undefined, fallback: number): number {
 }
 
 function clampPhaserStages(value: number | undefined): number {
-    if (!Number.isFinite(value)) return 4;
-    return Math.max(2, Math.min(8, Math.floor(Number(value))));
+    return clampPhaserStageCount(value);
 }
 
 function getSafeMatrixCellValue(matrix: number[][] | undefined, row: number, column: number): number {
@@ -1720,390 +1730,217 @@ export class AudioEngine {
             }
             case 'reverb': {
                 const reverbData = data as ReverbNodeData;
-                const inputGain = ctx.createGain();
-                const outputGain = ctx.createGain();
-                const convolver = ctx.createConvolver();
-                convolver.buffer = createReverbImpulse(ctx, reverbData.decay);
-                const dryGain = ctx.createGain();
-                const wetGain = ctx.createGain();
-                dryGain.gain.value = 1 - reverbData.mix;
-                wetGain.gain.value = reverbData.mix;
-
-                inputGain.connect(dryGain);
-                inputGain.connect(convolver);
-                convolver.connect(wetGain);
-                dryGain.connect(outputGain);
-                wetGain.connect(outputGain);
+                const graph = createReverbGraph(ctx, reverbData.mix);
+                graph.convolver.buffer = createReverbImpulse(ctx, reverbData.decay);
 
                 const params = new Map<string, AudioParam>();
-                params.set('mix', wetGain.gain);
+                params.set('mix', graph.wetGain.gain);
 
                 return {
-                    node: outputGain,
-                    inputNode: inputGain,
-                    internalNodes: [inputGain, convolver, dryGain, wetGain],
+                    node: graph.output,
+                    inputNode: graph.input,
+                    internalNodes: graph.nodes,
                     type: 'reverb',
-                    reverbConvolver: convolver,
-                    reverbDryGain: dryGain,
-                    reverbWetGain: wetGain,
+                    reverbConvolver: graph.convolver,
+                    reverbDryGain: graph.dryGain,
+                    reverbWetGain: graph.wetGain,
                     params,
                 };
             }
             case 'compressor': {
                 const compressorData = data as CompressorNodeData;
-                const inputGain = ctx.createGain();
-                const duckGain = ctx.createGain();
-                const compressor = ctx.createDynamicsCompressor();
-                const outputGain = ctx.createGain();
-                const sidechainAnalyser = ctx.createAnalyser();
-
-                duckGain.gain.value = 1;
-                compressor.threshold.value = compressorData.threshold;
-                compressor.knee.value = compressorData.knee;
-                compressor.ratio.value = compressorData.ratio;
-                compressor.attack.value = compressorData.attack;
-                compressor.release.value = compressorData.release;
-                sidechainAnalyser.fftSize = 256;
-                sidechainAnalyser.smoothingTimeConstant = 0.85;
-
-                inputGain.connect(duckGain);
-                duckGain.connect(compressor);
-                compressor.connect(outputGain);
+                const graph = createCompressorGraph(ctx);
+                updateCompressorGraph(graph, compressorData);
 
                 const params = new Map<string, AudioParam>();
-                params.set('threshold', compressor.threshold);
-                params.set('knee', compressor.knee);
-                params.set('ratio', compressor.ratio);
-                params.set('attack', compressor.attack);
-                params.set('release', compressor.release);
+                params.set('threshold', graph.compressor.threshold);
+                params.set('knee', graph.compressor.knee);
+                params.set('ratio', graph.compressor.ratio);
+                params.set('attack', graph.compressor.attack);
+                params.set('release', graph.compressor.release);
 
                 return {
-                    node: outputGain,
-                    inputNode: inputGain,
-                    internalNodes: [inputGain, duckGain, compressor, sidechainAnalyser],
+                    node: graph.output,
+                    inputNode: graph.input,
+                    internalNodes: graph.nodes,
                     type: 'compressor',
                     params,
-                    compressorNode: compressor,
-                    compressorDuckGain: duckGain,
-                    sidechainAnalyser,
+                    compressorNode: graph.compressor,
+                    compressorDuckGain: graph.duckGain,
+                    sidechainAnalyser: graph.sidechainAnalyser,
                     sidechainConnectionCount: 0,
                     sidechainSourceNodes: new Set<AudioNode>(),
                 };
             }
             case 'phaser': {
                 const phaserData = data as PhaserNodeData;
-                const stageCount = clampPhaserStages(phaserData.stages);
-
-                const inputGain = ctx.createGain();
-                const outputGain = ctx.createGain();
-                const dryGain = ctx.createGain();
-                const wetGain = ctx.createGain();
-                const feedbackGain = ctx.createGain();
-                const lfo = ctx.createOscillator();
-                const lfoGain = ctx.createGain();
-                const stageNodes: BiquadFilterNode[] = [];
-
-                for (let i = 0; i < stageCount; i++) {
-                    const stage = ctx.createBiquadFilter();
-                    stage.type = 'allpass';
-                    stage.frequency.value = Math.max(20, phaserData.baseFrequency);
-                    stage.Q.value = 0.5;
-                    stageNodes.push(stage);
-                }
-
-                dryGain.gain.value = 1 - phaserData.mix;
-                wetGain.gain.value = phaserData.mix;
-                feedbackGain.gain.value = Math.max(-0.95, Math.min(0.95, phaserData.feedback));
-                lfo.type = 'sine';
-                lfo.frequency.value = Math.max(0.01, phaserData.rate);
-                lfoGain.gain.value = Math.max(0, phaserData.depth) * Math.max(100, phaserData.baseFrequency);
-
-                inputGain.connect(dryGain);
-                dryGain.connect(outputGain);
-                inputGain.connect(stageNodes[0]);
-                for (let i = 0; i < stageNodes.length - 1; i++) {
-                    stageNodes[i].connect(stageNodes[i + 1]);
-                }
-                stageNodes[stageNodes.length - 1].connect(wetGain);
-                wetGain.connect(outputGain);
-                stageNodes[stageNodes.length - 1].connect(feedbackGain);
-                feedbackGain.connect(stageNodes[0]);
-                lfo.connect(lfoGain);
-                stageNodes.forEach((stage) => lfoGain.connect(stage.frequency));
+                const graph = createPhaserGraph(ctx, clampPhaserStages(phaserData.stages));
+                updatePhaserGraph(graph, phaserData);
 
                 const params = new Map<string, AudioParam>();
-                params.set('rate', lfo.frequency);
-                params.set('depth', lfoGain.gain);
-                params.set('feedback', feedbackGain.gain);
-                params.set('baseFrequency', stageNodes[0].frequency);
-                params.set('mix', wetGain.gain);
+                params.set('rate', graph.lfo.frequency);
+                params.set('depth', graph.lfoGain.gain);
+                params.set('feedback', graph.feedbackGain.gain);
+                params.set('baseFrequency', graph.stages[0].frequency);
+                params.set('mix', graph.wetGain.gain);
 
                 return {
-                    node: outputGain,
-                    inputNode: inputGain,
-                    internalNodes: [inputGain, outputGain, dryGain, wetGain, feedbackGain, lfo, lfoGain, ...stageNodes],
+                    node: graph.output,
+                    inputNode: graph.input,
+                    internalNodes: graph.nodes,
                     type: 'phaser',
                     params,
-                    lfoOsc: lfo,
-                    phaserDryGain: dryGain,
-                    phaserWetGain: wetGain,
-                    phaserFeedbackGain: feedbackGain,
-                    phaserLfoGain: lfoGain,
-                    phaserStages: stageNodes,
+                    lfoOsc: graph.lfo,
+                    phaserDryGain: graph.dryGain,
+                    phaserWetGain: graph.wetGain,
+                    phaserFeedbackGain: graph.feedbackGain,
+                    phaserLfoGain: graph.lfoGain,
+                    phaserStages: graph.stages,
                 };
             }
             case 'flanger': {
                 const flangerData = data as FlangerNodeData;
-                const inputGain = ctx.createGain();
-                const outputGain = ctx.createGain();
-                const dryGain = ctx.createGain();
-                const wetGain = ctx.createGain();
-                const delay = ctx.createDelay(0.05);
-                const feedbackGain = ctx.createGain();
-                const lfo = ctx.createOscillator();
-                const lfoGain = ctx.createGain();
-
-                const delaySec = Math.max(0, flangerData.delay) / 1000;
-                const depthSec = Math.max(0, flangerData.depth) / 1000;
-
-                dryGain.gain.value = 1 - flangerData.mix;
-                wetGain.gain.value = flangerData.mix;
-                delay.delayTime.value = delaySec;
-                feedbackGain.gain.value = Math.max(-0.95, Math.min(0.95, flangerData.feedback));
-                lfo.type = 'sine';
-                lfo.frequency.value = Math.max(0.01, flangerData.rate);
-                lfoGain.gain.value = depthSec;
-
-                inputGain.connect(dryGain);
-                dryGain.connect(outputGain);
-                inputGain.connect(delay);
-                delay.connect(feedbackGain);
-                feedbackGain.connect(delay);
-                delay.connect(wetGain);
-                wetGain.connect(outputGain);
-                lfo.connect(lfoGain);
-                lfoGain.connect(delay.delayTime);
+                const graph = createFlangerGraph(ctx);
+                updateFlangerGraph(graph, flangerData);
 
                 const params = new Map<string, AudioParam>();
-                params.set('rate', lfo.frequency);
-                params.set('depth', lfoGain.gain);
-                params.set('feedback', feedbackGain.gain);
-                params.set('delay', delay.delayTime);
-                params.set('mix', wetGain.gain);
+                params.set('rate', graph.lfo.frequency);
+                params.set('depth', graph.lfoGain.gain);
+                params.set('feedback', graph.feedbackGain.gain);
+                params.set('delay', graph.delay.delayTime);
+                params.set('mix', graph.wetGain.gain);
 
                 return {
-                    node: outputGain,
-                    inputNode: inputGain,
-                    internalNodes: [inputGain, outputGain, dryGain, wetGain, delay, feedbackGain, lfo, lfoGain],
+                    node: graph.output,
+                    inputNode: graph.input,
+                    internalNodes: graph.nodes,
                     type: 'flanger',
                     params,
-                    lfoOsc: lfo,
-                    flangerDelay: delay,
-                    flangerFeedbackGain: feedbackGain,
-                    flangerDryGain: dryGain,
-                    flangerWetGain: wetGain,
-                    flangerLfoGain: lfoGain,
+                    lfoOsc: graph.lfo,
+                    flangerDelay: graph.delay,
+                    flangerFeedbackGain: graph.feedbackGain,
+                    flangerDryGain: graph.dryGain,
+                    flangerWetGain: graph.wetGain,
+                    flangerLfoGain: graph.lfoGain,
                 };
             }
             case 'tremolo': {
                 const tremoloData = data as TremoloNodeData;
-                const inputGain = ctx.createGain();
-                const outputGain = ctx.createGain();
-                const dryGain = ctx.createGain();
-                const wetGain = ctx.createGain();
-                const ampGain = ctx.createGain();
-                const lfo = ctx.createOscillator();
-                const depth = Math.max(0, Math.min(1, tremoloData.depth));
-
-                dryGain.gain.value = 1 - tremoloData.mix;
-                wetGain.gain.value = tremoloData.mix;
-                ampGain.gain.value = 1 - depth * 0.5;
-                lfo.type = tremoloData.waveform;
-                lfo.frequency.value = Math.max(0.01, tremoloData.rate);
-
-                inputGain.connect(dryGain);
-                dryGain.connect(outputGain);
-                inputGain.connect(ampGain);
-                ampGain.connect(wetGain);
-                wetGain.connect(outputGain);
-
-                const lfoDepthGain = ctx.createGain();
-                lfoDepthGain.gain.value = depth * 0.5;
-                lfo.connect(lfoDepthGain);
-                lfoDepthGain.connect(ampGain.gain);
+                const graph = createTremoloGraph(ctx, false);
+                updateTremoloGraph(graph, {
+                    rate: tremoloData.rate,
+                    depth: tremoloData.depth,
+                    waveform: tremoloData.waveform,
+                    mix: tremoloData.mix,
+                });
 
                 const params = new Map<string, AudioParam>();
-                params.set('rate', lfo.frequency);
-                params.set('depth', lfoDepthGain.gain);
-                params.set('mix', wetGain.gain);
+                params.set('rate', graph.lfo.frequency);
+                params.set('depth', graph.depthGain.gain);
+                params.set('mix', graph.wetGain.gain);
 
                 return {
-                    node: outputGain,
-                    inputNode: inputGain,
-                    internalNodes: [inputGain, outputGain, dryGain, wetGain, ampGain, lfo, lfoDepthGain],
+                    node: graph.output,
+                    inputNode: graph.input,
+                    internalNodes: graph.nodes,
                     type: 'tremolo',
                     params,
-                    lfoOsc: lfo,
-                    tremoloDryGain: dryGain,
-                    tremoloWetGain: wetGain,
-                    tremoloAmpGain: ampGain,
-                    tremoloDepthGain: lfoDepthGain,
+                    lfoOsc: graph.lfo,
+                    tremoloDryGain: graph.dryGain,
+                    tremoloWetGain: graph.wetGain,
+                    tremoloAmpGain: graph.ampGain,
+                    tremoloDepthGain: graph.depthGain,
                 };
             }
             case 'eq3': {
                 const eqData = data as EQ3NodeData;
-                const inputGain = ctx.createGain();
-                const outputGain = ctx.createGain();
-                const dryGain = ctx.createGain();
-                const wetGain = ctx.createGain();
-                const lowShelf = ctx.createBiquadFilter();
-                const midPeak = ctx.createBiquadFilter();
-                const highShelf = ctx.createBiquadFilter();
-
-                const lowFrequency = Math.max(20, eqData.lowFrequency);
-                const highFrequency = Math.max(lowFrequency + MIN_EQ3_GAP_HZ, eqData.highFrequency);
-                const midFrequency = Math.sqrt(lowFrequency * highFrequency);
-
-                lowShelf.type = 'lowshelf';
-                lowShelf.frequency.value = lowFrequency;
-                lowShelf.gain.value = eqData.low;
-                midPeak.type = 'peaking';
-                midPeak.frequency.value = midFrequency;
-                midPeak.Q.value = 0.707;
-                midPeak.gain.value = eqData.mid;
-                highShelf.type = 'highshelf';
-                highShelf.frequency.value = highFrequency;
-                highShelf.gain.value = eqData.high;
-
-                dryGain.gain.value = 1 - eqData.mix;
-                wetGain.gain.value = eqData.mix;
-
-                inputGain.connect(dryGain);
-                dryGain.connect(outputGain);
-                inputGain.connect(lowShelf);
-                lowShelf.connect(midPeak);
-                midPeak.connect(highShelf);
-                highShelf.connect(wetGain);
-                wetGain.connect(outputGain);
+                const graph = createEq3Graph(ctx);
+                updateEq3Graph(graph, eqData);
 
                 const params = new Map<string, AudioParam>();
-                params.set('low', lowShelf.gain);
-                params.set('mid', midPeak.gain);
-                params.set('high', highShelf.gain);
-                params.set('lowFrequency', lowShelf.frequency);
-                params.set('highFrequency', highShelf.frequency);
-                params.set('mix', wetGain.gain);
+                params.set('low', graph.lowShelf.gain);
+                params.set('mid', graph.midPeak.gain);
+                params.set('high', graph.highShelf.gain);
+                params.set('lowFrequency', graph.lowShelf.frequency);
+                params.set('highFrequency', graph.highShelf.frequency);
+                params.set('mix', graph.wetGain.gain);
 
                 return {
-                    node: outputGain,
-                    inputNode: inputGain,
-                    internalNodes: [inputGain, outputGain, dryGain, wetGain, lowShelf, midPeak, highShelf],
+                    node: graph.output,
+                    inputNode: graph.input,
+                    internalNodes: graph.nodes,
                     type: 'eq3',
                     params,
-                    eq3DryGain: dryGain,
-                    eq3WetGain: wetGain,
-                    eq3LowShelf: lowShelf,
-                    eq3MidPeak: midPeak,
-                    eq3HighShelf: highShelf,
+                    eq3DryGain: graph.dryGain,
+                    eq3WetGain: graph.wetGain,
+                    eq3LowShelf: graph.lowShelf,
+                    eq3MidPeak: graph.midPeak,
+                    eq3HighShelf: graph.highShelf,
                 };
             }
             case 'distortion': {
                 const distortionData = data as DistortionNodeData;
-                const inputGain = ctx.createGain();
-                const outputGain = ctx.createGain();
-                const dryGain = ctx.createGain();
-                const wetGain = ctx.createGain();
-                const driveGain = ctx.createGain();
-                const waveShaper = ctx.createWaveShaper();
-                const toneFilter = ctx.createBiquadFilter();
-                const postGain = ctx.createGain();
-
-                driveGain.gain.value = 1 + distortionData.drive * 5;
-                waveShaper.curve = createWaveShaperCurve(distortionData.drive, 'softClip');
-                waveShaper.oversample = '2x';
-                toneFilter.type = 'lowpass';
-                toneFilter.frequency.value = distortionData.tone;
-                postGain.gain.value = distortionData.level;
-                wetGain.gain.value = distortionData.mix;
-                dryGain.gain.value = 1 - distortionData.mix;
-
-                inputGain.connect(dryGain);
-                dryGain.connect(outputGain);
-                inputGain.connect(driveGain);
-                driveGain.connect(waveShaper);
-                waveShaper.connect(toneFilter);
-                toneFilter.connect(postGain);
-                postGain.connect(wetGain);
-                wetGain.connect(outputGain);
+                const graph = createDistortionGraph(ctx);
+                updateDistortionGraph(graph, {
+                    type: distortionData.distortionType,
+                    drive: distortionData.drive,
+                    level: distortionData.level,
+                    mix: distortionData.mix,
+                    tone: distortionData.tone,
+                    oversample: '2x',
+                });
 
                 const params = new Map<string, AudioParam>();
-                params.set('drive', driveGain.gain);
-                params.set('level', postGain.gain);
-                params.set('mix', wetGain.gain);
-                params.set('tone', toneFilter.frequency);
+                params.set('drive', graph.driveGain.gain);
+                params.set('level', graph.levelGain.gain);
+                params.set('mix', graph.wetGain.gain);
+                params.set('tone', graph.toneFilter.frequency);
 
                 return {
-                    node: outputGain,
-                    inputNode: inputGain,
-                    internalNodes: [inputGain, dryGain, wetGain, driveGain, waveShaper, toneFilter, postGain],
+                    node: graph.output,
+                    inputNode: graph.input,
+                    internalNodes: graph.nodes,
                     type: 'distortion',
                     params,
-                    distortionWaveShaper: waveShaper,
-                    distortionDriveGain: driveGain,
-                    distortionToneFilter: toneFilter,
-                    distortionDryGain: dryGain,
-                    distortionWetGain: wetGain,
-                    distortionOutputGain: postGain,
+                    distortionWaveShaper: graph.waveShaper,
+                    distortionDriveGain: graph.driveGain,
+                    distortionToneFilter: graph.toneFilter,
+                    distortionDryGain: graph.dryGain,
+                    distortionWetGain: graph.wetGain,
+                    distortionOutputGain: graph.levelGain,
                 };
             }
             case 'chorus': {
                 const chorusData = data as ChorusNodeData;
-                const inputGain = ctx.createGain();
-                const outputGain = ctx.createGain();
-                const dryGain = ctx.createGain();
-                const wetGain = ctx.createGain();
-                const delay = ctx.createDelay(0.2);
-                const feedbackGain = ctx.createGain();
-                const lfoOsc = ctx.createOscillator();
-                const lfoGain = ctx.createGain();
-
-                delay.delayTime.value = chorusData.delay / 1000;
-                feedbackGain.gain.value = chorusData.feedback;
-                lfoOsc.type = 'sine';
-                lfoOsc.frequency.value = chorusData.rate;
-                lfoGain.gain.value = chorusData.depth / 1000;
-                wetGain.gain.value = chorusData.mix;
-                dryGain.gain.value = 1 - chorusData.mix;
-
-                inputGain.connect(dryGain);
-                dryGain.connect(outputGain);
-                inputGain.connect(delay);
-                delay.connect(feedbackGain);
-                feedbackGain.connect(delay);
-                delay.connect(wetGain);
-                wetGain.connect(outputGain);
-                lfoOsc.connect(lfoGain);
-                lfoGain.connect(delay.delayTime);
+                const graph = createChorusGraph(ctx, false);
+                updateChorusGraph(graph, {
+                    rate: chorusData.rate,
+                    depth: chorusData.depth,
+                    feedback: chorusData.feedback,
+                    delay: chorusData.delay,
+                    mix: chorusData.mix,
+                    stereo: false,
+                });
 
                 const params = new Map<string, AudioParam>();
-                params.set('rate', lfoOsc.frequency);
-                params.set('depth', lfoGain.gain);
-                params.set('feedback', feedbackGain.gain);
-                params.set('delay', delay.delayTime);
-                params.set('mix', wetGain.gain);
+                params.set('rate', graph.primaryLfo.frequency);
+                params.set('depth', graph.primaryLfoGain.gain);
+                params.set('feedback', graph.primaryFeedbackGain.gain);
+                params.set('delay', graph.primaryDelay.delayTime);
+                params.set('mix', graph.wetGain.gain);
 
                 return {
-                    node: outputGain,
-                    inputNode: inputGain,
-                    internalNodes: [inputGain, dryGain, wetGain, delay, feedbackGain, lfoOsc, lfoGain],
+                    node: graph.output,
+                    inputNode: graph.input,
+                    internalNodes: graph.nodes,
                     type: 'chorus',
                     params,
-                    lfoOsc,
-                    chorusDelay: delay,
-                    chorusFeedbackGain: feedbackGain,
-                    chorusDryGain: dryGain,
-                    chorusWetGain: wetGain,
-                    chorusLfoGain: lfoGain,
+                    lfoOsc: graph.primaryLfo,
+                    chorusDelay: graph.primaryDelay,
+                    chorusFeedbackGain: graph.primaryFeedbackGain,
+                    chorusDryGain: graph.dryGain,
+                    chorusWetGain: graph.wetGain,
+                    chorusLfoGain: graph.primaryLfoGain,
                 };
             }
             case 'noiseBurst': {
@@ -2859,23 +2696,43 @@ export class AudioEngine {
                 instance.feedbackGain.gain.setTargetAtTime(data.feedback, currentTime, 0.01);
             }
         } else if (instance.type === 'reverb') {
-            const wetNode = instance.reverbWetGain;
-            const dryNode = instance.reverbDryGain;
             if ('mix' in data && typeof data.mix === 'number') {
-                wetNode?.gain.setTargetAtTime(data.mix, currentTime, 0.01);
-                dryNode?.gain.setTargetAtTime(1 - data.mix, currentTime, 0.01);
+                updateReverbMix(
+                    {
+                        dryGain: instance.reverbDryGain!,
+                        wetGain: instance.reverbWetGain!,
+                    },
+                    data.mix,
+                    false,
+                    currentTime
+                );
             }
             if ('decay' in data && typeof data.decay === 'number' && instance.reverbConvolver) {
                 instance.reverbConvolver.buffer = createReverbImpulse(this.audioContext, data.decay);
             }
         } else if (instance.type === 'compressor') {
-            const compressor = instance.compressorNode;
-            if (!compressor) return;
-            if ('threshold' in data && typeof data.threshold === 'number') compressor.threshold.setTargetAtTime(data.threshold, currentTime, 0.01);
-            if ('knee' in data && typeof data.knee === 'number') compressor.knee.setTargetAtTime(data.knee, currentTime, 0.01);
-            if ('ratio' in data && typeof data.ratio === 'number') compressor.ratio.setTargetAtTime(data.ratio, currentTime, 0.01);
-            if ('attack' in data && typeof data.attack === 'number') compressor.attack.setTargetAtTime(data.attack, currentTime, 0.01);
-            if ('release' in data && typeof data.release === 'number') compressor.release.setTargetAtTime(data.release, currentTime, 0.01);
+            if (instance.compressorNode && instance.compressorDuckGain && instance.sidechainAnalyser) {
+                const visualData = this.nodeById.get(nodeId)?.data as CompressorNodeData | undefined;
+                updateCompressorGraph(
+                    {
+                        input: instance.inputNode as GainNode,
+                        output: instance.node as GainNode,
+                        duckGain: instance.compressorDuckGain,
+                        compressor: instance.compressorNode,
+                        sidechainAnalyser: instance.sidechainAnalyser,
+                        nodes: instance.internalNodes ?? [],
+                        dispose: () => undefined,
+                    },
+                    {
+                        threshold: ('threshold' in data && typeof data.threshold === 'number') ? data.threshold : (visualData?.threshold ?? -24),
+                        knee: ('knee' in data && typeof data.knee === 'number') ? data.knee : (visualData?.knee ?? 30),
+                        ratio: ('ratio' in data && typeof data.ratio === 'number') ? data.ratio : (visualData?.ratio ?? 12),
+                        attack: ('attack' in data && typeof data.attack === 'number') ? data.attack : (visualData?.attack ?? 0.003),
+                        release: ('release' in data && typeof data.release === 'number') ? data.release : (visualData?.release ?? 0.25),
+                    },
+                    currentTime
+                );
+            }
             const visualData = this.nodeById.get(nodeId)?.data as CompressorNodeData | undefined;
             if (visualData && instance.sidechainConnectionCount && instance.sidechainConnectionCount > 0) {
                 this.clearCompressorSidechain(instance);
@@ -2885,137 +2742,187 @@ export class AudioEngine {
                 instance.compressorDuckGain.gain.setTargetAtTime(1, currentTime, 0.01);
             }
         } else if (instance.type === 'phaser') {
-            if ('rate' in data && typeof data.rate === 'number' && instance.lfoOsc) {
-                instance.lfoOsc.frequency.setTargetAtTime(Math.max(0.01, data.rate), currentTime, 0.01);
-            }
-            if ('depth' in data && typeof data.depth === 'number' && instance.phaserLfoGain) {
-                const baseFrequency = (this.nodeById.get(nodeId)?.data as PhaserNodeData | undefined)?.baseFrequency ?? 1000;
-                instance.phaserLfoGain.gain.setTargetAtTime(Math.max(0, data.depth) * Math.max(100, baseFrequency), currentTime, 0.01);
-            }
-            if ('feedback' in data && typeof data.feedback === 'number' && instance.phaserFeedbackGain) {
-                instance.phaserFeedbackGain.gain.setTargetAtTime(Math.max(-0.95, Math.min(0.95, data.feedback)), currentTime, 0.01);
-            }
-            if ('mix' in data && typeof data.mix === 'number' && instance.phaserWetGain && instance.phaserDryGain) {
-                instance.phaserWetGain.gain.setTargetAtTime(data.mix, currentTime, 0.01);
-                instance.phaserDryGain.gain.setTargetAtTime(1 - data.mix, currentTime, 0.01);
-            }
-            if ('baseFrequency' in data && typeof data.baseFrequency === 'number' && instance.phaserStages) {
-                const value = Math.max(20, data.baseFrequency);
-                instance.phaserStages.forEach((stage) => stage.frequency.setTargetAtTime(value, currentTime, 0.01));
+            if (
+                instance.lfoOsc
+                && instance.phaserLfoGain
+                && instance.phaserFeedbackGain
+                && instance.phaserWetGain
+                && instance.phaserDryGain
+                && instance.phaserStages
+            ) {
+                const visualData = this.nodeById.get(nodeId)?.data as PhaserNodeData | undefined;
+                updatePhaserGraph(
+                    {
+                        input: instance.inputNode as GainNode,
+                        output: instance.node as GainNode,
+                        dryGain: instance.phaserDryGain,
+                        wetGain: instance.phaserWetGain,
+                        feedbackGain: instance.phaserFeedbackGain,
+                        lfo: instance.lfoOsc,
+                        lfoGain: instance.phaserLfoGain,
+                        stages: instance.phaserStages,
+                        nodes: instance.internalNodes ?? [],
+                        dispose: () => undefined,
+                    },
+                    {
+                        rate: ('rate' in data && typeof data.rate === 'number') ? data.rate : (visualData?.rate ?? 0.5),
+                        depth: ('depth' in data && typeof data.depth === 'number') ? data.depth : (visualData?.depth ?? 0.5),
+                        feedback: ('feedback' in data && typeof data.feedback === 'number') ? data.feedback : (visualData?.feedback ?? 0.7),
+                        baseFrequency: ('baseFrequency' in data && typeof data.baseFrequency === 'number') ? data.baseFrequency : (visualData?.baseFrequency ?? 1000),
+                        mix: ('mix' in data && typeof data.mix === 'number') ? data.mix : (visualData?.mix ?? 0.5),
+                    },
+                    currentTime
+                );
             }
             if ('stages' in data && typeof data.stages === 'number') {
                 this.refreshConnections(this.visualNodes, this.edges);
             }
         } else if (instance.type === 'flanger') {
-            if ('rate' in data && typeof data.rate === 'number' && instance.lfoOsc) {
-                instance.lfoOsc.frequency.setTargetAtTime(Math.max(0.01, data.rate), currentTime, 0.01);
-            }
-            if ('depth' in data && typeof data.depth === 'number' && instance.flangerLfoGain) {
-                instance.flangerLfoGain.gain.setTargetAtTime(Math.max(0, data.depth) / 1000, currentTime, 0.01);
-            }
-            if ('feedback' in data && typeof data.feedback === 'number' && instance.flangerFeedbackGain) {
-                instance.flangerFeedbackGain.gain.setTargetAtTime(Math.max(-0.95, Math.min(0.95, data.feedback)), currentTime, 0.01);
-            }
-            if ('delay' in data && typeof data.delay === 'number' && instance.flangerDelay) {
-                instance.flangerDelay.delayTime.setTargetAtTime(Math.max(0, data.delay) / 1000, currentTime, 0.01);
-            }
-            if ('mix' in data && typeof data.mix === 'number' && instance.flangerWetGain && instance.flangerDryGain) {
-                instance.flangerWetGain.gain.setTargetAtTime(data.mix, currentTime, 0.01);
-                instance.flangerDryGain.gain.setTargetAtTime(1 - data.mix, currentTime, 0.01);
+            if (
+                instance.lfoOsc
+                && instance.flangerLfoGain
+                && instance.flangerFeedbackGain
+                && instance.flangerDelay
+                && instance.flangerWetGain
+                && instance.flangerDryGain
+            ) {
+                const visualData = this.nodeById.get(nodeId)?.data as FlangerNodeData | undefined;
+                updateFlangerGraph(
+                    {
+                        input: instance.inputNode as GainNode,
+                        output: instance.node as GainNode,
+                        dryGain: instance.flangerDryGain,
+                        wetGain: instance.flangerWetGain,
+                        delay: instance.flangerDelay,
+                        feedbackGain: instance.flangerFeedbackGain,
+                        lfo: instance.lfoOsc,
+                        lfoGain: instance.flangerLfoGain,
+                        nodes: instance.internalNodes ?? [],
+                        dispose: () => undefined,
+                    },
+                    {
+                        rate: ('rate' in data && typeof data.rate === 'number') ? data.rate : (visualData?.rate ?? 0.2),
+                        depth: ('depth' in data && typeof data.depth === 'number') ? data.depth : (visualData?.depth ?? 2),
+                        feedback: ('feedback' in data && typeof data.feedback === 'number') ? data.feedback : (visualData?.feedback ?? 0.5),
+                        delay: ('delay' in data && typeof data.delay === 'number') ? data.delay : (visualData?.delay ?? 1),
+                        mix: ('mix' in data && typeof data.mix === 'number') ? data.mix : (visualData?.mix ?? 0.5),
+                    },
+                    currentTime
+                );
             }
         } else if (instance.type === 'tremolo') {
-            if ('rate' in data && typeof data.rate === 'number' && instance.lfoOsc) {
-                instance.lfoOsc.frequency.setTargetAtTime(Math.max(0.01, data.rate), currentTime, 0.01);
-            }
-            if ('waveform' in data && typeof data.waveform === 'string' && instance.lfoOsc) {
-                instance.lfoOsc.type = data.waveform as OscillatorType;
-            }
-            if ('depth' in data && typeof data.depth === 'number' && instance.tremoloDepthGain && instance.tremoloAmpGain) {
-                const depthAmount = Math.max(0, Math.min(1, data.depth));
-                instance.tremoloAmpGain.gain.setTargetAtTime(1 - depthAmount * 0.5, currentTime, 0.01);
-                instance.tremoloDepthGain.gain.setTargetAtTime(depthAmount * 0.5, currentTime, 0.01);
-            }
-            if ('mix' in data && typeof data.mix === 'number' && instance.tremoloWetGain && instance.tremoloDryGain) {
-                instance.tremoloWetGain.gain.setTargetAtTime(data.mix, currentTime, 0.01);
-                instance.tremoloDryGain.gain.setTargetAtTime(1 - data.mix, currentTime, 0.01);
+            if (instance.lfoOsc && instance.tremoloDepthGain && instance.tremoloAmpGain && instance.tremoloWetGain && instance.tremoloDryGain) {
+                const visualData = this.nodeById.get(nodeId)?.data as TremoloNodeData | undefined;
+                updateTremoloGraph(
+                    {
+                        input: instance.inputNode as GainNode,
+                        output: instance.node as GainNode,
+                        dryGain: instance.tremoloDryGain,
+                        wetGain: instance.tremoloWetGain,
+                        ampGain: instance.tremoloAmpGain,
+                        lfo: instance.lfoOsc,
+                        depthGain: instance.tremoloDepthGain,
+                        nodes: instance.internalNodes ?? [],
+                        dispose: () => undefined,
+                    },
+                    {
+                        rate: ('rate' in data && typeof data.rate === 'number') ? data.rate : (visualData?.rate ?? 4),
+                        depth: ('depth' in data && typeof data.depth === 'number') ? data.depth : (visualData?.depth ?? 0.5),
+                        waveform: (('waveform' in data && typeof data.waveform === 'string') ? data.waveform : (visualData?.waveform ?? 'sine')) as OscillatorType,
+                        mix: ('mix' in data && typeof data.mix === 'number') ? data.mix : (visualData?.mix ?? 0.5),
+                    },
+                    currentTime
+                );
             }
         } else if (instance.type === 'eq3') {
-            if ('low' in data && typeof data.low === 'number' && instance.eq3LowShelf) {
-                instance.eq3LowShelf.gain.setTargetAtTime(data.low, currentTime, 0.01);
-            }
-            if ('mid' in data && typeof data.mid === 'number' && instance.eq3MidPeak) {
-                instance.eq3MidPeak.gain.setTargetAtTime(data.mid, currentTime, 0.01);
-            }
-            if ('high' in data && typeof data.high === 'number' && instance.eq3HighShelf) {
-                instance.eq3HighShelf.gain.setTargetAtTime(data.high, currentTime, 0.01);
-            }
-            if (
-                ('lowFrequency' in data || 'highFrequency' in data)
-                && instance.eq3LowShelf
-                && instance.eq3MidPeak
-                && instance.eq3HighShelf
-            ) {
-                const visual = this.nodeById.get(nodeId)?.data as EQ3NodeData | undefined;
-                const lowFrequency = Math.max(20, ('lowFrequency' in data && typeof data.lowFrequency === 'number') ? data.lowFrequency : (visual?.lowFrequency ?? 400));
-                const highFrequency = Math.max(lowFrequency + MIN_EQ3_GAP_HZ, ('highFrequency' in data && typeof data.highFrequency === 'number') ? data.highFrequency : (visual?.highFrequency ?? 2500));
-                const midFrequency = Math.sqrt(lowFrequency * highFrequency);
-                instance.eq3LowShelf.frequency.setTargetAtTime(lowFrequency, currentTime, 0.01);
-                instance.eq3MidPeak.frequency.setTargetAtTime(midFrequency, currentTime, 0.01);
-                instance.eq3HighShelf.frequency.setTargetAtTime(highFrequency, currentTime, 0.01);
-            }
-            if ('mix' in data && typeof data.mix === 'number' && instance.eq3WetGain && instance.eq3DryGain) {
-                instance.eq3WetGain.gain.setTargetAtTime(data.mix, currentTime, 0.01);
-                instance.eq3DryGain.gain.setTargetAtTime(1 - data.mix, currentTime, 0.01);
+            if (instance.eq3LowShelf && instance.eq3MidPeak && instance.eq3HighShelf && instance.eq3WetGain && instance.eq3DryGain) {
+                const visualData = this.nodeById.get(nodeId)?.data as EQ3NodeData | undefined;
+                updateEq3Graph(
+                    {
+                        input: instance.inputNode as GainNode,
+                        output: instance.node as GainNode,
+                        dryGain: instance.eq3DryGain,
+                        wetGain: instance.eq3WetGain,
+                        lowShelf: instance.eq3LowShelf,
+                        midPeak: instance.eq3MidPeak,
+                        highShelf: instance.eq3HighShelf,
+                        nodes: instance.internalNodes ?? [],
+                        dispose: () => undefined,
+                    },
+                    {
+                        low: ('low' in data && typeof data.low === 'number') ? data.low : (visualData?.low ?? 0),
+                        mid: ('mid' in data && typeof data.mid === 'number') ? data.mid : (visualData?.mid ?? 0),
+                        high: ('high' in data && typeof data.high === 'number') ? data.high : (visualData?.high ?? 0),
+                        lowFrequency: ('lowFrequency' in data && typeof data.lowFrequency === 'number') ? data.lowFrequency : (visualData?.lowFrequency ?? 400),
+                        highFrequency: ('highFrequency' in data && typeof data.highFrequency === 'number') ? data.highFrequency : (visualData?.highFrequency ?? 2500),
+                        mix: ('mix' in data && typeof data.mix === 'number') ? data.mix : (visualData?.mix ?? 1),
+                    },
+                    currentTime
+                );
             }
         } else if (instance.type === 'distortion') {
-            if ('drive' in data && typeof data.drive === 'number' && instance.distortionDriveGain) {
-                instance.distortionDriveGain.gain.setTargetAtTime(1 + data.drive * 5, currentTime, 0.01);
-                if (instance.distortionWaveShaper) {
-                    const visualData = this.nodeById.get(nodeId)?.data as DistortionNodeData | undefined;
-                    const preset = visualData?.distortionType === 'hard'
-                        ? 'hardClip'
-                        : visualData?.distortionType === 'saturate'
-                            ? 'saturate'
-                            : 'softClip';
-                    instance.distortionWaveShaper.curve = createWaveShaperCurve(data.drive, preset);
-                }
-            }
-            if ('level' in data && typeof data.level === 'number' && instance.distortionOutputGain) {
-                instance.distortionOutputGain.gain.setTargetAtTime(data.level, currentTime, 0.01);
-            }
-            if ('mix' in data && typeof data.mix === 'number' && instance.distortionWetGain && instance.distortionDryGain) {
-                instance.distortionWetGain.gain.setTargetAtTime(data.mix, currentTime, 0.01);
-                instance.distortionDryGain.gain.setTargetAtTime(1 - data.mix, currentTime, 0.01);
-            }
-            if ('tone' in data && typeof data.tone === 'number' && instance.distortionToneFilter) {
-                instance.distortionToneFilter.frequency.setTargetAtTime(data.tone, currentTime, 0.01);
-            }
-            if ('distortionType' in data && typeof data.distortionType === 'string' && instance.distortionWaveShaper) {
+            if (
+                instance.distortionDriveGain
+                && instance.distortionWaveShaper
+                && instance.distortionToneFilter
+                && instance.distortionOutputGain
+                && instance.distortionWetGain
+                && instance.distortionDryGain
+            ) {
                 const visualData = this.nodeById.get(nodeId)?.data as DistortionNodeData | undefined;
-                const drive = visualData?.drive ?? 0.5;
-                const preset = data.distortionType === 'hard'
-                    ? 'hardClip'
-                    : data.distortionType === 'saturate'
-                        ? 'saturate'
-                        : 'softClip';
-                instance.distortionWaveShaper.curve = createWaveShaperCurve(drive, preset);
+                const distortionType = ('distortionType' in data && typeof data.distortionType === 'string')
+                    ? data.distortionType
+                    : (visualData?.distortionType ?? 'soft');
+                updateDistortionGraph(
+                    {
+                        input: instance.inputNode as GainNode,
+                        output: instance.node as GainNode,
+                        dryGain: instance.distortionDryGain,
+                        wetGain: instance.distortionWetGain,
+                        driveGain: instance.distortionDriveGain,
+                        waveShaper: instance.distortionWaveShaper,
+                        toneFilter: instance.distortionToneFilter,
+                        levelGain: instance.distortionOutputGain,
+                        nodes: instance.internalNodes ?? [],
+                        dispose: () => undefined,
+                    },
+                    {
+                        type: distortionType,
+                        drive: ('drive' in data && typeof data.drive === 'number') ? data.drive : (visualData?.drive ?? 0.5),
+                        level: ('level' in data && typeof data.level === 'number') ? data.level : (visualData?.level ?? 0.5),
+                        mix: ('mix' in data && typeof data.mix === 'number') ? data.mix : (visualData?.mix ?? 0.5),
+                        tone: ('tone' in data && typeof data.tone === 'number') ? data.tone : (visualData?.tone ?? 4000),
+                        oversample: '2x',
+                    },
+                    currentTime
+                );
             }
         } else if (instance.type === 'chorus') {
-            if ('rate' in data && typeof data.rate === 'number' && instance.lfoOsc) {
-                instance.lfoOsc.frequency.setTargetAtTime(data.rate, currentTime, 0.01);
-            }
-            if ('depth' in data && typeof data.depth === 'number' && instance.chorusLfoGain) {
-                instance.chorusLfoGain.gain.setTargetAtTime(data.depth / 1000, currentTime, 0.01);
-            }
-            if ('feedback' in data && typeof data.feedback === 'number' && instance.chorusFeedbackGain) {
-                instance.chorusFeedbackGain.gain.setTargetAtTime(data.feedback, currentTime, 0.01);
-            }
-            if ('delay' in data && typeof data.delay === 'number' && instance.chorusDelay) {
-                instance.chorusDelay.delayTime.setTargetAtTime(data.delay / 1000, currentTime, 0.01);
-            }
-            if ('mix' in data && typeof data.mix === 'number' && instance.chorusWetGain && instance.chorusDryGain) {
-                instance.chorusWetGain.gain.setTargetAtTime(data.mix, currentTime, 0.01);
-                instance.chorusDryGain.gain.setTargetAtTime(1 - data.mix, currentTime, 0.01);
+            if (instance.lfoOsc && instance.chorusLfoGain && instance.chorusFeedbackGain && instance.chorusDelay && instance.chorusWetGain && instance.chorusDryGain) {
+                const visualData = this.nodeById.get(nodeId)?.data as ChorusNodeData | undefined;
+                updateChorusGraph(
+                    {
+                        input: instance.inputNode as GainNode,
+                        output: instance.node as GainNode,
+                        dryGain: instance.chorusDryGain,
+                        wetGain: instance.chorusWetGain,
+                        primaryDelay: instance.chorusDelay,
+                        primaryFeedbackGain: instance.chorusFeedbackGain,
+                        primaryLfo: instance.lfoOsc,
+                        primaryLfoGain: instance.chorusLfoGain,
+                        nodes: instance.internalNodes ?? [],
+                        dispose: () => undefined,
+                    },
+                    {
+                        rate: ('rate' in data && typeof data.rate === 'number') ? data.rate : (visualData?.rate ?? 1.5),
+                        depth: ('depth' in data && typeof data.depth === 'number') ? data.depth : (visualData?.depth ?? 3.5),
+                        feedback: ('feedback' in data && typeof data.feedback === 'number') ? data.feedback : (visualData?.feedback ?? 0.2),
+                        delay: ('delay' in data && typeof data.delay === 'number') ? data.delay : (visualData?.delay ?? 20),
+                        mix: ('mix' in data && typeof data.mix === 'number') ? data.mix : (visualData?.mix ?? 0.5),
+                        stereo: false,
+                    },
+                    currentTime
+                );
             }
         } else if (instance.type === 'noiseBurst') {
             if (instance.noiseBurstData) {

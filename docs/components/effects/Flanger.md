@@ -12,6 +12,7 @@ Create short comb-filter motion with a modulated delay and feedback path.
 - `depth` defaults to `2`, `feedback` to `0.5`, `delay` to `1`, and `mix` to `0.5`.
 
 ## Integration Notes
+- Shared browser-side audio behavior is routed through the workspace vanilla runtime where applicable.
 - Delay and depth are expressed in milliseconds.
 - Keep feedback in a conservative range for browser-safe behavior.
 

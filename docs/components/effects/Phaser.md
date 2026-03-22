@@ -12,6 +12,7 @@ Add moving notch-style color using an all-pass stage chain with feedback.
 - `depth` defaults to `0.5`, `feedback` to `0.7`, `baseFrequency` to `1000`, `stages` to `4`, and `mix` to `0.5`.
 
 ## Integration Notes
+- Shared browser-side audio behavior is routed through the workspace vanilla runtime where applicable.
 - Keep feedback below `1` to avoid unstable resonance.
 - Stage count and frequency ranges should stay aligned between docs and implementation.
 

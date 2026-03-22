@@ -12,6 +12,7 @@ Generate continuous noise sources for textures, percussion, and modulation-like 
 - `bufferSize` defaults to `4096`.
 
 ## Integration Notes
+- Shared browser-side audio behavior is routed through the workspace vanilla runtime where applicable.
 - Pair with filters, envelopes, or samplers for drum and ambience patches.
 - Keep supported noise-type docs aligned with generator behavior.
 - Noise samples now come from the shared internal `din-core` helper used by the playground runtime as well.

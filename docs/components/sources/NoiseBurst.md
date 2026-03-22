@@ -12,6 +12,7 @@ Create short triggered bursts of noise for hats, snares, and transient textures.
 - `duration` defaults to `0.1`, `gain` to `1`, `attack` to `0.001`, and `release` to `0.05`.
 
 ## Integration Notes
+- Shared browser-side audio behavior is routed through the workspace vanilla runtime where applicable.
 - Use inside `Track` or any trigger-aware subtree.
 - Keep trigger-envelope behavior aligned with sequencer docs and tests.
 - Burst buffer generation now shares the same internal `din-core` noise helper as continuous sources and playground preview.

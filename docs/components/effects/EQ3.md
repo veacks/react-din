@@ -12,6 +12,7 @@ Shape tone with a low/mid/high three-band equalizer built on stable biquad filte
 - `lowFrequency` defaults to `400`, `highFrequency` to `2500`, and `mix` to `1`.
 
 ## Integration Notes
+- Shared browser-side audio behavior is routed through the workspace vanilla runtime where applicable.
 - Crossovers are clamped to maintain a valid low/mid/high split.
 - `mix` enables parallel EQ blending.
 

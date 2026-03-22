@@ -13,6 +13,7 @@ Provide a simplified `WaveShaper` interface with musical presets (`softClip`, `h
 - `oversample`: `2x`
 
 ## Integration Notes
+- Shared browser-side audio behavior is routed through the workspace vanilla runtime where applicable.
 - Use this component when UI-facing graphs need predictable distortion curves without manually authoring a `Float32Array` curve.
 - Keep `amount` in the lower range for UI feedback sound design to avoid harsh clipping.
 - Preset curve generation now routes through the shared internal `din-core` helper so node previews and library rendering stay aligned.

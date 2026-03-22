@@ -2,7 +2,7 @@ import { useEffect, useRef, type FC } from 'react';
 import type { NoiseProps, NoiseType } from './types';
 import { useAudio } from '../core/AudioProvider';
 import { useAudioOut, AudioOutProvider } from '../core/AudioOutContext';
-import { dinCoreFillNoiseSamples } from '../internal/dinCore';
+import { createNoiseBuffer } from '@din/vanilla';
 
 /**
  * Noise generator component.
@@ -46,8 +46,7 @@ export const Noise: FC<NoiseProps> = ({
         if (!context || !outputNode || isPlayingRef.current) return;
 
         const sampleCount = Math.ceil(bufferSize * context.sampleRate / 44100);
-        const buffer = context.createBuffer(1, sampleCount, context.sampleRate);
-        dinCoreFillNoiseSamples(type as NoiseType, sampleCount, buffer.getChannelData(0));
+        const buffer = createNoiseBuffer(context, type as NoiseType, sampleCount);
         const source = context.createBufferSource();
         source.buffer = buffer;
         source.loop = true;

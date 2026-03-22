@@ -81,4 +81,22 @@ describe('library audio node components', () => {
             expect(gainRef.current).not.toBeNull();
         });
     });
+
+    it('keeps compressor graphs mountable with shared runtime helpers', async () => {
+        const gainRef = createRef<AudioNode>();
+
+        render(
+            <AudioProvider>
+                <Gain gain={0.7} nodeRef={gainRef}>
+                    <Compressor threshold={-18} ratio={6} attack={0.01} release={0.12}>
+                        <Osc autoStart frequency={220} />
+                    </Compressor>
+                </Gain>
+            </AudioProvider>
+        );
+
+        await waitFor(() => {
+            expect(gainRef.current).not.toBeNull();
+        });
+    });
 });

@@ -1,0 +1,133 @@
+{
+  "name": "@din/react",
+  "version": "0.1.0",
+  "description": "React bindings for the DIN vanilla audio runtime",
+  "author": "Valentin Dubois - veacks.net",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./core": {
+      "import": {
+        "types": "./dist/core/index.d.ts",
+        "default": "./dist/core/index.js"
+      },
+      "require": {
+        "types": "./dist/core/index.d.cts",
+        "default": "./dist/core/index.cjs"
+      }
+    },
+    "./nodes": {
+      "import": {
+        "types": "./dist/nodes/index.d.ts",
+        "default": "./dist/nodes/index.js"
+      },
+      "require": {
+        "types": "./dist/nodes/index.d.cts",
+        "default": "./dist/nodes/index.cjs"
+      }
+    },
+    "./transport": {
+      "import": {
+        "types": "./dist/transport/index.d.ts",
+        "default": "./dist/transport/index.js"
+      },
+      "require": {
+        "types": "./dist/transport/index.d.cts",
+        "default": "./dist/transport/index.cjs"
+      }
+    },
+    "./sequencer": {
+      "import": {
+        "types": "./dist/sequencer/index.d.ts",
+        "default": "./dist/sequencer/index.js"
+      },
+      "require": {
+        "types": "./dist/sequencer/index.d.cts",
+        "default": "./dist/sequencer/index.cjs"
+      }
+    },
+    "./analyzers": {
+      "import": {
+        "types": "./dist/analyzers/index.d.ts",
+        "default": "./dist/analyzers/index.js"
+      },
+      "require": {
+        "types": "./dist/analyzers/index.d.cts",
+        "default": "./dist/analyzers/index.cjs"
+      }
+    },
+    "./sources": {
+      "import": {
+        "types": "./dist/sources/index.d.ts",
+        "default": "./dist/sources/index.js"
+      },
+      "require": {
+        "types": "./dist/sources/index.d.cts",
+        "default": "./dist/sources/index.cjs"
+      }
+    },
+    "./effects": {
+      "import": {
+        "types": "./dist/effects/index.d.ts",
+        "default": "./dist/effects/index.js"
+      },
+      "require": {
+        "types": "./dist/effects/index.d.cts",
+        "default": "./dist/effects/index.cjs"
+      }
+    },
+    "./midi": {
+      "import": {
+        "types": "./dist/midi/index.d.ts",
+        "default": "./dist/midi/index.js"
+      },
+      "require": {
+        "types": "./dist/midi/index.d.cts",
+        "default": "./dist/midi/index.cjs"
+      }
+    },
+    "./patch": {
+      "import": {
+        "types": "./dist/patch/index.d.ts",
+        "default": "./dist/patch/index.js"
+      },
+      "require": {
+        "types": "./dist/patch/index.d.cts",
+        "default": "./dist/patch/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup --config tsup.config.ts",
+    "dev": "tsup --config tsup.config.ts --watch",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@din/vanilla": "*"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0"
+  }
+}

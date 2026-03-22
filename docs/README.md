@@ -20,6 +20,11 @@
 
 - [AudioLibraryPanel](./playground/AudioLibraryPanel.md)
 
+## Package Architecture
+
+- [DIN Vanilla Runtime](./packages/DinVanillaRuntime.md)
+- [Workspace Topology](./architecture/WorkspaceTopology.md)
+
 ## Governance
 
 - Coverage manifest: [`project/COVERAGE_MANIFEST.json`](../project/COVERAGE_MANIFEST.json)

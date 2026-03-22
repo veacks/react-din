@@ -12,6 +12,7 @@ Apply amplitude modulation to produce rhythmic volume movement.
 - `depth` defaults to `0.5`, `waveform` to `'sine'`, `stereo` to `false`, and `mix` to `0.5`.
 
 ## Integration Notes
+- Shared browser-side audio behavior is routed through the workspace vanilla runtime where applicable.
 - Use `stereo` for alternating left/right modulation.
 - Keep depth moderate for transparent musical tremolo.
 

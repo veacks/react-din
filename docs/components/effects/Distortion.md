@@ -12,6 +12,7 @@ Apply non-linear drive, clipping, or saturation to child audio.
 - `drive` defaults to `0.5`, `level` to `0.5`, `oversample` to `2x`, and `tone` to `4000`.
 
 ## Integration Notes
+- Shared browser-side audio behavior is routed through the workspace vanilla runtime where applicable.
 - Use before reverb or after dynamics depending on the target sound.
 - Keep algorithm changes documented because presets can change audibly.
 - Curve generation now routes through the shared internal `din-core` adapter so library and playground distortion stay aligned.

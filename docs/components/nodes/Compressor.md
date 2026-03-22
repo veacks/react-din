@@ -12,6 +12,7 @@ Apply dynamic range compression to child audio.
 - `bypass` defaults to `false`.
 
 ## Integration Notes
+- Shared browser-side audio behavior is routed through the workspace vanilla runtime where applicable.
 - Place late in a signal chain before the output bus.
 - Set `sidechainBusId` to duck against an aux bus published with `AuxSend`.
 - Combine with analyzer coverage for level checks.

@@ -27,15 +27,30 @@
         "baseUrl": ".",
         "paths": {
             "react-din": [
-                "./src/index.ts"
+                "./packages/react-din/src/index.ts"
             ],
             "react-din/*": [
-                "./src/*"
+                "./packages/react-din/src/*"
+            ],
+            "@din/react": [
+                "./packages/react/src/index.ts"
+            ],
+            "@din/react/*": [
+                "./packages/react/src/*"
+            ],
+            "@din/vanilla": [
+                "./packages/vanilla/src/index.ts"
+            ],
+            "@din/vanilla/*": [
+                "./packages/vanilla/src/*"
             ]
         }
     },
     "include": [
-        "src"
+        "src",
+        "packages/react/src",
+        "packages/react-din/src",
+        "packages/vanilla/src"
     ],
     "exclude": [
         "node_modules",

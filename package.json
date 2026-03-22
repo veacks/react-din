@@ -1,12 +1,14 @@
 {
   "name": "react-din",
   "version": "0.1.0",
-  "description": "A React-first declarative WebAudio library for building audio graphs",
+  "description": "Compatibility shim for the @din/react declarative Web Audio runtime",
   "author": "Valentin Dubois - veacks.net",
   "license": "MIT",
   "type": "module",
   "workspaces": [
-    "example",
+    "packages/react",
+    "packages/react/example",
+    "packages/vanilla",
     "playground"
   ],
   "main": "./dist/index.cjs",
@@ -126,14 +128,14 @@
     "core:build": "node ./scripts/build-din-core.mjs",
     "core:test": "node ./scripts/test-din-core.mjs",
     "validate:core": "node ./scripts/validate-core.mjs",
-    "build": "npm run core:build && tsup",
+    "build": "npm run core:build && npm run -w @din/vanilla build && npm run -w @din/react build && tsup",
     "dev": "tsup --watch",
-    "lint": "eslint src --ext .ts,.tsx",
+    "lint": "eslint src packages playground/src --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
     "test": "npm run core:test && npm run test:library && npm run test:playground",
     "test:library": "vitest --config vitest.config.ts --run",
     "test:library:watch": "vitest --config vitest.config.ts",
-    "test:playground": "npm -w playground run test:run",
+    "test:playground": "npm -w @din/editor run test:run",
     "test:e2e": "playwright test",
     "validate:docs": "node ./scripts/validate-docs.mjs",
     "validate:patch-schema": "node ./scripts/validate-patch-schema.mjs",
@@ -141,8 +143,11 @@
     "validate:changes": "node ./scripts/validate-changes.mjs",
     "ci:check": "npm run validate:core && npm run validate:docs && npm run validate:patch-schema && npm run validate:coverage && npm run test:library && npm run test:playground",
     "prepublishOnly": "npm run build",
-    "example:dev": "npm -w example run dev",
-    "playground:dev": "npm -w playground run dev"
+    "example:dev": "npm -w @din/react-example run dev",
+    "playground:dev": "npm -w @din/editor run dev"
+  },
+  "dependencies": {
+    "@din/react": "*"
   },
   "peerDependencies": {
     "react": ">=18.0.0",

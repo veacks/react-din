@@ -12,6 +12,7 @@ Apply algorithmic or impulse-based reverb to child audio.
 - `decay` defaults to `2`, `preDelay` to `0.01`, and `damping` to `0.5`.
 
 ## Integration Notes
+- Shared browser-side audio behavior is routed through the workspace vanilla runtime where applicable.
 - Use for room, hall, or texture sends directly in the graph tree.
 - Align impulse-loading behavior with fetch and decode docs when changed.
 - Algorithmic impulse generation now uses the shared internal `din-core` helper so preview/runtime defaults drift less easily.
