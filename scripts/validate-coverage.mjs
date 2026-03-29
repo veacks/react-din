@@ -44,9 +44,9 @@ const expectedPublicSources = [
 ];
 
 const expectedNodeSources = fs
-    .readdirSync(path.join(root, 'playground/src/playground/nodes'))
+    .readdirSync(path.join(root, 'editor/src/editor/nodes'))
     .filter((file) => file.endsWith('.tsx'))
-    .map((file) => `playground/src/playground/nodes/${file}`)
+    .map((file) => `editor/src/editor/nodes/${file}`)
     .sort();
 
 const contents = fs.readFileSync(manifestPath, 'utf8');

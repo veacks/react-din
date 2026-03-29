@@ -8,7 +8,7 @@
 
 ## Documentation Contract
 
-- Every file under `docs/components/**` and `docs/playground-nodes/**` must include these headings:
+- Every file under `docs/components/**` and `docs/editor-nodes/**` must include these headings:
   - `## Purpose`
   - `## Props / Handles`
   - `## Defaults`
@@ -19,7 +19,7 @@
 
 ## Coverage Governance
 
-- `project/COVERAGE_MANIFEST.json` is the source of truth for in-scope public components and playground nodes.
+- `project/COVERAGE_MANIFEST.json` is the source of truth for in-scope public components and editor nodes.
 - Every mapped item must keep its `source`, `docs`, `tests`, and `scenarios` entries current.
 - A change to a mapped source file is incomplete until the mapped documentation file and at least one mapped test file change in the same branch.
 
@@ -32,12 +32,12 @@
 ## Component And Node Rules
 
 - A new public component is incomplete until it updates exports, docs, tests, and `project/COVERAGE_MANIFEST.json`.
-- A new playground node is incomplete until it updates:
-  - `playground/src/playground/nodes/index.ts`
-  - `playground/src/PlaygroundDemo.tsx`
-  - `playground/src/playground/store.ts`
-  - `playground/src/playground/AudioEngine.ts`
-  - `playground/src/playground/CodeGenerator.tsx`
+- A new editor node is incomplete until it updates:
+  - `editor/src/editor/nodes/index.ts`
+  - `editor/src/EditorDemo.tsx`
+  - `editor/src/editor/store.ts`
+  - `editor/src/editor/AudioEngine.ts`
+  - `editor/src/editor/CodeGenerator.tsx`
   - docs, tests, and `project/COVERAGE_MANIFEST.json`
 - Every modulate-able numeric node parameter must expose a dedicated target handle (pin) with a stable handle id.
 - When a target handle is connected for a slider-backed parameter, the UI must hide or disable the slider and show the connected value instead.

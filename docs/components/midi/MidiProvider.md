@@ -16,7 +16,7 @@
 - Default ports fall back to the first available input/output.
 
 ## Integration Notes
-Place it above `useMidi`, `useMidiNote`, `useMidiCC`, `useMidiClock`, MIDI input bridges, MIDI output bridges, and `MidiTransportSync`. The playground uses a shared runtime instance so node UI and preview stay in sync.
+Place it above `useMidi`, `useMidiNote`, `useMidiCC`, `useMidiClock`, MIDI input bridges, MIDI output bridges, and `MidiTransportSync`. The editor uses a shared runtime instance so node UI and preview stay in sync.
 
 ## Failure Modes
 Without a provider, MIDI hooks throw. Unsupported browsers report `unsupported`. Permission rejection reports `denied`.

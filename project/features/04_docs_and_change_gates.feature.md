@@ -18,7 +18,7 @@ Enforce documentation language and source-to-doc-test change gates for every map
 
 ### F04-S03 New nodes and public components update all required touch points
 
-**Given** a contributor adds a new public component or playground node
+**Given** a contributor adds a new public component or editor node
 **When** validation runs
 **Then** registration files, docs, tests, and the coverage manifest are all updated
 

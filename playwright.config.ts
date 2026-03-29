@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-    testDir: './playground/tests/e2e',
+    testDir: './editor/tests/e2e',
     retries: process.env.CI ? 2 : 0,
     reporter: process.env.CI ? 'github' : 'list',
     use: {
@@ -9,7 +9,7 @@ export default defineConfig({
         trace: 'retain-on-failure',
     },
     webServer: {
-        command: 'npm -w playground run dev -- --host 127.0.0.1 --port 4173',
+        command: 'npm -w editor run dev -- --host 127.0.0.1 --port 4173',
         url: 'http://127.0.0.1:4173',
         reuseExistingServer: !process.env.CI,
         timeout: 120000,

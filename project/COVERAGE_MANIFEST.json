@@ -486,14 +486,14 @@
       ]
     },
     {
-      "id": "playground-node:OscNode",
-      "kind": "playground-node",
+      "id": "editor-node:OscNode",
+      "kind": "editor-node",
       "name": "OscNode",
-      "source": "playground/src/playground/nodes/OscNode.tsx",
-      "docs": "docs/playground-nodes/OscNode.md",
+      "source": "editor/src/editor/nodes/OscNode.tsx",
+      "docs": "docs/editor-nodes/OscNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -501,14 +501,14 @@
       ]
     },
     {
-      "id": "playground-node:GainNode",
-      "kind": "playground-node",
+      "id": "editor-node:GainNode",
+      "kind": "editor-node",
       "name": "GainNode",
-      "source": "playground/src/playground/nodes/GainNode.tsx",
-      "docs": "docs/playground-nodes/GainNode.md",
+      "source": "editor/src/editor/nodes/GainNode.tsx",
+      "docs": "docs/editor-nodes/GainNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -516,14 +516,14 @@
       ]
     },
     {
-      "id": "playground-node:FilterNode",
-      "kind": "playground-node",
+      "id": "editor-node:FilterNode",
+      "kind": "editor-node",
       "name": "FilterNode",
-      "source": "playground/src/playground/nodes/FilterNode.tsx",
-      "docs": "docs/playground-nodes/FilterNode.md",
+      "source": "editor/src/editor/nodes/FilterNode.tsx",
+      "docs": "docs/editor-nodes/FilterNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -531,15 +531,15 @@
       ]
     },
     {
-      "id": "playground-node:OutputNode",
-      "kind": "playground-node",
+      "id": "editor-node:OutputNode",
+      "kind": "editor-node",
       "name": "OutputNode",
-      "source": "playground/src/playground/nodes/OutputNode.tsx",
-      "docs": "docs/playground-nodes/OutputNode.md",
+      "source": "editor/src/editor/nodes/OutputNode.tsx",
+      "docs": "docs/editor-nodes/OutputNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts",
-        "playground/tests/e2e/playground.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts",
+        "editor/tests/e2e/editor.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -547,14 +547,14 @@
       ]
     },
     {
-      "id": "playground-node:NoiseNode",
-      "kind": "playground-node",
+      "id": "editor-node:NoiseNode",
+      "kind": "editor-node",
       "name": "NoiseNode",
-      "source": "playground/src/playground/nodes/NoiseNode.tsx",
-      "docs": "docs/playground-nodes/NoiseNode.md",
+      "source": "editor/src/editor/nodes/NoiseNode.tsx",
+      "docs": "docs/editor-nodes/NoiseNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -562,14 +562,14 @@
       ]
     },
     {
-      "id": "playground-node:DelayNode",
-      "kind": "playground-node",
+      "id": "editor-node:DelayNode",
+      "kind": "editor-node",
       "name": "DelayNode",
-      "source": "playground/src/playground/nodes/DelayNode.tsx",
-      "docs": "docs/playground-nodes/DelayNode.md",
+      "source": "editor/src/editor/nodes/DelayNode.tsx",
+      "docs": "docs/editor-nodes/DelayNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -577,14 +577,14 @@
       ]
     },
     {
-      "id": "playground-node:ReverbNode",
-      "kind": "playground-node",
+      "id": "editor-node:ReverbNode",
+      "kind": "editor-node",
       "name": "ReverbNode",
-      "source": "playground/src/playground/nodes/ReverbNode.tsx",
-      "docs": "docs/playground-nodes/ReverbNode.md",
+      "source": "editor/src/editor/nodes/ReverbNode.tsx",
+      "docs": "docs/editor-nodes/ReverbNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -592,14 +592,14 @@
       ]
     },
     {
-      "id": "playground-node:AnalyzerNode",
-      "kind": "playground-node",
+      "id": "editor-node:AnalyzerNode",
+      "kind": "editor-node",
       "name": "AnalyzerNode",
-      "source": "playground/src/playground/nodes/AnalyzerNode.tsx",
-      "docs": "docs/playground-nodes/AnalyzerNode.md",
+      "source": "editor/src/editor/nodes/AnalyzerNode.tsx",
+      "docs": "docs/editor-nodes/AnalyzerNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -607,14 +607,14 @@
       ]
     },
     {
-      "id": "playground-node:ChorusNode",
-      "kind": "playground-node",
+      "id": "editor-node:ChorusNode",
+      "kind": "editor-node",
       "name": "ChorusNode",
-      "source": "playground/src/playground/nodes/ChorusNode.tsx",
-      "docs": "docs/playground-nodes/ChorusNode.md",
+      "source": "editor/src/editor/nodes/ChorusNode.tsx",
+      "docs": "docs/editor-nodes/ChorusNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -622,15 +622,15 @@
       ]
     },
     {
-      "id": "playground-node:CompressorNode",
-      "kind": "playground-node",
+      "id": "editor-node:CompressorNode",
+      "kind": "editor-node",
       "name": "CompressorNode",
-      "source": "playground/src/playground/nodes/CompressorNode.tsx",
-      "docs": "docs/playground-nodes/CompressorNode.md",
+      "source": "editor/src/editor/nodes/CompressorNode.tsx",
+      "docs": "docs/editor-nodes/CompressorNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts",
-        "playground/tests/unit/node-helpers.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts",
+        "editor/tests/unit/node-helpers.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -639,14 +639,14 @@
       ]
     },
     {
-      "id": "playground-node:PhaserNode",
-      "kind": "playground-node",
+      "id": "editor-node:PhaserNode",
+      "kind": "editor-node",
       "name": "PhaserNode",
-      "source": "playground/src/playground/nodes/PhaserNode.tsx",
-      "docs": "docs/playground-nodes/PhaserNode.md",
+      "source": "editor/src/editor/nodes/PhaserNode.tsx",
+      "docs": "docs/editor-nodes/PhaserNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -655,14 +655,14 @@
       ]
     },
     {
-      "id": "playground-node:FlangerNode",
-      "kind": "playground-node",
+      "id": "editor-node:FlangerNode",
+      "kind": "editor-node",
       "name": "FlangerNode",
-      "source": "playground/src/playground/nodes/FlangerNode.tsx",
-      "docs": "docs/playground-nodes/FlangerNode.md",
+      "source": "editor/src/editor/nodes/FlangerNode.tsx",
+      "docs": "docs/editor-nodes/FlangerNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -671,14 +671,14 @@
       ]
     },
     {
-      "id": "playground-node:TremoloNode",
-      "kind": "playground-node",
+      "id": "editor-node:TremoloNode",
+      "kind": "editor-node",
       "name": "TremoloNode",
-      "source": "playground/src/playground/nodes/TremoloNode.tsx",
-      "docs": "docs/playground-nodes/TremoloNode.md",
+      "source": "editor/src/editor/nodes/TremoloNode.tsx",
+      "docs": "docs/editor-nodes/TremoloNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -687,14 +687,14 @@
       ]
     },
     {
-      "id": "playground-node:EQ3Node",
-      "kind": "playground-node",
+      "id": "editor-node:EQ3Node",
+      "kind": "editor-node",
       "name": "EQ3Node",
-      "source": "playground/src/playground/nodes/EQ3Node.tsx",
-      "docs": "docs/playground-nodes/EQ3Node.md",
+      "source": "editor/src/editor/nodes/EQ3Node.tsx",
+      "docs": "docs/editor-nodes/EQ3Node.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -703,14 +703,14 @@
       ]
     },
     {
-      "id": "playground-node:ConstantSourceNode",
-      "kind": "playground-node",
+      "id": "editor-node:ConstantSourceNode",
+      "kind": "editor-node",
       "name": "ConstantSourceNode",
-      "source": "playground/src/playground/nodes/ConstantSourceNode.tsx",
-      "docs": "docs/playground-nodes/ConstantSourceNode.md",
+      "source": "editor/src/editor/nodes/ConstantSourceNode.tsx",
+      "docs": "docs/editor-nodes/ConstantSourceNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S02",
@@ -718,16 +718,16 @@
       ]
     },
     {
-      "id": "playground-node:ConvolverNode",
-      "kind": "playground-node",
+      "id": "editor-node:ConvolverNode",
+      "kind": "editor-node",
       "name": "ConvolverNode",
-      "source": "playground/src/playground/nodes/ConvolverNode.tsx",
-      "docs": "docs/playground-nodes/ConvolverNode.md",
+      "source": "editor/src/editor/nodes/ConvolverNode.tsx",
+      "docs": "docs/editor-nodes/ConvolverNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts",
-        "playground/tests/unit/audio-library.spec.ts",
-        "playground/tests/unit/playground-connection-assist.spec.tsx"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts",
+        "editor/tests/unit/audio-library.spec.ts",
+        "editor/tests/unit/editor-connection-assist.spec.tsx"
       ],
       "scenarios": [
         "F02-S01",
@@ -735,14 +735,14 @@
       ]
     },
     {
-      "id": "playground-node:DistortionNode",
-      "kind": "playground-node",
+      "id": "editor-node:DistortionNode",
+      "kind": "editor-node",
       "name": "DistortionNode",
-      "source": "playground/src/playground/nodes/DistortionNode.tsx",
-      "docs": "docs/playground-nodes/DistortionNode.md",
+      "source": "editor/src/editor/nodes/DistortionNode.tsx",
+      "docs": "docs/editor-nodes/DistortionNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -750,14 +750,14 @@
       ]
     },
     {
-      "id": "playground-node:EventTriggerNode",
-      "kind": "playground-node",
+      "id": "editor-node:EventTriggerNode",
+      "kind": "editor-node",
       "name": "EventTriggerNode",
-      "source": "playground/src/playground/nodes/EventTriggerNode.tsx",
-      "docs": "docs/playground-nodes/EventTriggerNode.md",
+      "source": "editor/src/editor/nodes/EventTriggerNode.tsx",
+      "docs": "docs/editor-nodes/EventTriggerNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S03",
@@ -765,14 +765,14 @@
       ]
     },
     {
-      "id": "playground-node:MediaStreamNode",
-      "kind": "playground-node",
+      "id": "editor-node:MediaStreamNode",
+      "kind": "editor-node",
       "name": "MediaStreamNode",
-      "source": "playground/src/playground/nodes/MediaStreamNode.tsx",
-      "docs": "docs/playground-nodes/MediaStreamNode.md",
+      "source": "editor/src/editor/nodes/MediaStreamNode.tsx",
+      "docs": "docs/editor-nodes/MediaStreamNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -780,14 +780,14 @@
       ]
     },
     {
-      "id": "playground-node:NoiseBurstNode",
-      "kind": "playground-node",
+      "id": "editor-node:NoiseBurstNode",
+      "kind": "editor-node",
       "name": "NoiseBurstNode",
-      "source": "playground/src/playground/nodes/NoiseBurstNode.tsx",
-      "docs": "docs/playground-nodes/NoiseBurstNode.md",
+      "source": "editor/src/editor/nodes/NoiseBurstNode.tsx",
+      "docs": "docs/editor-nodes/NoiseBurstNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -795,14 +795,14 @@
       ]
     },
     {
-      "id": "playground-node:Panner3DNode",
-      "kind": "playground-node",
+      "id": "editor-node:Panner3DNode",
+      "kind": "editor-node",
       "name": "Panner3DNode",
-      "source": "playground/src/playground/nodes/Panner3DNode.tsx",
-      "docs": "docs/playground-nodes/Panner3DNode.md",
+      "source": "editor/src/editor/nodes/Panner3DNode.tsx",
+      "docs": "docs/editor-nodes/Panner3DNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -810,14 +810,14 @@
       ]
     },
     {
-      "id": "playground-node:StereoPannerNode",
-      "kind": "playground-node",
+      "id": "editor-node:StereoPannerNode",
+      "kind": "editor-node",
       "name": "StereoPannerNode",
-      "source": "playground/src/playground/nodes/StereoPannerNode.tsx",
-      "docs": "docs/playground-nodes/StereoPannerNode.md",
+      "source": "editor/src/editor/nodes/StereoPannerNode.tsx",
+      "docs": "docs/editor-nodes/StereoPannerNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -825,14 +825,14 @@
       ]
     },
     {
-      "id": "playground-node:WaveShaperNode",
-      "kind": "playground-node",
+      "id": "editor-node:WaveShaperNode",
+      "kind": "editor-node",
       "name": "WaveShaperNode",
-      "source": "playground/src/playground/nodes/WaveShaperNode.tsx",
-      "docs": "docs/playground-nodes/WaveShaperNode.md",
+      "source": "editor/src/editor/nodes/WaveShaperNode.tsx",
+      "docs": "docs/editor-nodes/WaveShaperNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -840,14 +840,14 @@
       ]
     },
     {
-      "id": "playground-node:MixerNode",
-      "kind": "playground-node",
+      "id": "editor-node:MixerNode",
+      "kind": "editor-node",
       "name": "MixerNode",
-      "source": "playground/src/playground/nodes/MixerNode.tsx",
-      "docs": "docs/playground-nodes/MixerNode.md",
+      "source": "editor/src/editor/nodes/MixerNode.tsx",
+      "docs": "docs/editor-nodes/MixerNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -855,14 +855,14 @@
       ]
     },
     {
-      "id": "playground-node:AuxSendNode",
-      "kind": "playground-node",
+      "id": "editor-node:AuxSendNode",
+      "kind": "editor-node",
       "name": "AuxSendNode",
-      "source": "playground/src/playground/nodes/AuxSendNode.tsx",
-      "docs": "docs/playground-nodes/AuxSendNode.md",
+      "source": "editor/src/editor/nodes/AuxSendNode.tsx",
+      "docs": "docs/editor-nodes/AuxSendNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -871,14 +871,14 @@
       ]
     },
     {
-      "id": "playground-node:AuxReturnNode",
-      "kind": "playground-node",
+      "id": "editor-node:AuxReturnNode",
+      "kind": "editor-node",
       "name": "AuxReturnNode",
-      "source": "playground/src/playground/nodes/AuxReturnNode.tsx",
-      "docs": "docs/playground-nodes/AuxReturnNode.md",
+      "source": "editor/src/editor/nodes/AuxReturnNode.tsx",
+      "docs": "docs/editor-nodes/AuxReturnNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -887,15 +887,15 @@
       ]
     },
     {
-      "id": "playground-node:MatrixMixerNode",
-      "kind": "playground-node",
+      "id": "editor-node:MatrixMixerNode",
+      "kind": "editor-node",
       "name": "MatrixMixerNode",
-      "source": "playground/src/playground/nodes/MatrixMixerNode.tsx",
-      "docs": "docs/playground-nodes/MatrixMixerNode.md",
+      "source": "editor/src/editor/nodes/MatrixMixerNode.tsx",
+      "docs": "docs/editor-nodes/MatrixMixerNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts",
-        "playground/tests/unit/node-helpers.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts",
+        "editor/tests/unit/node-helpers.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -904,14 +904,14 @@
       ]
     },
     {
-      "id": "playground-node:InputNode",
-      "kind": "playground-node",
+      "id": "editor-node:InputNode",
+      "kind": "editor-node",
       "name": "InputNode",
-      "source": "playground/src/playground/nodes/InputNode.tsx",
-      "docs": "docs/playground-nodes/InputNode.md",
+      "source": "editor/src/editor/nodes/InputNode.tsx",
+      "docs": "docs/editor-nodes/InputNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S02",
@@ -919,15 +919,15 @@
       ]
     },
     {
-      "id": "playground-node:UiTokensNode",
-      "kind": "playground-node",
+      "id": "editor-node:UiTokensNode",
+      "kind": "editor-node",
       "name": "UiTokensNode",
-      "source": "playground/src/playground/nodes/UiTokensNode.tsx",
-      "docs": "docs/playground-nodes/UiTokensNode.md",
+      "source": "editor/src/editor/nodes/UiTokensNode.tsx",
+      "docs": "docs/editor-nodes/UiTokensNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts",
-        "playground/tests/unit/node-helpers.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts",
+        "editor/tests/unit/node-helpers.spec.ts"
       ],
       "scenarios": [
         "F02-S02",
@@ -935,14 +935,14 @@
       ]
     },
     {
-      "id": "playground-node:NoteNode",
-      "kind": "playground-node",
+      "id": "editor-node:NoteNode",
+      "kind": "editor-node",
       "name": "NoteNode",
-      "source": "playground/src/playground/nodes/NoteNode.tsx",
-      "docs": "docs/playground-nodes/NoteNode.md",
+      "source": "editor/src/editor/nodes/NoteNode.tsx",
+      "docs": "docs/editor-nodes/NoteNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S02",
@@ -950,15 +950,15 @@
       ]
     },
     {
-      "id": "playground-node:TransportNode",
-      "kind": "playground-node",
+      "id": "editor-node:TransportNode",
+      "kind": "editor-node",
       "name": "TransportNode",
-      "source": "playground/src/playground/nodes/TransportNode.tsx",
-      "docs": "docs/playground-nodes/TransportNode.md",
+      "source": "editor/src/editor/nodes/TransportNode.tsx",
+      "docs": "docs/editor-nodes/TransportNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts",
-        "playground/tests/e2e/playground.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts",
+        "editor/tests/e2e/editor.spec.ts"
       ],
       "scenarios": [
         "F02-S03",
@@ -966,15 +966,15 @@
       ]
     },
     {
-      "id": "playground-node:StepSequencerNode",
-      "kind": "playground-node",
+      "id": "editor-node:StepSequencerNode",
+      "kind": "editor-node",
       "name": "StepSequencerNode",
-      "source": "playground/src/playground/nodes/StepSequencerNode.tsx",
-      "docs": "docs/playground-nodes/StepSequencerNode.md",
+      "source": "editor/src/editor/nodes/StepSequencerNode.tsx",
+      "docs": "docs/editor-nodes/StepSequencerNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts",
-        "playground/tests/e2e/playground.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts",
+        "editor/tests/e2e/editor.spec.ts"
       ],
       "scenarios": [
         "F02-S03",
@@ -982,14 +982,14 @@
       ]
     },
     {
-      "id": "playground-node:PianoRollNode",
-      "kind": "playground-node",
+      "id": "editor-node:PianoRollNode",
+      "kind": "editor-node",
       "name": "PianoRollNode",
-      "source": "playground/src/playground/nodes/PianoRollNode.tsx",
-      "docs": "docs/playground-nodes/PianoRollNode.md",
+      "source": "editor/src/editor/nodes/PianoRollNode.tsx",
+      "docs": "docs/editor-nodes/PianoRollNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S03",
@@ -997,14 +997,14 @@
       ]
     },
     {
-      "id": "playground-node:LFONode",
-      "kind": "playground-node",
+      "id": "editor-node:LFONode",
+      "kind": "editor-node",
       "name": "LFONode",
-      "source": "playground/src/playground/nodes/LFONode.tsx",
-      "docs": "docs/playground-nodes/LFONode.md",
+      "source": "editor/src/editor/nodes/LFONode.tsx",
+      "docs": "docs/editor-nodes/LFONode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S03",
@@ -1012,14 +1012,14 @@
       ]
     },
     {
-      "id": "playground-node:ADSRNode",
-      "kind": "playground-node",
+      "id": "editor-node:ADSRNode",
+      "kind": "editor-node",
       "name": "ADSRNode",
-      "source": "playground/src/playground/nodes/ADSRNode.tsx",
-      "docs": "docs/playground-nodes/ADSRNode.md",
+      "source": "editor/src/editor/nodes/ADSRNode.tsx",
+      "docs": "docs/editor-nodes/ADSRNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S03",
@@ -1027,15 +1027,15 @@
       ]
     },
     {
-      "id": "playground-node:VoiceNode",
-      "kind": "playground-node",
+      "id": "editor-node:VoiceNode",
+      "kind": "editor-node",
       "name": "VoiceNode",
-      "source": "playground/src/playground/nodes/VoiceNode.tsx",
-      "docs": "docs/playground-nodes/VoiceNode.md",
+      "source": "editor/src/editor/nodes/VoiceNode.tsx",
+      "docs": "docs/editor-nodes/VoiceNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts",
-        "playground/tests/e2e/playground.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts",
+        "editor/tests/e2e/editor.spec.ts"
       ],
       "scenarios": [
         "F02-S03",
@@ -1043,16 +1043,16 @@
       ]
     },
     {
-      "id": "playground-node:SamplerNode",
-      "kind": "playground-node",
+      "id": "editor-node:SamplerNode",
+      "kind": "editor-node",
       "name": "SamplerNode",
-      "source": "playground/src/playground/nodes/SamplerNode.tsx",
-      "docs": "docs/playground-nodes/SamplerNode.md",
+      "source": "editor/src/editor/nodes/SamplerNode.tsx",
+      "docs": "docs/editor-nodes/SamplerNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts",
-        "playground/tests/unit/audio-library.spec.ts",
-        "playground/tests/unit/playground-connection-assist.spec.tsx"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts",
+        "editor/tests/unit/audio-library.spec.ts",
+        "editor/tests/unit/editor-connection-assist.spec.tsx"
       ],
       "scenarios": [
         "F02-S01",
@@ -1060,14 +1060,14 @@
       ]
     },
     {
-      "id": "playground-node:MathNode",
-      "kind": "playground-node",
+      "id": "editor-node:MathNode",
+      "kind": "editor-node",
       "name": "MathNode",
-      "source": "playground/src/playground/nodes/MathNode.tsx",
-      "docs": "docs/playground-nodes/MathNode.md",
+      "source": "editor/src/editor/nodes/MathNode.tsx",
+      "docs": "docs/editor-nodes/MathNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S02",
@@ -1075,14 +1075,14 @@
       ]
     },
     {
-      "id": "playground-node:CompareNode",
-      "kind": "playground-node",
+      "id": "editor-node:CompareNode",
+      "kind": "editor-node",
       "name": "CompareNode",
-      "source": "playground/src/playground/nodes/CompareNode.tsx",
-      "docs": "docs/playground-nodes/CompareNode.md",
+      "source": "editor/src/editor/nodes/CompareNode.tsx",
+      "docs": "docs/editor-nodes/CompareNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S02",
@@ -1090,14 +1090,14 @@
       ]
     },
     {
-      "id": "playground-node:MixNode",
-      "kind": "playground-node",
+      "id": "editor-node:MixNode",
+      "kind": "editor-node",
       "name": "MixNode",
-      "source": "playground/src/playground/nodes/MixNode.tsx",
-      "docs": "docs/playground-nodes/MixNode.md",
+      "source": "editor/src/editor/nodes/MixNode.tsx",
+      "docs": "docs/editor-nodes/MixNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S02",
@@ -1105,14 +1105,14 @@
       ]
     },
     {
-      "id": "playground-node:ClampNode",
-      "kind": "playground-node",
+      "id": "editor-node:ClampNode",
+      "kind": "editor-node",
       "name": "ClampNode",
-      "source": "playground/src/playground/nodes/ClampNode.tsx",
-      "docs": "docs/playground-nodes/ClampNode.md",
+      "source": "editor/src/editor/nodes/ClampNode.tsx",
+      "docs": "docs/editor-nodes/ClampNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S02",
@@ -1120,14 +1120,14 @@
       ]
     },
     {
-      "id": "playground-node:SwitchNode",
-      "kind": "playground-node",
+      "id": "editor-node:SwitchNode",
+      "kind": "editor-node",
       "name": "SwitchNode",
-      "source": "playground/src/playground/nodes/SwitchNode.tsx",
-      "docs": "docs/playground-nodes/SwitchNode.md",
+      "source": "editor/src/editor/nodes/SwitchNode.tsx",
+      "docs": "docs/editor-nodes/SwitchNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S02",
@@ -1156,7 +1156,7 @@
       "docs": "docs/components/patch/PatchRenderer.md",
       "tests": [
         "tests/library/patch.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F01-S05",
@@ -1237,14 +1237,14 @@
     },
     {
       "id": "node:MidiNoteNode",
-      "kind": "playground-node",
+      "kind": "editor-node",
       "name": "MidiNoteNode",
-      "source": "playground/src/playground/nodes/MidiNoteNode.tsx",
-      "docs": "docs/playground-nodes/MidiNoteNode.md",
+      "source": "editor/src/editor/nodes/MidiNoteNode.tsx",
+      "docs": "docs/editor-nodes/MidiNoteNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/node-helpers.spec.ts",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/node-helpers.spec.ts",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S04",
@@ -1254,14 +1254,14 @@
     },
     {
       "id": "node:MidiCCNode",
-      "kind": "playground-node",
+      "kind": "editor-node",
       "name": "MidiCCNode",
-      "source": "playground/src/playground/nodes/MidiCCNode.tsx",
-      "docs": "docs/playground-nodes/MidiCCNode.md",
+      "source": "editor/src/editor/nodes/MidiCCNode.tsx",
+      "docs": "docs/editor-nodes/MidiCCNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/node-helpers.spec.ts",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/node-helpers.spec.ts",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S04",
@@ -1271,13 +1271,13 @@
     },
     {
       "id": "node:MidiNoteOutputNode",
-      "kind": "playground-node",
+      "kind": "editor-node",
       "name": "MidiNoteOutputNode",
-      "source": "playground/src/playground/nodes/MidiNoteOutputNode.tsx",
-      "docs": "docs/playground-nodes/MidiNoteOutputNode.md",
+      "source": "editor/src/editor/nodes/MidiNoteOutputNode.tsx",
+      "docs": "docs/editor-nodes/MidiNoteOutputNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S04",
@@ -1287,13 +1287,13 @@
     },
     {
       "id": "node:MidiCCOutputNode",
-      "kind": "playground-node",
+      "kind": "editor-node",
       "name": "MidiCCOutputNode",
-      "source": "playground/src/playground/nodes/MidiCCOutputNode.tsx",
-      "docs": "docs/playground-nodes/MidiCCOutputNode.md",
+      "source": "editor/src/editor/nodes/MidiCCOutputNode.tsx",
+      "docs": "docs/editor-nodes/MidiCCOutputNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S04",
@@ -1303,13 +1303,13 @@
     },
     {
       "id": "node:MidiSyncNode",
-      "kind": "playground-node",
+      "kind": "editor-node",
       "name": "MidiSyncNode",
-      "source": "playground/src/playground/nodes/MidiSyncNode.tsx",
-      "docs": "docs/playground-nodes/MidiSyncNode.md",
+      "source": "editor/src/editor/nodes/MidiSyncNode.tsx",
+      "docs": "docs/editor-nodes/MidiSyncNode.md",
       "tests": [
-        "playground/tests/unit/nodes-ui.spec.tsx",
-        "playground/tests/unit/store-and-codegen.spec.ts"
+        "editor/tests/unit/nodes-ui.spec.tsx",
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S04",

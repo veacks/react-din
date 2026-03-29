@@ -107,27 +107,27 @@ for (const entry of diffEntries) {
         continue;
     }
 
-    if (entry.path?.startsWith('playground/src/playground/nodes/') && entry.path.endsWith('.tsx')) {
+    if (entry.path?.startsWith('editor/src/editor/nodes/') && entry.path.endsWith('.tsx')) {
         errors.push(
-            `${entry.path}: playground node changes must be added to project/COVERAGE_MANIFEST.json and update docs/tests`
+            `${entry.path}: editor node changes must be added to project/COVERAGE_MANIFEST.json and update docs/tests`
         );
 
         if (entry.status.startsWith('A')) {
             const baseName = path.basename(entry.path, '.tsx');
-            const expectedDocs = `docs/playground-nodes/${baseName}.md`;
+            const expectedDocs = `docs/editor-nodes/${baseName}.md`;
             const requiredFiles = [
-                'playground/src/playground/nodes/index.ts',
-                'playground/src/PlaygroundDemo.tsx',
-                'playground/src/playground/store.ts',
-                'playground/src/playground/AudioEngine.ts',
-                'playground/src/playground/CodeGenerator.tsx',
+                'editor/src/editor/nodes/index.ts',
+                'editor/src/EditorDemo.tsx',
+                'editor/src/editor/store.ts',
+                'editor/src/editor/AudioEngine.ts',
+                'editor/src/editor/CodeGenerator.tsx',
                 'project/COVERAGE_MANIFEST.json',
                 expectedDocs,
             ];
 
             for (const required of requiredFiles) {
                 if (!changedFiles.has(required)) {
-                    errors.push(`${entry.path}: new playground nodes must also change ${required}`);
+                    errors.push(`${entry.path}: new editor nodes must also change ${required}`);
                 }
             }
         }

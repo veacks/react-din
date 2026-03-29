@@ -10,7 +10,7 @@
   "type": "module",
   "workspaces": [
     "example",
-    "playground"
+    "editor"
   ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -134,8 +134,7 @@
     "test": "npm run test:library && npm run test:editor",
     "test:library": "vitest --config vitest.config.ts --run",
     "test:library:watch": "vitest --config vitest.config.ts",
-    "test:editor": "npm -w @din/editor run test:run",
-    "test:playground": "npm run test:editor",
+    "test:editor": "npm -w editor run test:run",
     "test:e2e": "playwright test",
     "validate:docs": "node ./scripts/validate-docs.mjs",
     "validate:patch-schema": "node ./scripts/validate-patch-schema.mjs",
@@ -144,8 +143,7 @@
     "ci:check": "npm run validate:docs && npm run validate:patch-schema && npm run validate:coverage && npm run test:library && npm run test:editor",
     "prepublishOnly": "npm run build",
     "example:dev": "npm -w example run dev",
-    "editor:dev": "npm -w @din/editor run dev",
-    "playground:dev": "npm run editor:dev"
+    "editor:dev": "npm -w editor run dev"
   },
   "peerDependencies": {
     "react": ">=18.0.0",
