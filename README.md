@@ -388,6 +388,17 @@ function SpatialAudio() {
 
 The published `@din/react` package now includes the [`example`](./example) workspace so the demo source stays bundled with the library release.
 
+## DIN Editor MCP
+
+The local MCP server for DIN Editor lives in [`editor/mcp-server`](./editor/mcp-server).
+
+```bash
+npm run editor:mcp:build
+npm run editor:mcp:start
+```
+
+It exposes a local stdio MCP server plus a loopback-only WebSocket bridge so an AI agent can inspect, preview, and apply graph operations against a live DIN Editor tab or work offline from patch JSON files.
+
 ## Quality Gates
 
 ```bash

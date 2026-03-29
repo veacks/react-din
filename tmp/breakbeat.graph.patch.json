@@ -1,0 +1,469 @@
+{
+  "version": 1,
+  "name": "Amen Breakbeat Sketch",
+  "nodes": [
+    {
+      "id": "transport-1",
+      "type": "transport",
+      "position": {
+        "x": -120,
+        "y": 40
+      },
+      "data": {
+        "type": "transport",
+        "bpm": 168,
+        "playing": false,
+        "beatsPerBar": 4,
+        "beatUnit": 4,
+        "stepsPerBeat": 4,
+        "barsPerPhrase": 4,
+        "swing": 0.18,
+        "label": "Transport"
+      }
+    },
+    {
+      "id": "seq-kick",
+      "type": "stepSequencer",
+      "position": {
+        "x": 120,
+        "y": -110
+      },
+      "data": {
+        "type": "stepSequencer",
+        "steps": 16,
+        "pattern": [
+          1,
+          0,
+          0,
+          0,
+          0.82,
+          0,
+          0.64,
+          0,
+          0.92,
+          0,
+          0.72,
+          0,
+          0.82,
+          0.36,
+          0.68,
+          0
+        ],
+        "activeSteps": [
+          true,
+          false,
+          false,
+          false,
+          true,
+          false,
+          true,
+          false,
+          true,
+          false,
+          true,
+          false,
+          true,
+          true,
+          true,
+          false
+        ],
+        "label": "Kick Seq"
+      }
+    },
+    {
+      "id": "seq-snare",
+      "type": "stepSequencer",
+      "position": {
+        "x": 120,
+        "y": 60
+      },
+      "data": {
+        "type": "stepSequencer",
+        "steps": 16,
+        "pattern": [
+          0,
+          0,
+          0,
+          0,
+          0.95,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0.28,
+          0
+        ],
+        "activeSteps": [
+          false,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          true,
+          false,
+          true,
+          false
+        ],
+        "label": "Snare Seq"
+      }
+    },
+    {
+      "id": "seq-hat",
+      "type": "stepSequencer",
+      "position": {
+        "x": 120,
+        "y": 230
+      },
+      "data": {
+        "type": "stepSequencer",
+        "steps": 16,
+        "pattern": [
+          0.55,
+          0.22,
+          0.62,
+          0.18,
+          0.55,
+          0.22,
+          0.7,
+          0.18,
+          0.55,
+          0.28,
+          0.64,
+          0.18,
+          0.55,
+          0.22,
+          0.74,
+          0.24
+        ],
+        "activeSteps": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "label": "Hat Seq"
+      }
+    },
+    {
+      "id": "seq-ghost",
+      "type": "stepSequencer",
+      "position": {
+        "x": 120,
+        "y": 400
+      },
+      "data": {
+        "type": "stepSequencer",
+        "steps": 16,
+        "pattern": [
+          0,
+          0,
+          0.32,
+          0,
+          0,
+          0.25,
+          0,
+          0.18,
+          0,
+          0.22,
+          0,
+          0.3,
+          0,
+          0.18,
+          0,
+          0.26
+        ],
+        "activeSteps": [
+          false,
+          false,
+          true,
+          false,
+          false,
+          true,
+          false,
+          true,
+          false,
+          true,
+          false,
+          true,
+          false,
+          true,
+          false,
+          true
+        ],
+        "label": "Ghost Seq"
+      }
+    },
+    {
+      "id": "sampler-kick",
+      "type": "sampler",
+      "position": {
+        "x": 420,
+        "y": -110
+      },
+      "data": {
+        "type": "sampler",
+        "assetPath": "/samples/amen-kick.wav",
+        "fileName": "amen-kick.wav",
+        "src": "",
+        "loop": false,
+        "playbackRate": 1,
+        "detune": 0,
+        "label": "Kick"
+      }
+    },
+    {
+      "id": "sampler-snare",
+      "type": "sampler",
+      "position": {
+        "x": 420,
+        "y": 60
+      },
+      "data": {
+        "type": "sampler",
+        "assetPath": "/samples/amen-snare.wav",
+        "fileName": "amen-snare.wav",
+        "src": "",
+        "loop": false,
+        "playbackRate": 1,
+        "detune": 0,
+        "label": "Snare"
+      }
+    },
+    {
+      "id": "sampler-hat",
+      "type": "sampler",
+      "position": {
+        "x": 420,
+        "y": 230
+      },
+      "data": {
+        "type": "sampler",
+        "assetPath": "/samples/amen-hat.wav",
+        "fileName": "amen-hat.wav",
+        "src": "",
+        "loop": false,
+        "playbackRate": 1.08,
+        "detune": 0,
+        "label": "Hat"
+      }
+    },
+    {
+      "id": "sampler-ghost",
+      "type": "sampler",
+      "position": {
+        "x": 420,
+        "y": 400
+      },
+      "data": {
+        "type": "sampler",
+        "assetPath": "/samples/amen-ghost.wav",
+        "fileName": "amen-ghost.wav",
+        "src": "",
+        "loop": false,
+        "playbackRate": 0.98,
+        "detune": -30,
+        "label": "Ghost"
+      }
+    },
+    {
+      "id": "mixer-1",
+      "type": "mixer",
+      "position": {
+        "x": 740,
+        "y": 135
+      },
+      "data": {
+        "type": "mixer",
+        "inputs": 4,
+        "label": "Drum Bus"
+      }
+    },
+    {
+      "id": "compressor-1",
+      "type": "compressor",
+      "position": {
+        "x": 980,
+        "y": 135
+      },
+      "data": {
+        "type": "compressor",
+        "threshold": -22,
+        "knee": 12,
+        "ratio": 6,
+        "attack": 0.005,
+        "release": 0.18,
+        "sidechainStrength": 0.55,
+        "label": "Bus Compressor"
+      }
+    },
+    {
+      "id": "eq3-1",
+      "type": "eq3",
+      "position": {
+        "x": 1210,
+        "y": 135
+      },
+      "data": {
+        "type": "eq3",
+        "low": 2,
+        "mid": -1.5,
+        "high": 3,
+        "lowFrequency": 180,
+        "highFrequency": 4200,
+        "mix": 1,
+        "label": "Breakbeat EQ"
+      }
+    },
+    {
+      "id": "output-1",
+      "type": "output",
+      "position": {
+        "x": 1440,
+        "y": 135
+      },
+      "data": {
+        "type": "output",
+        "playing": false,
+        "masterGain": 0.72,
+        "label": "Output"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "transport-kick",
+      "source": "transport-1",
+      "target": "seq-kick",
+      "sourceHandle": "out",
+      "targetHandle": "transport"
+    },
+    {
+      "id": "transport-snare",
+      "source": "transport-1",
+      "target": "seq-snare",
+      "sourceHandle": "out",
+      "targetHandle": "transport"
+    },
+    {
+      "id": "transport-hat",
+      "source": "transport-1",
+      "target": "seq-hat",
+      "sourceHandle": "out",
+      "targetHandle": "transport"
+    },
+    {
+      "id": "transport-ghost",
+      "source": "transport-1",
+      "target": "seq-ghost",
+      "sourceHandle": "out",
+      "targetHandle": "transport"
+    },
+    {
+      "id": "kick-trigger",
+      "source": "seq-kick",
+      "target": "sampler-kick",
+      "sourceHandle": "trigger",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "snare-trigger",
+      "source": "seq-snare",
+      "target": "sampler-snare",
+      "sourceHandle": "trigger",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "hat-trigger",
+      "source": "seq-hat",
+      "target": "sampler-hat",
+      "sourceHandle": "trigger",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "ghost-trigger",
+      "source": "seq-ghost",
+      "target": "sampler-ghost",
+      "sourceHandle": "trigger",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "kick-bus",
+      "source": "sampler-kick",
+      "target": "mixer-1",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "snare-bus",
+      "source": "sampler-snare",
+      "target": "mixer-1",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "hat-bus",
+      "source": "sampler-hat",
+      "target": "mixer-1",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "ghost-bus",
+      "source": "sampler-ghost",
+      "target": "mixer-1",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "bus-compressor",
+      "source": "mixer-1",
+      "target": "compressor-1",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "compressor-eq",
+      "source": "compressor-1",
+      "target": "eq3-1",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "eq-output",
+      "source": "eq3-1",
+      "target": "output-1",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    }
+  ],
+  "interface": {
+    "inputs": [],
+    "events": [],
+    "midiInputs": [],
+    "midiOutputs": []
+  }
+}

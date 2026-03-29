@@ -152,6 +152,58 @@ html.light {
     min-height: 40px;
   }
 
+  .ui-mcp-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid var(--panel-border);
+    background: color-mix(in srgb, var(--panel-muted) 92%, transparent);
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .ui-mcp-indicator-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: currentColor;
+    box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 18%, transparent);
+  }
+
+  .ui-mcp-indicator-meta {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    letter-spacing: 0.08em;
+  }
+
+  .ui-mcp-indicator--active {
+    border-color: color-mix(in srgb, var(--success) 58%, var(--panel-border));
+    background: color-mix(in srgb, var(--success) 12%, var(--panel-bg));
+    color: var(--success);
+  }
+
+  .ui-mcp-indicator--connecting {
+    border-color: color-mix(in srgb, var(--accent) 58%, var(--panel-border));
+    background: color-mix(in srgb, var(--accent) 14%, var(--panel-bg));
+    color: var(--accent);
+  }
+
+  .ui-mcp-indicator--offline {
+    color: var(--text-subtle);
+  }
+
+  .ui-mcp-indicator--error {
+    border-color: color-mix(in srgb, var(--danger) 58%, var(--panel-border));
+    background: color-mix(in srgb, var(--danger) 14%, var(--panel-bg));
+    color: var(--danger);
+  }
+
   .ui-canvas-stage {
     background: linear-gradient(180deg, color-mix(in srgb, var(--panel-muted) 18%, var(--canvas-bg)) 0%, var(--canvas-bg) 28%, var(--canvas-bg) 100%);
   }

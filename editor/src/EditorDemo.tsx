@@ -94,6 +94,7 @@ import { DEFAULT_NODE_SIZE } from './editor/graphBuilders';
 import { groupCatalogByCategory, type EditorNodeType } from './editor/nodeCatalog';
 import { editorMidiRuntime } from './editor/midiRuntime';
 import { createUiTokenParams } from './editor/uiTokens';
+import { McpStatusBadge } from './editor/agent-bridge/McpStatusBadge';
 
 const nodeTypes: NodeTypes = {
     oscNode: OscNode as NodeTypes[string],
@@ -2299,6 +2300,7 @@ const EditorDemoContent: FC = () => {
                         </button>
                     </div>
                     <div className="ui-topbar-actions flex flex-wrap items-center justify-end gap-2">
+                        <McpStatusBadge />
                         <button
                             type="button"
                             onClick={togglePalette}

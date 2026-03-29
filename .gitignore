@@ -5,3 +5,4 @@ test-results/
 .DS_Store
 
 node_modules
+editor/mcp-server/.din-editor-mcp/
