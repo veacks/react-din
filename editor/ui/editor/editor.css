@@ -1,7 +1,20 @@
 /* Node-based Editor Styles */
 
+:root {
+    --pin-size: 12.5px;
+    --node-header-pad-x: 12px;
+    --node-header-pad-y: 8px;
+    --node-content-pad-x: 12px;
+    --node-content-pad-y: 12px;
+    --node-content-gap: 10px;
+    --node-control-gap: 6px;
+    --node-control-min-height: 40px;
+    --node-section-gap: 8px;
+    --node-body-radius: 12px;
+}
+
 .react-flow__node {
-    border-radius: 8px;
+    border-radius: var(--node-body-radius);
     background: var(--node-bg);
     color: var(--text);
     border: 1px solid var(--node-border);
@@ -19,15 +32,6 @@
     background: var(--canvas-bg);
     border-radius: 12px;
     overflow: hidden;
-    --pin-size: 12.5px;
-    --node-header-pad-x: 12px;
-    --node-header-pad-y: 8px;
-    --node-content-pad-x: 12px;
-    --node-content-pad-y: 12px;
-    --node-content-gap: 10px;
-    --node-control-gap: 6px;
-    --node-control-min-height: 40px;
-    --node-section-gap: 8px;
 }
 
 .react-flow__background {
@@ -37,10 +41,9 @@
 .audio-node {
     display: flex;
     flex-direction: column;
-    /* overflow: hidden;  <-- Removed to allow handles with negative offsets to be visible */
     background: var(--node-bg);
     border: 1px solid var(--node-border);
-    border-radius: 8px;
+    border-radius: var(--node-body-radius);
     box-shadow: var(--node-shadow);
     font-family: inherit;
 }
@@ -50,71 +53,166 @@
     box-shadow: var(--node-shadow-focus);
 }
 
+:is(
+    .node-family-source,
+    .osc-node,
+    .noise-node,
+    .noise-burst-node,
+    .constant-source-node,
+    .media-stream-node,
+    .sampler-node,
+    .voice-node,
+    .transport-node,
+    .step-sequencer-node,
+    .sequencer-node,
+    .piano-roll-node,
+    .event-trigger-node,
+    .note-node,
+    .midi-note-node,
+    .midi-cc-node,
+    .midi-note-output-node,
+    .midi-cc-output-node,
+    .midi-sync-node
+) {
+    --node-header-bg: var(--node-family-source-header);
+    --node-header-text: var(--node-family-source-header-text);
+    --node-border: var(--node-family-source-border);
+    --node-family-accent: var(--node-family-source);
+    --node-family-chip: var(--node-family-source-chip);
+}
+
+:is(
+    .node-family-control,
+    .gain-node,
+    .lfo-node,
+    .adsr-node,
+    .math-node,
+    .compare-node,
+    .mix-node,
+    .clamp-node,
+    .switch-node,
+    .input-node,
+    .ui-tokens-node
+) {
+    --node-header-bg: var(--node-family-control-header);
+    --node-header-text: var(--node-family-control-header-text);
+    --node-border: var(--node-family-control-border);
+    --node-family-accent: var(--node-family-control);
+    --node-family-chip: var(--node-family-control-chip);
+}
+
+:is(
+    .node-family-routing,
+    .mixer-node,
+    .aux-send-node,
+    .aux-return-node,
+    .matrix-mixer-node,
+    .output-node
+) {
+    --node-header-bg: var(--node-family-routing-header);
+    --node-header-text: var(--node-family-routing-header-text);
+    --node-border: var(--node-family-routing-border);
+    --node-family-accent: var(--node-family-routing);
+    --node-family-chip: var(--node-family-routing-chip);
+}
+
+:is(
+    .node-family-spectral,
+    .filter-node,
+    .delay-node,
+    .reverb-node,
+    .phaser-node,
+    .flanger-node,
+    .tremolo-node,
+    .eq3-node,
+    .distortion-node,
+    .chorus-node,
+    .wave-shaper-node,
+    .waveShaper-node,
+    .convolver-node
+) {
+    --node-header-bg: var(--node-family-spectral-header);
+    --node-header-text: var(--node-family-spectral-header-text);
+    --node-border: var(--node-family-spectral-border);
+    --node-family-accent: var(--node-family-spectral);
+    --node-family-chip: var(--node-family-spectral-chip);
+}
+
+:is(
+    .node-family-spatial,
+    .panner-node,
+    .panner3d-node
+) {
+    --node-header-bg: var(--node-family-spatial-header);
+    --node-header-text: var(--node-family-spatial-header-text);
+    --node-border: var(--node-family-spatial-border);
+    --node-family-accent: var(--node-family-spatial);
+    --node-family-chip: var(--node-family-spatial-chip);
+}
+
+:is(
+    .node-family-dynamics,
+    .compressor-node
+) {
+    --node-header-bg: var(--node-family-dynamics-header);
+    --node-header-text: var(--node-family-dynamics-header-text);
+    --node-border: var(--node-family-dynamics-border);
+    --node-family-accent: var(--node-family-dynamics);
+    --node-family-chip: var(--node-family-dynamics-chip);
+}
+
+:is(
+    .node-family-analysis,
+    .analyzer-node
+) {
+    --node-header-bg: var(--node-family-analysis-header);
+    --node-header-text: var(--node-family-analysis-header-text);
+    --node-border: var(--node-family-analysis-border);
+    --node-family-accent: var(--node-family-analysis);
+    --node-family-chip: var(--node-family-analysis-chip);
+}
+
+:is(
+    .node-family-midi,
+    .midi-note-node,
+    .midi-cc-node,
+    .midi-note-output-node,
+    .midi-cc-output-node,
+    .midi-sync-node
+) {
+    --node-header-bg: var(--node-family-midi-header);
+    --node-header-text: var(--node-family-midi-header-text);
+    --node-border: var(--node-family-midi-border);
+    --node-family-accent: var(--node-family-midi);
+    --node-family-chip: var(--node-family-midi-chip);
+}
+
+:is(
+    .node-family-utility,
+    .ui-tokens-node
+) {
+    --node-header-bg: var(--node-family-utility-header);
+    --node-header-text: var(--node-family-utility-header-text);
+    --node-border: var(--node-family-utility-border);
+    --node-family-accent: var(--node-family-utility);
+    --node-family-chip: var(--node-family-utility-chip);
+}
+
 .node-header {
     position: relative;
     padding: var(--node-header-pad-y) var(--node-header-pad-x);
-    background: var(--node-header-bg);
+    background: var(--node-header-bg) !important;
     font-weight: bold;
     display: flex;
     align-items: center;
     gap: 8px;
     border-bottom: 1px solid var(--node-border);
-    color: var(--node-header-text);
+    color: var(--node-header-text) !important;
     cursor: grab;
 }
 
 .node-header:active {
     cursor: grabbing;
-}
-
-.osc-node .node-header {
-    background: #ff8844;
-    color: #fff;
-}
-
-.gain-node .node-header {
-    background: #44cc44;
-    color: #fff;
-}
-
-.filter-node .node-header {
-    background: #aa44ff;
-    color: #fff;
-}
-
-.output-node .node-header {
-    background: #ff4466;
-    color: #fff;
-}
-
-.noise-node .node-header {
-    background: #666666;
-    color: #fff;
-}
-
-.delay-node .node-header {
-    background: #4488ff;
-    color: #fff;
-}
-
-.reverb-node .node-header {
-    background: #8844ff;
-    color: #fff;
-}
-
-.panner-node .node-header {
-    background: #44cccc;
-    color: #042222;
-}
-
-.mixer-node .node-header {
-    background: #ffaa44;
-    color: #2b1b00;
-}
-
-.input-node .node-header {
-    background: #555555;
-    color: #fff;
 }
 
 .node-icon {
@@ -212,20 +310,25 @@
     z-index: 10;
     background: var(--control-border);
     transform-origin: center;
-    box-shadow: 0 0 0 2px rgba(6, 10, 25, 0.35);
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--primitive-neutral-950) 35%, transparent);
 }
 
 /* Audio Handles (Green) */
 .handle-audio {
-    background: #00ff41 !important;
-    /* Bright Green */
-    border-color: #00ff41 !important;
+    background: var(--semantic-flow-audio) !important;
+    border-color: var(--semantic-flow-audio) !important;
 }
 
 /* Parameter Handles (Blue) */
 .handle-param {
-    background: var(--accent) !important;
-    /* Bright Blue */
+    background: var(--semantic-flow-control) !important;
+    border-color: var(--semantic-flow-control) !important;
+}
+
+/* Trigger Handles */
+.handle-trigger {
+    background: var(--semantic-flow-trigger) !important;
+    border-color: var(--semantic-flow-trigger) !important;
 }
 
 .handle-in {
@@ -271,8 +374,8 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    border: 1px dashed color-mix(in srgb, var(--accent) 54%, var(--panel-border));
-    background: color-mix(in srgb, var(--panel-muted) 86%, transparent);
+    border: 1px dashed color-mix(in oklab, var(--semantic-accent) 54%, var(--panel-border));
+    background: color-mix(in oklab, var(--panel-muted) 86%, transparent);
     border-radius: 8px;
     color: var(--accent);
     font-size: 10px;
@@ -281,18 +384,18 @@
 }
 
 .react-flow__node.connection-assist-node {
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 36%, transparent), var(--node-shadow-focus);
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--semantic-accent) 36%, transparent), var(--node-shadow-focus);
     border-radius: 10px;
 }
 
 .react-flow__node.connection-assist-node .audio-node {
-    border-color: color-mix(in srgb, var(--accent) 72%, var(--node-border));
+    border-color: color-mix(in oklab, var(--semantic-accent) 72%, var(--node-border));
 }
 
 .react-flow__handle.connection-assist-handle {
     transform: scale(1.28);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent), 0 0 14px color-mix(in srgb, var(--accent) 80%, white);
-    border-color: color-mix(in srgb, var(--accent) 80%, white);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--semantic-accent) 30%, transparent), 0 0 14px color-mix(in oklab, var(--semantic-accent) 80%, white);
+    border-color: color-mix(in oklab, var(--semantic-accent) 80%, white);
     z-index: 12;
 }
 
@@ -319,7 +422,7 @@
 .play-button {
     padding: 6px 12px;
     border: none;
-    border-radius: 4px;
+    border-radius: 8px;
     font-size: 11px;
     font-weight: 600;
     cursor: pointer;
@@ -331,13 +434,13 @@
 }
 
 .play-button.play {
-    background: var(--success);
-    color: #fff;
+    background: var(--semantic-success);
+    color: var(--primitive-neutral-950);
 }
 
 .play-button.stop {
-    background: var(--danger);
-    color: #fff;
+    background: var(--semantic-danger);
+    color: var(--primitive-neutral-950);
 }
 
 .output-node.playing {
@@ -352,7 +455,7 @@
     }
 
     50% {
-        box-shadow: 0 0 18px rgba(239, 68, 68, 0.35);
+        box-shadow: 0 0 18px color-mix(in oklab, var(--semantic-danger) 35%, transparent);
     }
 }
 
@@ -372,7 +475,7 @@
     margin-top: 8px;
     padding: 8px;
     background: var(--panel-muted);
-    border-radius: 4px;
+    border-radius: 8px;
     text-align: center;
 }
 
@@ -380,7 +483,7 @@
     display: block;
     font-size: 16px;
     font-weight: bold;
-    color: #ffcc00;
+    color: var(--semantic-warning);
 }
 
 .note-display .freq {
@@ -417,8 +520,6 @@
 .ui-tokens-node .node-header {
     justify-content: space-between;
     position: relative;
-    background: #555555;
-    color: #fff;
 }
 
 .input-node .header-title {
@@ -503,12 +604,13 @@
 
 .react-flow__minimap {
     background: var(--minimap-bg);
-    border-radius: 8px;
+    border-radius: 10px;
 }
 
 .react-flow__controls {
-    border-radius: 8px;
+    border-radius: 10px;
     overflow: hidden;
+    border: 1px solid color-mix(in oklab, var(--panel-border) 88%, transparent);
 }
 
 .react-flow__controls-button {
@@ -531,9 +633,9 @@
     max-width: calc(100% - 32px);
     padding: 10px;
     border-radius: 14px;
-    border: 1px solid color-mix(in srgb, var(--panel-border) 84%, transparent);
-    background: color-mix(in srgb, var(--panel-bg) 92%, var(--canvas-bg));
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+    border: 1px solid color-mix(in oklab, var(--panel-border) 84%, transparent);
+    background: color-mix(in oklab, var(--panel-bg) 92%, var(--canvas-bg));
+    box-shadow: var(--component-connection-assist-shadow);
     backdrop-filter: blur(14px);
 }
 
@@ -580,8 +682,8 @@
 
 .connection-assist-item:hover,
 .connection-assist-item.active {
-    background: color-mix(in srgb, var(--panel-muted) 88%, transparent);
-    border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+    background: color-mix(in oklab, var(--panel-muted) 88%, transparent);
+    border-color: color-mix(in oklab, var(--accent) 50%, transparent);
     transform: translateX(2px);
 }
 
@@ -607,14 +709,14 @@
 }
 
 .ui-library-dropzone {
-    border-color: color-mix(in srgb, var(--panel-border) 80%, transparent);
-    background: color-mix(in srgb, var(--panel-bg) 82%, transparent);
+    border-color: color-mix(in oklab, var(--panel-border) 80%, transparent);
+    background: color-mix(in oklab, var(--panel-bg) 82%, transparent);
 }
 
 .ui-library-dropzone.is-drag-over {
     border-color: var(--accent);
-    background: color-mix(in srgb, var(--accent-soft) 70%, var(--panel-bg));
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent);
+    background: color-mix(in oklab, var(--accent-soft) 70%, var(--panel-bg));
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 70%, transparent);
 }
 
 .ui-library-tile {
@@ -623,17 +725,17 @@
 
 .ui-library-icon {
     position: relative;
-    background: linear-gradient(180deg, #f2f2f4 0%, #dedee1 100%);
-    box-shadow: 0 8px 16px rgba(5, 9, 20, 0.18);
+    background: linear-gradient(180deg, color-mix(in oklab, var(--panel-bg) 96%, white) 0%, color-mix(in oklab, var(--panel-muted) 92%, white) 100%);
+    box-shadow: 0 8px 16px color-mix(in oklab, var(--primitive-neutral-950) 18%, transparent);
 }
 
 .light .ui-library-icon {
-    background: linear-gradient(180deg, #f4f4f5 0%, #e5e5e7 100%);
+    background: linear-gradient(180deg, color-mix(in oklab, var(--panel-bg) 98%, white) 0%, color-mix(in oklab, var(--panel-muted) 96%, white) 100%);
 }
 
 .ui-library-note-glyph {
     font-size: 40px;
-    color: rgba(120, 120, 124, 0.35);
+    color: color-mix(in oklab, var(--text-subtle) 38%, transparent);
     line-height: 1;
     transform: translateY(2px);
 }
@@ -649,13 +751,13 @@
     align-items: center;
     justify-content: center;
     font-size: 14px;
-    color: #fff;
-    background: rgba(120, 124, 136, 0.68);
-    box-shadow: 0 6px 12px rgba(16, 20, 36, 0.28);
+    color: var(--primitive-neutral-0);
+    background: color-mix(in oklab, var(--primitive-slate-500) 68%, var(--panel-muted));
+    box-shadow: 0 6px 12px color-mix(in oklab, var(--primitive-neutral-950) 28%, transparent);
 }
 
 .ui-library-icon:hover .ui-library-play-overlay {
-    background: rgba(68, 136, 255, 0.78);
+    background: color-mix(in oklab, var(--semantic-accent) 78%, var(--panel-muted));
 }
 
 .ui-library-delete {
@@ -701,8 +803,8 @@
 }
 
 .sequencer-pad.active {
-    background: #ffcc00;
-    box-shadow: 0 0 4px #ffcc00;
+    background: var(--semantic-warning);
+    box-shadow: 0 0 4px color-mix(in oklab, var(--semantic-warning) 78%, transparent);
 }
 
 .sequencer-status {
@@ -724,8 +826,8 @@
 }
 
 .sequencer-status-dot.active {
-    background: #36d399;
-    box-shadow: 0 0 10px rgba(54, 211, 153, 0.65);
+    background: var(--semantic-success);
+    box-shadow: 0 0 10px color-mix(in oklab, var(--semantic-success) 65%, transparent);
     transform: scale(1.15);
 }
 
@@ -748,7 +850,7 @@
 .adsr-viz {
     margin-bottom: 10px;
     background: var(--panel-muted);
-    border-radius: 4px;
+    border-radius: 8px;
     padding: 5px;
     overflow: hidden;
 }
@@ -823,7 +925,7 @@
     bottom: 0;
     left: 0;
     width: 100%;
-    background: #ffcc00;
+    background: var(--semantic-warning);
     opacity: 0.5;
     pointer-events: none;
 }
@@ -856,27 +958,27 @@
 }
 
 .sequencer-pad.current-step {
-    background: #ffffff;
+    background: var(--primitive-neutral-0);
     box-shadow:
-        0 0 0 2px rgba(255, 255, 255, 0.85),
-        0 0 18px rgba(255, 255, 255, 0.55);
+        0 0 0 2px color-mix(in oklab, var(--primitive-neutral-0) 85%, transparent),
+        0 0 18px color-mix(in oklab, var(--primitive-neutral-0) 55%, transparent);
 }
 
 .sequencer-pad.current-step.active {
-    background: #ffd54d;
+    background: color-mix(in oklab, var(--semantic-warning) 72%, white);
     box-shadow:
-        0 0 0 2px rgba(255, 242, 204, 0.95),
-        0 0 18px rgba(255, 204, 0, 0.8);
+        0 0 0 2px color-mix(in oklab, var(--semantic-warning) 90%, white),
+        0 0 18px color-mix(in oklab, var(--semantic-warning) 80%, transparent);
 }
 
 .step-column.current-step-column .velocity-bar-container {
-    outline: 1px solid rgba(255, 255, 255, 0.32);
+    outline: 1px solid color-mix(in oklab, var(--primitive-neutral-0) 32%, transparent);
     outline-offset: 2px;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--primitive-neutral-0) 14%, transparent);
 }
 
 .step-column.current-step-column .velocity-bar {
-    background: linear-gradient(180deg, #ffffff 0%, #ffd54d 100%);
+    background: linear-gradient(180deg, var(--primitive-neutral-0) 0%, color-mix(in oklab, var(--semantic-warning) 72%, white) 100%);
     opacity: 1;
 }
 
@@ -984,5 +1086,5 @@
 }
 
 .piano-cell.selecting {
-    background: rgba(96, 165, 250, 0.35);
+    background: var(--semantic-selection);
 }

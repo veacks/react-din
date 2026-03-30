@@ -218,16 +218,22 @@ describe('Editor connection assist', () => {
         expect(document.querySelector('.connection-assist-handle')).toBeNull();
     });
 
-    it('keeps the audio library panel collapsed by default and expands it on demand', async () => {
+    it('shows the shared bottom drawer and lets the library tab collapse and reopen', async () => {
         const audioLibrary = await import('../../ui/editor/audioLibrary');
         vi.mocked(audioLibrary.listAssets).mockResolvedValue([]);
 
         const { EditorDemo } = await import('../../ui/EditorDemo');
         render(<EditorDemo />);
 
+        await waitFor(() => {
+            expect(screen.getByLabelText('Search library files')).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByTitle('Collapse bottom drawer'));
+
         expect(screen.queryByLabelText('Search library files')).not.toBeInTheDocument();
 
-        fireEvent.click(screen.getByTitle('Expand audio library'));
+        fireEvent.click(screen.getByTitle('Expand bottom drawer'));
 
         await waitFor(() => {
             expect(screen.getByLabelText('Search library files')).toBeInTheDocument();
@@ -282,8 +288,8 @@ describe('Editor connection assist', () => {
             );
         });
 
-        fireEvent.click(screen.getByTitle('Expand audio library'));
         await waitFor(() => {
+            expect(screen.getByLabelText('Search library files')).toBeInTheDocument();
             expect(screen.getAllByText('kick.wav').length).toBeGreaterThan(0);
         });
 
@@ -307,7 +313,9 @@ describe('Editor connection assist', () => {
         const { EditorDemo } = await import('../../ui/EditorDemo');
         render(<EditorDemo />);
 
-        fireEvent.click(screen.getByTitle('Expand audio library'));
+        await waitFor(() => {
+            expect(screen.getByLabelText('Search library files')).toBeInTheDocument();
+        });
         const dropzone = screen.getByText('Drag and drop audio files here').closest('.ui-library-dropzone') as HTMLElement;
         expect(dropzone).toBeTruthy();
 
@@ -328,7 +336,9 @@ describe('Editor connection assist', () => {
         const { EditorDemo } = await import('../../ui/EditorDemo');
         render(<EditorDemo />);
 
-        fireEvent.click(screen.getByTitle('Expand audio library'));
+        await waitFor(() => {
+            expect(screen.getByLabelText('Search library files')).toBeInTheDocument();
+        });
         const dropzone = screen.getByText('Drag and drop audio files here').closest('.ui-library-dropzone') as HTMLElement;
         expect(dropzone).toBeTruthy();
 

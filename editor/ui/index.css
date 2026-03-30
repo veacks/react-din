@@ -8,38 +8,195 @@
   color-scheme: dark;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  --app-bg: #080912;
-  --app-bg-accent: #141828;
-  --panel-bg: #121523;
-  --panel-border: #283044;
-  --panel-muted: #1a1f31;
-  --panel-elevated: #191e30;
-  --text: #e9edff;
-  --text-muted: #9aa5c6;
-  --text-subtle: #7580a5;
-  --accent: #68a5ff;
-  --accent-soft: rgba(104, 165, 255, 0.24);
-  --danger: #ff707d;
-  --danger-soft: rgba(255, 112, 125, 0.22);
-  --success: #36d399;
-  --canvas-bg: #0d1120;
-  --canvas-grid: rgba(111, 131, 179, 0.42);
-  --node-bg: #151a2c;
-  --node-border: #2b3552;
-  --node-header-bg: #202949;
-  --node-header-text: #f6f8ff;
-  --node-shadow: 0 10px 30px rgba(4, 8, 22, 0.58);
-  --node-shadow-focus: 0 0 0 2px rgba(104, 165, 255, 0.42), 0 16px 34px rgba(2, 6, 20, 0.58);
-  --control-bg: #1a2237;
-  --control-border: #2e3a5a;
-  --edge-color: #68a5ff;
-  --minimap-bg: #131b2f;
-  --controls-bg: #161d30;
-  --minimap-mask: rgba(5, 8, 17, 0.82);
-  --focus-ring: 0 0 0 2px rgba(104, 165, 255, 0.42);
-  --shell-gap: 10px;
-  --panel-radius: 14px;
-  --topbar-radius: 16px;
+
+  /* Primitive ramp */
+  --primitive-neutral-0: oklch(0.99 0.005 255);
+  --primitive-neutral-50: oklch(0.96 0.006 255);
+  --primitive-neutral-100: oklch(0.92 0.008 255);
+  --primitive-neutral-200: oklch(0.85 0.01 255);
+  --primitive-neutral-300: oklch(0.74 0.012 255);
+  --primitive-neutral-400: oklch(0.62 0.014 255);
+  --primitive-neutral-500: oklch(0.5 0.015 255);
+  --primitive-neutral-600: oklch(0.38 0.014 255);
+  --primitive-neutral-700: oklch(0.28 0.012 255);
+  --primitive-neutral-800: oklch(0.2 0.01 255);
+  --primitive-neutral-900: oklch(0.14 0.008 255);
+  --primitive-neutral-950: oklch(0.09 0.006 255);
+  --primitive-blue-500: oklch(0.68 0.17 250);
+  --primitive-blue-600: oklch(0.62 0.18 250);
+  --primitive-sky-500: oklch(0.76 0.12 235);
+  --primitive-cyan-500: oklch(0.78 0.11 210);
+  --primitive-green-500: oklch(0.74 0.15 156);
+  --primitive-emerald-500: oklch(0.72 0.14 160);
+  --primitive-amber-500: oklch(0.82 0.14 80);
+  --primitive-orange-500: oklch(0.74 0.16 45);
+  --primitive-red-500: oklch(0.66 0.2 25);
+  --primitive-violet-500: oklch(0.68 0.17 305);
+  --primitive-fuchsia-500: oklch(0.67 0.16 330);
+  --primitive-slate-500: oklch(0.48 0.03 255);
+
+  /* Semantic surfaces and state */
+  --semantic-surface-app: var(--primitive-neutral-950);
+  --semantic-surface-app-accent: color-mix(in oklab, var(--primitive-blue-500) 16%, var(--primitive-neutral-950));
+  --semantic-surface-panel: var(--primitive-neutral-900);
+  --semantic-surface-panel-muted: var(--primitive-neutral-800);
+  --semantic-surface-elevated: color-mix(in oklab, var(--primitive-neutral-800) 88%, white);
+  --semantic-surface-canvas: var(--primitive-neutral-900);
+  --semantic-border-default: color-mix(in oklab, var(--primitive-neutral-500) 35%, var(--primitive-neutral-800));
+  --semantic-border-strong: color-mix(in oklab, var(--primitive-neutral-300) 22%, var(--primitive-neutral-700));
+  --semantic-text: var(--primitive-neutral-50);
+  --semantic-text-muted: color-mix(in oklab, var(--primitive-neutral-300) 82%, var(--primitive-neutral-900));
+  --semantic-text-subtle: color-mix(in oklab, var(--primitive-neutral-400) 82%, var(--primitive-neutral-900));
+  --semantic-accent: var(--primitive-blue-500);
+  --semantic-accent-soft: color-mix(in oklab, var(--semantic-accent) 24%, transparent);
+  --semantic-danger: var(--primitive-red-500);
+  --semantic-danger-soft: color-mix(in oklab, var(--semantic-danger) 20%, transparent);
+  --semantic-success: var(--primitive-green-500);
+  --semantic-success-soft: color-mix(in oklab, var(--semantic-success) 18%, transparent);
+  --semantic-warning: var(--primitive-amber-500);
+  --semantic-warning-soft: color-mix(in oklab, var(--semantic-warning) 18%, transparent);
+  --semantic-info: var(--primitive-sky-500);
+  --semantic-info-soft: color-mix(in oklab, var(--semantic-info) 18%, transparent);
+  --semantic-focus-ring-color: color-mix(in oklab, var(--semantic-accent) 52%, white);
+  --semantic-selection: color-mix(in oklab, var(--semantic-accent) 22%, transparent);
+  --semantic-overlay: color-mix(in oklab, var(--primitive-neutral-950) 74%, transparent);
+  --semantic-scrim: color-mix(in oklab, var(--primitive-neutral-950) 84%, transparent);
+  --semantic-flow-audio: var(--semantic-success);
+  --semantic-flow-control: var(--semantic-accent);
+  --semantic-flow-trigger: var(--semantic-danger);
+  --semantic-flow-invalid: var(--semantic-danger);
+  --semantic-flow-compatible: var(--semantic-success);
+  --semantic-flow-hover: var(--semantic-warning);
+
+  /* Component tokens */
+  --component-shell-gap: 10px;
+  --component-shell-padding: 10px;
+  --component-panel-radius: 14px;
+  --component-topbar-radius: 16px;
+  --component-panel-shadow: 0 10px 26px color-mix(in oklab, var(--primitive-neutral-950) 38%, transparent);
+  --component-panel-backdrop: blur(14px);
+  --component-canvas-radius: 12px;
+  --component-canvas-shadow: inset 0 1px 0 color-mix(in oklab, white 7%, transparent);
+  --component-drawer-height: 280px;
+  --component-rail-width: 54px;
+  --component-inspector-width: 320px;
+  --component-command-palette-width: 560px;
+  --component-command-palette-max-height: 420px;
+  --component-activity-size: 36px;
+  --component-property-gap: 8px;
+  --component-diagnostics-chip-radius: 8px;
+  --component-library-tile-radius: 14px;
+  --component-library-tile-shadow: 0 8px 16px color-mix(in oklab, var(--primitive-neutral-950) 18%, transparent);
+  --component-connection-assist-shadow: 0 18px 40px color-mix(in oklab, var(--primitive-neutral-950) 28%, transparent);
+  --component-minimap-mask: var(--semantic-scrim);
+  --component-controls-bg: var(--semantic-surface-elevated);
+
+  /* Node-family tokens */
+  --node-family-source: var(--primitive-orange-500);
+  --node-family-source-header: color-mix(in oklab, var(--node-family-source) 18%, var(--semantic-surface-panel));
+  --node-family-source-header-text: var(--semantic-text);
+  --node-family-source-border: color-mix(in oklab, var(--node-family-source) 42%, var(--semantic-border-default));
+  --node-family-source-chip: color-mix(in oklab, var(--node-family-source) 26%, var(--semantic-surface-panel-muted));
+  --node-family-source-minimap: var(--node-family-source);
+  --node-family-source-handle-glow: color-mix(in oklab, var(--node-family-source) 42%, transparent);
+
+  --node-family-control: var(--primitive-violet-500);
+  --node-family-control-header: color-mix(in oklab, var(--node-family-control) 18%, var(--semantic-surface-panel));
+  --node-family-control-header-text: var(--semantic-text);
+  --node-family-control-border: color-mix(in oklab, var(--node-family-control) 42%, var(--semantic-border-default));
+  --node-family-control-chip: color-mix(in oklab, var(--node-family-control) 26%, var(--semantic-surface-panel-muted));
+  --node-family-control-minimap: var(--node-family-control);
+  --node-family-control-handle-glow: color-mix(in oklab, var(--node-family-control) 42%, transparent);
+
+  --node-family-routing: var(--primitive-amber-500);
+  --node-family-routing-header: color-mix(in oklab, var(--node-family-routing) 18%, var(--semantic-surface-panel));
+  --node-family-routing-header-text: var(--semantic-text);
+  --node-family-routing-border: color-mix(in oklab, var(--node-family-routing) 42%, var(--semantic-border-default));
+  --node-family-routing-chip: color-mix(in oklab, var(--node-family-routing) 26%, var(--semantic-surface-panel-muted));
+  --node-family-routing-minimap: var(--node-family-routing);
+  --node-family-routing-handle-glow: color-mix(in oklab, var(--node-family-routing) 42%, transparent);
+
+  --node-family-spectral: var(--primitive-fuchsia-500);
+  --node-family-spectral-header: color-mix(in oklab, var(--node-family-spectral) 18%, var(--semantic-surface-panel));
+  --node-family-spectral-header-text: var(--semantic-text);
+  --node-family-spectral-border: color-mix(in oklab, var(--node-family-spectral) 42%, var(--semantic-border-default));
+  --node-family-spectral-chip: color-mix(in oklab, var(--node-family-spectral) 26%, var(--semantic-surface-panel-muted));
+  --node-family-spectral-minimap: var(--node-family-spectral);
+  --node-family-spectral-handle-glow: color-mix(in oklab, var(--node-family-spectral) 42%, transparent);
+
+  --node-family-spatial: var(--primitive-cyan-500);
+  --node-family-spatial-header: color-mix(in oklab, var(--node-family-spatial) 18%, var(--semantic-surface-panel));
+  --node-family-spatial-header-text: var(--semantic-text);
+  --node-family-spatial-border: color-mix(in oklab, var(--node-family-spatial) 42%, var(--semantic-border-default));
+  --node-family-spatial-chip: color-mix(in oklab, var(--node-family-spatial) 26%, var(--semantic-surface-panel-muted));
+  --node-family-spatial-minimap: var(--node-family-spatial);
+  --node-family-spatial-handle-glow: color-mix(in oklab, var(--node-family-spatial) 42%, transparent);
+
+  --node-family-dynamics: var(--primitive-green-500);
+  --node-family-dynamics-header: color-mix(in oklab, var(--node-family-dynamics) 18%, var(--semantic-surface-panel));
+  --node-family-dynamics-header-text: var(--semantic-text);
+  --node-family-dynamics-border: color-mix(in oklab, var(--node-family-dynamics) 42%, var(--semantic-border-default));
+  --node-family-dynamics-chip: color-mix(in oklab, var(--node-family-dynamics) 26%, var(--semantic-surface-panel-muted));
+  --node-family-dynamics-minimap: var(--node-family-dynamics);
+  --node-family-dynamics-handle-glow: color-mix(in oklab, var(--node-family-dynamics) 42%, transparent);
+
+  --node-family-analysis: var(--primitive-sky-500);
+  --node-family-analysis-header: color-mix(in oklab, var(--node-family-analysis) 18%, var(--semantic-surface-panel));
+  --node-family-analysis-header-text: var(--semantic-text);
+  --node-family-analysis-border: color-mix(in oklab, var(--node-family-analysis) 42%, var(--semantic-border-default));
+  --node-family-analysis-chip: color-mix(in oklab, var(--node-family-analysis) 26%, var(--semantic-surface-panel-muted));
+  --node-family-analysis-minimap: var(--node-family-analysis);
+  --node-family-analysis-handle-glow: color-mix(in oklab, var(--node-family-analysis) 42%, transparent);
+
+  --node-family-midi: var(--primitive-emerald-500);
+  --node-family-midi-header: color-mix(in oklab, var(--node-family-midi) 18%, var(--semantic-surface-panel));
+  --node-family-midi-header-text: var(--semantic-text);
+  --node-family-midi-border: color-mix(in oklab, var(--node-family-midi) 42%, var(--semantic-border-default));
+  --node-family-midi-chip: color-mix(in oklab, var(--node-family-midi) 26%, var(--semantic-surface-panel-muted));
+  --node-family-midi-minimap: var(--node-family-midi);
+  --node-family-midi-handle-glow: color-mix(in oklab, var(--node-family-midi) 42%, transparent);
+
+  --node-family-utility: var(--primitive-slate-500);
+  --node-family-utility-header: color-mix(in oklab, var(--node-family-utility) 18%, var(--semantic-surface-panel));
+  --node-family-utility-header-text: var(--semantic-text);
+  --node-family-utility-border: color-mix(in oklab, var(--node-family-utility) 42%, var(--semantic-border-default));
+  --node-family-utility-chip: color-mix(in oklab, var(--node-family-utility) 26%, var(--semantic-surface-panel-muted));
+  --node-family-utility-minimap: var(--node-family-utility);
+  --node-family-utility-handle-glow: color-mix(in oklab, var(--node-family-utility) 42%, transparent);
+
+  /* Legacy compatibility aliases */
+  --app-bg: var(--semantic-surface-app);
+  --app-bg-accent: var(--semantic-surface-app-accent);
+  --panel-bg: var(--semantic-surface-panel);
+  --panel-border: var(--semantic-border-default);
+  --panel-muted: var(--semantic-surface-panel-muted);
+  --panel-elevated: var(--semantic-surface-elevated);
+  --text: var(--semantic-text);
+  --text-muted: var(--semantic-text-muted);
+  --text-subtle: var(--semantic-text-subtle);
+  --accent: var(--semantic-accent);
+  --accent-soft: var(--semantic-accent-soft);
+  --danger: var(--semantic-danger);
+  --danger-soft: var(--semantic-danger-soft);
+  --success: var(--semantic-success);
+  --canvas-bg: var(--semantic-surface-canvas);
+  --canvas-grid: color-mix(in oklab, var(--semantic-text-subtle) 48%, transparent);
+  --node-bg: var(--semantic-surface-panel);
+  --node-border: var(--semantic-border-default);
+  --node-header-bg: var(--semantic-surface-panel-muted);
+  --node-header-text: var(--semantic-text);
+  --node-shadow: 0 10px 30px color-mix(in oklab, var(--primitive-neutral-950) 58%, transparent);
+  --node-shadow-focus: 0 0 0 2px color-mix(in oklab, var(--semantic-accent) 42%, transparent), 0 16px 34px color-mix(in oklab, var(--primitive-neutral-950) 58%, transparent);
+  --control-bg: var(--semantic-surface-panel-muted);
+  --control-border: color-mix(in oklab, var(--semantic-border-default) 90%, transparent);
+  --edge-color: var(--semantic-flow-control);
+  --minimap-bg: var(--semantic-surface-panel);
+  --controls-bg: var(--semantic-surface-elevated);
+  --minimap-mask: var(--component-minimap-mask);
+  --focus-ring: 0 0 0 2px var(--semantic-focus-ring-color);
+  --shell-gap: var(--component-shell-gap);
+  --panel-radius: var(--component-panel-radius);
+  --topbar-radius: var(--component-topbar-radius);
 }
 
 html.dark {
@@ -48,35 +205,34 @@ html.dark {
 
 html.light {
   color-scheme: light;
-  --app-bg: #f2efe9;
-  --app-bg-accent: #f8f5ef;
-  --panel-bg: #ffffff;
-  --panel-border: #d8d4cb;
-  --panel-muted: #f1ede6;
-  --panel-elevated: #ffffff;
-  --text: #171922;
-  --text-muted: #626877;
-  --text-subtle: #7c8292;
-  --accent: #2265f7;
-  --accent-soft: rgba(34, 101, 247, 0.18);
-  --danger: #dc3e4e;
-  --danger-soft: rgba(220, 62, 78, 0.15);
-  --success: #198f56;
-  --canvas-bg: #ece8df;
-  --canvas-grid: rgba(106, 114, 130, 0.36);
-  --node-bg: #ffffff;
-  --node-border: #d2cdc1;
-  --node-header-bg: #f4f1ea;
-  --node-header-text: #171922;
-  --node-shadow: 0 10px 26px rgba(34, 39, 53, 0.13);
-  --node-shadow-focus: 0 0 0 2px rgba(34, 101, 247, 0.28), 0 10px 22px rgba(22, 28, 40, 0.14);
-  --control-bg: #f4f1ea;
-  --control-border: #d5d0c4;
-  --edge-color: #2265f7;
-  --minimap-bg: #f4f1ea;
-  --controls-bg: #ffffff;
-  --minimap-mask: rgba(255, 255, 255, 0.68);
-  --focus-ring: 0 0 0 2px rgba(34, 101, 247, 0.28);
+  --semantic-surface-app: oklch(0.96 0.008 95);
+  --semantic-surface-app-accent: color-mix(in oklab, var(--primitive-blue-500) 8%, var(--semantic-surface-app));
+  --semantic-surface-panel: oklch(0.99 0.003 95);
+  --semantic-surface-panel-muted: oklch(0.95 0.01 95);
+  --semantic-surface-elevated: oklch(0.99 0.002 95);
+  --semantic-surface-canvas: oklch(0.93 0.01 95);
+  --semantic-border-default: oklch(0.84 0.015 95);
+  --semantic-border-strong: oklch(0.72 0.015 95);
+  --semantic-text: oklch(0.18 0.015 255);
+  --semantic-text-muted: oklch(0.42 0.02 255);
+  --semantic-text-subtle: oklch(0.53 0.02 255);
+  --semantic-accent-soft: color-mix(in oklab, var(--semantic-accent) 16%, transparent);
+  --semantic-danger-soft: color-mix(in oklab, var(--semantic-danger) 14%, transparent);
+  --semantic-success-soft: color-mix(in oklab, var(--semantic-success) 14%, transparent);
+  --semantic-warning-soft: color-mix(in oklab, var(--semantic-warning) 14%, transparent);
+  --semantic-info-soft: color-mix(in oklab, var(--semantic-info) 14%, transparent);
+  --semantic-focus-ring-color: color-mix(in oklab, var(--semantic-accent) 32%, white);
+  --semantic-overlay: color-mix(in oklab, white 72%, transparent);
+  --semantic-scrim: color-mix(in oklab, white 68%, transparent);
+  --node-family-source-header: color-mix(in oklab, var(--node-family-source) 14%, var(--semantic-surface-panel));
+  --node-family-control-header: color-mix(in oklab, var(--node-family-control) 14%, var(--semantic-surface-panel));
+  --node-family-routing-header: color-mix(in oklab, var(--node-family-routing) 14%, var(--semantic-surface-panel));
+  --node-family-spectral-header: color-mix(in oklab, var(--node-family-spectral) 14%, var(--semantic-surface-panel));
+  --node-family-spatial-header: color-mix(in oklab, var(--node-family-spatial) 14%, var(--semantic-surface-panel));
+  --node-family-dynamics-header: color-mix(in oklab, var(--node-family-dynamics) 14%, var(--semantic-surface-panel));
+  --node-family-analysis-header: color-mix(in oklab, var(--node-family-analysis) 14%, var(--semantic-surface-panel));
+  --node-family-midi-header: color-mix(in oklab, var(--node-family-midi) 14%, var(--semantic-surface-panel));
+  --node-family-utility-header: color-mix(in oklab, var(--node-family-utility) 14%, var(--semantic-surface-panel));
 }
 
 @layer base {
@@ -94,10 +250,11 @@ html.light {
   }
 
   body {
-    @apply bg-[var(--app-bg)] text-[var(--text)] font-sans antialiased;
+    @apply bg-[var(--app-bg)] text-[var(--text)] antialiased;
+    font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
     background-image:
-      radial-gradient(1200px 400px at 50% -20%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 60%),
-      radial-gradient(800px 340px at 0% 100%, color-mix(in srgb, var(--app-bg-accent) 70%, transparent), transparent 60%);
+      radial-gradient(1200px 400px at 50% -20%, color-mix(in oklab, var(--semantic-accent) 18%, transparent), transparent 60%),
+      radial-gradient(800px 340px at 0% 100%, color-mix(in oklab, var(--app-bg-accent) 72%, transparent), transparent 60%);
     background-attachment: fixed;
   }
 
@@ -111,15 +268,15 @@ html.light {
   .ui-shell {
     gap: var(--shell-gap);
     padding: var(--shell-gap);
-    background: linear-gradient(180deg, color-mix(in srgb, var(--app-bg-accent) 35%, var(--app-bg)) 0%, var(--app-bg) 100%);
+    background: linear-gradient(180deg, color-mix(in oklab, var(--app-bg-accent) 35%, var(--app-bg)) 0%, var(--app-bg) 100%);
   }
 
   .ui-panel {
-    background: color-mix(in srgb, var(--panel-bg) 90%, transparent);
+    background: color-mix(in oklab, var(--panel-bg) 90%, transparent);
     border-radius: var(--panel-radius);
     overflow: hidden;
-    box-shadow: 0 10px 26px rgba(3, 7, 20, 0.32);
-    backdrop-filter: blur(14px);
+    box-shadow: var(--component-panel-shadow);
+    backdrop-filter: var(--component-panel-backdrop);
   }
 
   .ui-panel-header {
@@ -127,20 +284,20 @@ html.light {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    background: color-mix(in srgb, var(--panel-muted) 84%, transparent);
+    background: color-mix(in oklab, var(--panel-muted) 84%, transparent);
   }
 
   .ui-topbar {
-    background: color-mix(in srgb, var(--panel-bg) 92%, transparent);
+    background: color-mix(in oklab, var(--panel-bg) 92%, transparent);
     border-radius: var(--topbar-radius);
-    border: 1px solid color-mix(in srgb, var(--panel-border) 90%, transparent);
-    box-shadow: 0 8px 20px rgba(3, 7, 20, 0.3);
-    backdrop-filter: blur(14px);
+    border: 1px solid color-mix(in oklab, var(--panel-border) 90%, transparent);
+    box-shadow: 0 8px 20px color-mix(in oklab, var(--primitive-neutral-950) 30%, transparent);
+    backdrop-filter: var(--component-panel-backdrop);
   }
 
   .ui-stage {
     border-radius: var(--panel-radius);
-    background: linear-gradient(180deg, color-mix(in srgb, var(--panel-bg) 18%, var(--canvas-bg)) 0%, var(--canvas-bg) 22%, var(--canvas-bg) 100%);
+    background: linear-gradient(180deg, color-mix(in oklab, var(--panel-bg) 18%, var(--canvas-bg)) 0%, var(--canvas-bg) 22%, var(--canvas-bg) 100%);
     overflow: hidden;
   }
 
@@ -174,7 +331,7 @@ html.light {
     height: 8px;
     border-radius: 999px;
     background: currentColor;
-    box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 18%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in oklab, currentColor 18%, transparent);
   }
 
   .ui-mcp-indicator-meta {
@@ -183,14 +340,14 @@ html.light {
   }
 
   .ui-mcp-indicator--active {
-    border-color: color-mix(in srgb, var(--success) 58%, var(--panel-border));
-    background: color-mix(in srgb, var(--success) 12%, var(--panel-bg));
+    border-color: color-mix(in oklab, var(--success) 58%, var(--panel-border));
+    background: color-mix(in oklab, var(--success) 12%, var(--panel-bg));
     color: var(--success);
   }
 
   .ui-mcp-indicator--connecting {
-    border-color: color-mix(in srgb, var(--accent) 58%, var(--panel-border));
-    background: color-mix(in srgb, var(--accent) 14%, var(--panel-bg));
+    border-color: color-mix(in oklab, var(--accent) 58%, var(--panel-border));
+    background: color-mix(in oklab, var(--accent) 14%, var(--panel-bg));
     color: var(--accent);
   }
 
@@ -199,13 +356,13 @@ html.light {
   }
 
   .ui-mcp-indicator--error {
-    border-color: color-mix(in srgb, var(--danger) 58%, var(--panel-border));
-    background: color-mix(in srgb, var(--danger) 14%, var(--panel-bg));
+    border-color: color-mix(in oklab, var(--danger) 58%, var(--panel-border));
+    background: color-mix(in oklab, var(--danger) 14%, var(--panel-bg));
     color: var(--danger);
   }
 
   .ui-canvas-stage {
-    background: linear-gradient(180deg, color-mix(in srgb, var(--panel-muted) 18%, var(--canvas-bg)) 0%, var(--canvas-bg) 28%, var(--canvas-bg) 100%);
+    background: linear-gradient(180deg, color-mix(in oklab, var(--panel-muted) 18%, var(--canvas-bg)) 0%, var(--canvas-bg) 28%, var(--canvas-bg) 100%);
   }
 
   .ui-collapse-button {
@@ -217,7 +374,7 @@ html.light {
   .ui-palette-compact-item {
     position: relative;
     border-left-width: 4px;
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--panel-border) 60%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--panel-border) 60%, transparent);
   }
 
   .ui-palette-compact-item::after {
@@ -226,6 +383,69 @@ html.light {
     inset: 0;
     border-radius: 11px;
     pointer-events: none;
-    box-shadow: inset 0 10px 24px rgba(255, 255, 255, 0.02);
+    box-shadow: inset 0 10px 24px color-mix(in oklab, white 2%, transparent);
+  }
+
+  .ui-rail,
+  .ui-drawer,
+  .ui-inspector,
+  .ui-catalog-browser,
+  .ui-command-palette {
+    background: color-mix(in oklab, var(--panel-bg) 92%, transparent);
+    border: 1px solid color-mix(in oklab, var(--panel-border) 88%, transparent);
+    border-radius: var(--component-panel-radius);
+    box-shadow: var(--component-panel-shadow);
+    backdrop-filter: var(--component-panel-backdrop);
+  }
+
+  .ui-rail {
+    width: var(--component-rail-width);
+  }
+
+  .ui-drawer {
+    min-height: var(--component-drawer-height);
+  }
+
+  .ui-inspector {
+    width: var(--component-inspector-width);
+  }
+
+  .ui-command-palette {
+    width: min(var(--component-command-palette-width), calc(100vw - 24px));
+    max-height: var(--component-command-palette-max-height);
+  }
+
+  .ui-property-row {
+    display: grid;
+    gap: var(--component-property-gap);
+  }
+
+  .ui-segmented-tabs {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--panel-muted) 84%, transparent);
+    border: 1px solid color-mix(in oklab, var(--panel-border) 88%, transparent);
+  }
+
+  .ui-diagnostics-item {
+    border-radius: var(--component-diagnostics-chip-radius);
+    background: color-mix(in oklab, var(--danger) 14%, var(--panel-bg));
+    border: 1px solid color-mix(in oklab, var(--danger) 40%, var(--panel-border));
+    color: var(--danger);
+  }
+
+  .ui-library-tile {
+    border-radius: var(--component-library-tile-radius);
+    box-shadow: var(--component-library-tile-shadow);
+  }
+
+  .ui-empty-state {
+    border: 1px dashed var(--panel-border);
+    border-radius: var(--panel-radius);
+    color: var(--text-subtle);
+    background: color-mix(in oklab, var(--panel-muted) 72%, transparent);
   }
 }

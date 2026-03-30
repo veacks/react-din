@@ -16,6 +16,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import './editor/editor.css';
 import Inspector from './editor/Inspector';
+import { CodeGenerator } from './editor/CodeGenerator';
 import ConnectionAssistMenu from './editor/ConnectionAssistMenu';
 import { MidiProvider, useMidi } from '../../src/midi';
 import { graphDocumentToPatch, migratePatchDocument, patchToGraphDocument, type PatchDocument } from '../../src/patch';
@@ -96,6 +97,14 @@ import { editorMidiRuntime } from './editor/midiRuntime';
 import { createUiTokenParams } from './editor/uiTokens';
 import { McpStatusBadge } from '../bridge/McpStatusBadge';
 import { createAtmosphericBreakbeatArcTemplate } from './editor/templates/atmosphericBreakbeatArcTemplate';
+import { ActivityRail } from './shell/ActivityRail';
+import { BottomDrawer } from './shell/BottomDrawer';
+import { CommandPalette } from './shell/CommandPalette';
+import { EditorTopbar } from './shell/EditorTopbar';
+import { InspectorPane } from './shell/InspectorPane';
+import type { CommandPaletteAction } from './shell/editor-shell.types';
+import { useEditorLayout } from './shell/useEditorLayout';
+import { getMiniMapNodeColor } from './editor/nodeColorMap';
 
 const nodeTypes: NodeTypes = {
     oscNode: OscNode as NodeTypes[string],
@@ -769,17 +778,6 @@ const getClientPosition = (event: MouseEvent | TouchEvent): XYPosition | null =>
     return { x: touch.clientX, y: touch.clientY };
 };
 
-const getInitialTheme = (): 'light' | 'dark' => {
-    if (typeof window === 'undefined') return 'dark';
-    const stored = window.localStorage.getItem('din-editor-theme');
-    if (stored === 'light' || stored === 'dark') return stored;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-};
-
-const getViewportWidth = () => (typeof window === 'undefined' ? 1440 : window.innerWidth);
-const getDefaultPaletteCollapsed = (viewportWidth: number) => viewportWidth < 1220;
-const getDefaultInspectorCollapsed = (viewportWidth: number) => viewportWidth < 1040;
-
 interface FeedbackTemplateGraph {
     nodes: Node<AudioNodeData>[];
     edges: Edge[];
@@ -1050,7 +1048,7 @@ function createMedievalStrategyLongformTemplate(): FeedbackTemplateGraph {
     };
 }
 
-const NodePalette: FC<{ compact?: boolean }> = ({ compact = false }) => {
+const NodePalette: FC<{ compact?: boolean; query?: string }> = ({ compact = false, query = '' }) => {
     const addNode = useAudioGraphStore((s) => s.addNode);
 
     const handleDragStart = useCallback((e: React.DragEvent, nodeType: EditorNodeType) => {
@@ -1058,10 +1056,22 @@ const NodePalette: FC<{ compact?: boolean }> = ({ compact = false }) => {
         e.dataTransfer.effectAllowed = 'move';
     }, []);
 
+    const normalizedQuery = query.trim().toLowerCase();
+    const visibleCategories = normalizedQuery
+        ? nodeCategories
+            .map((category) => ({
+                ...category,
+                nodes: category.nodes.filter((node) =>
+                    `${node.label} ${category.name} ${node.type}`.toLowerCase().includes(normalizedQuery)
+                ),
+            }))
+            .filter((category) => category.nodes.length > 0)
+        : nodeCategories;
+
     if (compact) {
         return (
             <div className="ui-palette-compact grid grid-cols-2 gap-3 overflow-y-auto px-2 py-3">
-                {nodeCategories.flatMap((category) => category.nodes).map((node) => (
+                {visibleCategories.flatMap((category) => category.nodes).map((node) => (
                     <button
                         key={node.type}
                         type="button"
@@ -1080,16 +1090,22 @@ const NodePalette: FC<{ compact?: boolean }> = ({ compact = false }) => {
 
     return (
         <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 py-4">
-            {nodeCategories.map((category) => (
+            {visibleCategories.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[var(--panel-border)] bg-[var(--panel-muted)] px-4 py-8 text-center text-[11px] text-[var(--text-subtle)]">
+                    No node matches this search.
+                </div>
+            ) : visibleCategories.map((category) => (
                 <div key={category.name} className="space-y-2">
                     <h4 className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--text-subtle)]">
                         {category.name}
                     </h4>
                     <div className="grid grid-cols-2 gap-2">
                         {category.nodes.map((node) => (
-                            <div
+                            <button
                                 key={node.type}
-                                className="group flex cursor-grab items-center gap-2 rounded-md border border-transparent bg-[var(--panel-muted)] px-2 py-2 text-[11px] font-medium text-[var(--text)] transition hover:border-[var(--panel-border)] hover:bg-[var(--panel-bg)] active:cursor-grabbing"
+                                type="button"
+                                aria-label={`Add ${node.label}`}
+                                className="group flex w-full cursor-grab items-center gap-2 rounded-md border border-transparent bg-[var(--panel-muted)] px-2 py-2 text-left text-[11px] font-medium text-[var(--text)] transition hover:border-[var(--panel-border)] hover:bg-[var(--panel-bg)] active:cursor-grabbing"
                                 style={{ borderLeftWidth: 3, borderLeftColor: node.color }}
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, node.type)}
@@ -1097,7 +1113,7 @@ const NodePalette: FC<{ compact?: boolean }> = ({ compact = false }) => {
                             >
                                 <span className="text-sm">{node.icon}</span>
                                 <span className="truncate">{node.label}</span>
-                            </div>
+                            </button>
                         ))}
                     </div>
                 </div>
@@ -1111,6 +1127,7 @@ const EditorDemoContent: FC<EditorDemoProps> = ({ project }) => {
     const edges = useAudioGraphStore((s) => s.edges);
     const graphs = useAudioGraphStore((s) => s.graphs);
     const activeGraphId = useAudioGraphStore((s) => s.activeGraphId);
+    const selectedNodeId = useAudioGraphStore((s) => s.selectedNodeId);
     const onNodesChange = useAudioGraphStore((s) => s.onNodesChange);
     const onEdgesChange = useAudioGraphStore((s) => s.onEdgesChange);
     const onConnect = useAudioGraphStore((s) => s.onConnect);
@@ -1129,19 +1146,35 @@ const EditorDemoContent: FC<EditorDemoProps> = ({ project }) => {
     const canRedo = useAudioGraphStore((s) => s.canRedo);
     const isHydrated = useAudioGraphStore((s) => s.isHydrated);
     const setHydrated = useAudioGraphStore((s) => s.setHydrated);
-
-    const [theme, setTheme] = useState<'light' | 'dark'>(() => getInitialTheme());
-    const isDark = theme === 'dark';
-    const [viewportWidth, setViewportWidth] = useState(() => getViewportWidth());
-    const [isPaletteCollapsed, setPaletteCollapsed] = useState(() => getDefaultPaletteCollapsed(getViewportWidth()));
-    const [isInspectorCollapsed, setInspectorCollapsed] = useState(() => getDefaultInspectorCollapsed(getViewportWidth()));
-    const hasManualPanelLayoutRef = useRef(false);
+    const {
+        setTheme,
+        isDark,
+        viewportWidth,
+        leftPanelView,
+        leftPanelCollapsed,
+        rightPanelCollapsed,
+        bottomDrawerOpen,
+        bottomDrawerTab,
+        bottomDrawerHeight,
+        inspectorTab,
+        commandPaletteOpen,
+        setCommandPaletteOpen,
+        toggleLeftPanel,
+        toggleRightPanel,
+        toggleBottomDrawer,
+        openLeftPanelView,
+        openBottomDrawerTab,
+        openInspectorTab,
+        updateBottomDrawerHeight,
+    } = useEditorLayout();
 
     const activeGraph = graphs.find((graph) => graph.id === activeGraphId) ?? graphs[0];
     const activeGraphName = activeGraph?.name ?? 'Untitled Graph';
     const componentName = toPascalCase(activeGraphName);
+    const selectedNodeLabel = nodes.find((node) => node.id === selectedNodeId)?.data.label ?? null;
 
     const [nameDraft, setNameDraft] = useState(activeGraphName);
+    const [catalogQuery, setCatalogQuery] = useState('');
     const saveTimerRef = useRef<number | null>(null);
     const flowRef = useRef<{
         screenToFlowPosition: (clientPosition: XYPosition, options?: { snapToGrid: boolean }) => XYPosition;
@@ -1156,7 +1189,6 @@ const EditorDemoContent: FC<EditorDemoProps> = ({ project }) => {
     const [assistMenuQuery, setAssistMenuQuery] = useState('');
     const [assistMenuPosition, setAssistMenuPosition] = useState<XYPosition>({ x: ASSIST_MENU_MARGIN, y: ASSIST_MENU_MARGIN });
     const [assistDropClientPosition, setAssistDropClientPosition] = useState<XYPosition | null>(null);
-    const [isLibraryPanelCollapsed, setLibraryPanelCollapsed] = useState(true);
     const [libraryAssets, setLibraryAssets] = useState<AudioLibraryAsset[]>([]);
     const [librarySearch, setLibrarySearch] = useState('');
     const [previewAssetId, setPreviewAssetId] = useState<string | null>(null);
@@ -1211,31 +1243,6 @@ const EditorDemoContent: FC<EditorDemoProps> = ({ project }) => {
     }, [activeGraphName, activeGraphId]);
 
     useEffect(() => {
-        const root = document.documentElement;
-        root.classList.toggle('dark', isDark);
-        root.classList.toggle('light', !isDark);
-        window.localStorage.setItem('din-editor-theme', theme);
-    }, [isDark, theme]);
-
-    useEffect(() => {
-        const onResize = () => {
-            const nextWidth = getViewportWidth();
-            setViewportWidth(nextWidth);
-
-            if (!hasManualPanelLayoutRef.current) {
-                setPaletteCollapsed(getDefaultPaletteCollapsed(nextWidth));
-                setInspectorCollapsed(getDefaultInspectorCollapsed(nextWidth));
-            } else if (nextWidth < 900) {
-                // Keep the canvas usable on narrow viewports.
-                setInspectorCollapsed(true);
-            }
-        };
-
-        window.addEventListener('resize', onResize);
-        return () => window.removeEventListener('resize', onResize);
-    }, []);
-
-    useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.defaultPrevented || event.altKey || event.shiftKey) return;
             if (isEditableTarget(event.target)) return;
@@ -1247,6 +1254,12 @@ const EditorDemoContent: FC<EditorDemoProps> = ({ project }) => {
             if (isMac && event.ctrlKey) return;
 
             const key = event.key.toLowerCase();
+            if (key === 'k') {
+                event.preventDefault();
+                setCommandPaletteOpen(true);
+                return;
+            }
+
             if (key === 'z' && canUndo) {
                 event.preventDefault();
                 undo();
@@ -1261,7 +1274,7 @@ const EditorDemoContent: FC<EditorDemoProps> = ({ project }) => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [canRedo, canUndo, redo, undo]);
+    }, [canRedo, canUndo, redo, setCommandPaletteOpen, undo]);
 
     useEffect(() => {
         const refreshLibraryAssets = () => {
@@ -1880,40 +1893,228 @@ const EditorDemoContent: FC<EditorDemoProps> = ({ project }) => {
         return canConnect(connection, new Map(nodes.map((node) => [node.id, node])));
     }, [nodes]);
 
-    const tabBase =
-        'rounded-full border px-4 py-1.5 text-[12px] font-semibold transition';
     const templateButtonBase =
         'flex w-full items-center gap-2 rounded-md border border-[var(--panel-border)] bg-[var(--panel-muted)] px-3 py-2 text-left text-[11px] font-medium text-[var(--text)] transition hover:border-[var(--accent)] hover:bg-[var(--panel-bg)]';
-    const leftPanelWidth = isPaletteCollapsed ? 78 : viewportWidth < 1360 ? 228 : 268;
-    const rightPanelWidth = isInspectorCollapsed ? 78 : viewportWidth < 1360 ? 304 : 344;
+    const leftPanelWidth = leftPanelCollapsed ? 128 : viewportWidth < 1360 ? 260 : 320;
+    const rightPanelWidth = rightPanelCollapsed ? 0 : viewportWidth < 1360 ? 336 : 388;
 
-    const togglePalette = useCallback(() => {
-        hasManualPanelLayoutRef.current = true;
-        setPaletteCollapsed((previous) => !previous);
+    const handleFitCanvas = useCallback(() => {
+        flowRef.current?.fitView?.({ padding: 0.16, duration: 260 });
     }, []);
 
-    const toggleInspector = useCallback(() => {
-        hasManualPanelLayoutRef.current = true;
-        setInspectorCollapsed((previous) => !previous);
-    }, []);
+    const handleToggleBottomDrawer = useCallback(() => {
+        if (bottomDrawerOpen && bottomDrawerTab === 'library') {
+            stopPreviewAudio();
+        }
+        toggleBottomDrawer();
+    }, [bottomDrawerOpen, bottomDrawerTab, stopPreviewAudio, toggleBottomDrawer]);
 
-    const toggleLibraryPanel = useCallback(() => {
-        setLibraryPanelCollapsed((previous) => {
-            const next = !previous;
-            if (next) {
-                stopPreviewAudio();
-            }
-            return next;
-        });
-    }, [stopPreviewAudio]);
+    const handleOpenBottomDrawerTab = useCallback((tab: 'library' | 'runtime' | 'diagnostics') => {
+        if (bottomDrawerTab === 'library' && tab !== 'library') {
+            stopPreviewAudio();
+        }
+        openBottomDrawerTab(tab);
+    }, [bottomDrawerTab, openBottomDrawerTab, stopPreviewAudio]);
+
+    const closeCommandPalette = useCallback(() => {
+        setCommandPaletteOpen(false);
+    }, [setCommandPaletteOpen]);
+
+    const commandPaletteActions = useMemo<CommandPaletteAction[]>(() => [
+        { id: 'open-catalog', title: 'Open Catalog', section: 'Panels', onSelect: () => openLeftPanelView('catalog') },
+        { id: 'open-explorer', title: 'Open Explorer', section: 'Panels', onSelect: () => openLeftPanelView('explorer') },
+        { id: 'open-library', title: 'Open Library Drawer', section: 'Panels', onSelect: () => handleOpenBottomDrawerTab('library') },
+        { id: 'open-runtime', title: 'Open Runtime Drawer', section: 'Panels', onSelect: () => handleOpenBottomDrawerTab('runtime') },
+        { id: 'open-diagnostics', title: 'Open Diagnostics Drawer', section: 'Panels', onSelect: () => handleOpenBottomDrawerTab('diagnostics') },
+        { id: 'open-inspector', title: 'Open Inspector', section: 'Panels', onSelect: () => openInspectorTab('inspect') },
+        { id: 'open-code', title: 'Open Code Panel', section: 'Panels', onSelect: () => openInspectorTab('code') },
+        { id: 'toggle-left-panel', title: 'Toggle Left Panel', section: 'Panels', onSelect: toggleLeftPanel },
+        { id: 'toggle-right-panel', title: 'Toggle Inspector Panel', section: 'Panels', onSelect: toggleRightPanel },
+        { id: 'toggle-bottom-drawer', title: 'Toggle Bottom Drawer', section: 'Panels', onSelect: handleToggleBottomDrawer },
+        { id: 'create-graph', title: 'Create Graph', section: 'Graph', onSelect: () => createGraph() },
+        { id: 'delete-graph', title: 'Delete Active Graph', section: 'Graph', onSelect: () => handleDeleteGraph(activeGraphId) },
+        { id: 'copy-patch', title: 'Copy Patch JSON', section: 'Patch', onSelect: () => void handleCopyPatch() },
+        { id: 'download-patch', title: 'Download Patch JSON', section: 'Patch', onSelect: handleDownloadPatch },
+        { id: 'import-patch', title: 'Import Patch JSON', section: 'Patch', onSelect: () => patchImportRef.current?.click() },
+        { id: 'arrange-nodes', title: 'Auto Arrange Nodes', section: 'Canvas', onSelect: handleAutoArrangeNodes },
+        { id: 'fit-canvas', title: 'Fit Canvas', section: 'Canvas', onSelect: handleFitCanvas },
+        { id: 'toggle-theme', title: isDark ? 'Switch To Light Theme' : 'Switch To Dark Theme', section: 'Theme', onSelect: () => setTheme(isDark ? 'light' : 'dark') },
+    ], [
+        activeGraphId,
+        createGraph,
+        handleAutoArrangeNodes,
+        handleCopyPatch,
+        handleDeleteGraph,
+        handleDownloadPatch,
+        handleFitCanvas,
+        handleOpenBottomDrawerTab,
+        handleToggleBottomDrawer,
+        isDark,
+        openInspectorTab,
+        openLeftPanelView,
+        setTheme,
+        toggleLeftPanel,
+        toggleRightPanel,
+    ]);
+
+    const activityRailItems = [
+        { id: 'catalog', label: 'Catalog', shortLabel: 'CAT', active: !leftPanelCollapsed && leftPanelView === 'catalog', onSelect: () => openLeftPanelView('catalog') },
+        { id: 'explorer', label: 'Explorer', shortLabel: 'EXP', active: !leftPanelCollapsed && leftPanelView === 'explorer', onSelect: () => openLeftPanelView('explorer') },
+        { id: 'library', label: 'Library', shortLabel: 'LIB', active: bottomDrawerOpen && bottomDrawerTab === 'library', onSelect: () => handleOpenBottomDrawerTab('library') },
+        { id: 'runtime', label: 'Runtime', shortLabel: 'RUN', active: bottomDrawerOpen && bottomDrawerTab === 'runtime', onSelect: () => handleOpenBottomDrawerTab('runtime') },
+        { id: 'diagnostics', label: 'Diagnostics', shortLabel: 'DIA', active: bottomDrawerOpen && bottomDrawerTab === 'diagnostics', onSelect: () => handleOpenBottomDrawerTab('diagnostics') },
+        { id: 'inspect', label: 'Inspect', shortLabel: 'INS', active: !rightPanelCollapsed && inspectorTab === 'inspect', onSelect: () => openInspectorTab('inspect') },
+        { id: 'code', label: 'Code', shortLabel: 'COD', active: !rightPanelCollapsed && inspectorTab === 'code', onSelect: () => openInspectorTab('code') },
+    ];
+
+    const runtimeDrawerContent = (
+        <div className="grid h-full gap-3 overflow-y-auto pr-1 lg:grid-cols-[minmax(0,1fr)_260px]">
+            <div className="rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-bg)] p-4">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-subtle)]">Workspace Summary</div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-muted)] px-3 py-3">
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-subtle)]">Graph</div>
+                        <div className="mt-1 text-[15px] font-semibold text-[var(--text)]">{activeGraphName}</div>
+                    </div>
+                    <div className="rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-muted)] px-3 py-3">
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-subtle)]">Nodes</div>
+                        <div className="mt-1 text-[15px] font-semibold text-[var(--text)]">{nodes.length}</div>
+                    </div>
+                    <div className="rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-muted)] px-3 py-3">
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-subtle)]">Edges</div>
+                        <div className="mt-1 text-[15px] font-semibold text-[var(--text)]">{edges.length}</div>
+                    </div>
+                    <div className="rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-muted)] px-3 py-3">
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-subtle)]">Component</div>
+                        <div className="mt-1 font-mono text-[12px] text-[var(--text)]">{componentName}</div>
+                    </div>
+                </div>
+            </div>
+            <MidiStatusStrip />
+        </div>
+    );
+
+    const diagnosticsDrawerContent = (
+        <div className="h-full overflow-y-auto pr-1">
+            {graphDiagnostics.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[var(--panel-border)] bg-[var(--panel-bg)] px-4 py-8 text-center text-[11px] text-[var(--text-subtle)]">
+                    No invalid connection detected.
+                </div>
+            ) : (
+                <div className="flex flex-col gap-3">
+                    {graphDiagnostics.map((message) => (
+                        <div
+                            key={message}
+                            className="rounded-2xl border border-[var(--danger)]/35 bg-[var(--danger-soft)] px-4 py-3 text-[11px] text-[var(--danger)]"
+                        >
+                            {message}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+
+    const libraryDrawerContent = (
+        <div className="h-full overflow-y-auto pr-1">
+            <input
+                ref={libraryUploadRef}
+                type="file"
+                accept="audio/*"
+                multiple
+                onChange={handleLibraryUpload}
+                style={{ display: 'none' }}
+            />
+            <div
+                className={`ui-library-dropzone mb-3 rounded-xl border border-dashed px-3 py-3 transition ${isLibraryDragOver ? 'is-drag-over' : ''}`}
+                onDragOver={handleLibraryDragOver}
+                onDragLeave={handleLibraryDragLeave}
+                onDrop={handleLibraryDrop}
+            >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-[11px] text-[var(--text-subtle)]">Drag and drop audio files here</div>
+                    <button
+                        type="button"
+                        onClick={() => libraryUploadRef.current?.click()}
+                        className="rounded border border-[var(--panel-border)] bg-[var(--panel-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                    >
+                        Browse Files
+                    </button>
+                </div>
+                <div className="mt-2">
+                    <input
+                        type="text"
+                        value={librarySearch}
+                        onChange={(event) => setLibrarySearch(event.target.value)}
+                        placeholder="Search library files"
+                        aria-label="Search library files"
+                        className="h-8 w-full rounded-md border border-[var(--panel-border)] bg-[var(--panel-bg)] px-2 text-[11px] text-[var(--text)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-soft)]"
+                    />
+                </div>
+            </div>
+
+            {libraryPanelError ? (
+                <div className="mb-3 rounded border border-[var(--danger)]/45 bg-[var(--danger-soft)] px-2 py-1 text-[10px] text-[var(--danger)]">
+                    {libraryPanelError}
+                </div>
+            ) : null}
+
+            <div className="ui-library-list rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] px-2 py-3">
+                {filteredLibraryAssets.length === 0 ? (
+                    <div className="px-3 py-6 text-center text-[11px] text-[var(--text-subtle)]">No audio files found.</div>
+                ) : (
+                    <div className="ui-library-grid grid grid-cols-[repeat(auto-fill,minmax(118px,1fr))] gap-3">
+                        {filteredLibraryAssets.map((asset) => (
+                            <div key={asset.id} className="ui-library-tile relative rounded-lg px-1 py-1 text-center">
+                                <button
+                                    type="button"
+                                    onClick={() => handleLibraryDelete(asset)}
+                                    className="ui-library-delete absolute right-1 top-1 z-10 rounded-full border border-[var(--danger)]/50 bg-[var(--panel-bg)] px-1.5 py-0.5 text-[10px] text-[var(--danger)] transition hover:bg-[var(--danger-soft)]"
+                                    title="Delete file from library"
+                                >
+                                    x
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handlePreviewToggle(asset.id)}
+                                    className="ui-library-icon mx-auto mb-2 flex h-[106px] w-[96px] items-center justify-center rounded-xl border border-[var(--panel-border)]"
+                                    title={previewAssetId === asset.id ? 'Stop preview' : 'Preview audio'}
+                                >
+                                    <span className="ui-library-note-glyph">♪</span>
+                                    <span className="ui-library-play-overlay" aria-hidden="true">
+                                        {previewAssetId === asset.id ? '■' : '▶'}
+                                    </span>
+                                </button>
+                                <div className="truncate px-1 text-[11px] font-semibold text-[var(--text)]" title={asset.name}>
+                                    {asset.name}
+                                </div>
+                                <div className="text-[10px] text-[var(--text-subtle)]">
+                                    {formatBytes(asset.size)} · {formatDuration(asset.durationSec)}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+
+    const isPaletteCollapsed = leftPanelCollapsed;
+    const isInspectorCollapsed = rightPanelCollapsed;
+    const togglePalette = toggleLeftPanel;
+    const toggleInspector = toggleRightPanel;
 
     return (
+        <>
         <div
             className="ui-shell grid h-screen w-full text-[var(--text)]"
-            style={{ gridTemplateColumns: `${leftPanelWidth}px minmax(0, 1fr) ${rightPanelWidth}px` }}
+            style={{ gridTemplateColumns: `64px ${leftPanelWidth}px minmax(0, 1fr) ${rightPanelWidth}px` }}
         >
+            <div className="min-h-0 border-r border-[var(--panel-border)]">
+                <ActivityRail items={activityRailItems} />
+            </div>
             <aside className="ui-panel ui-panel-left flex h-full min-h-0 flex-col border-r border-[var(--panel-border)]">
-                {!isPaletteCollapsed && project && (
+                {!isPaletteCollapsed && leftPanelView === 'explorer' && project && (
                     <div className="border-b border-[var(--panel-border)] px-3 py-3">
                         <div className="rounded-[18px] border border-[var(--panel-border)] bg-[var(--panel-muted)] px-3 py-3">
                             <div className="flex items-start justify-between gap-3">
@@ -1992,9 +2193,22 @@ const EditorDemoContent: FC<EditorDemoProps> = ({ project }) => {
                 )}
 
                 <div className="ui-panel-header border-b border-[var(--panel-border)] px-3 py-2">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--text-subtle)]">
-                        Nodes
-                    </span>
+                    <div className="flex items-center gap-2 rounded-full border border-[var(--panel-border)] bg-[var(--panel-muted)] p-1">
+                        {(['catalog', 'explorer'] as const).map((view) => (
+                            <button
+                                key={view}
+                                type="button"
+                                onClick={() => openLeftPanelView(view)}
+                                className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] transition ${
+                                    leftPanelView === view
+                                        ? 'bg-[var(--accent-soft)] text-[var(--text)]'
+                                        : 'text-[var(--text-subtle)] hover:text-[var(--text)]'
+                                }`}
+                            >
+                                {view}
+                            </button>
+                        ))}
+                    </div>
                     <button
                         type="button"
                         onClick={togglePalette}
@@ -2006,15 +2220,30 @@ const EditorDemoContent: FC<EditorDemoProps> = ({ project }) => {
                     </button>
                 </div>
 
-                {!isPaletteCollapsed && (
-                    <div className="px-3 pt-3">
-                        <MidiStatusStrip />
+                {!isPaletteCollapsed && leftPanelView === 'catalog' && (
+                    <div className="border-b border-[var(--panel-border)] px-3 py-3">
+                        <input
+                            type="text"
+                            value={catalogQuery}
+                            onChange={(event) => setCatalogQuery(event.target.value)}
+                            placeholder="Search nodes"
+                            aria-label="Search nodes"
+                            className="h-9 w-full rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] px-3 text-[11px] text-[var(--text)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-soft)]"
+                        />
                     </div>
                 )}
 
-                <NodePalette compact={isPaletteCollapsed} />
+                {leftPanelView === 'catalog' ? (
+                    <NodePalette compact={isPaletteCollapsed} query={catalogQuery} />
+                ) : (
+                    <div className="flex-1 overflow-y-auto px-4 py-4">
+                        <div className="rounded-2xl border border-dashed border-[var(--panel-border)] bg-[var(--panel-muted)] px-4 py-8 text-center text-[11px] text-[var(--text-subtle)]">
+                            Select a graph from the project explorer above.
+                        </div>
+                    </div>
+                )}
 
-                {!isPaletteCollapsed && (
+                {!isPaletteCollapsed && leftPanelView === 'catalog' && (
                 <div className="border-t border-[var(--panel-border)] px-4 py-4">
                     <h4 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--text-subtle)]">
                         Templates
@@ -2415,127 +2644,33 @@ const EditorDemoContent: FC<EditorDemoProps> = ({ project }) => {
             </aside>
 
             <section className="ui-stage flex h-full min-w-0 flex-col">
-                <div className="ui-topbar flex flex-wrap items-center justify-between gap-3 border-b border-[var(--panel-border)] px-4 py-2">
-                    <input
-                        ref={patchImportRef}
-                        type="file"
-                        accept="application/json,.json"
-                        onChange={handleImportPatch}
-                        style={{ display: 'none' }}
-                    />
-                    <div className="flex min-w-0 items-center gap-3">
-                        {project ? (
-                            <div className="flex min-w-0 items-center gap-3 rounded-[18px] border border-[var(--panel-border)] bg-[var(--panel-muted)] px-3 py-2">
-                                <span
-                                    className="inline-block h-3 w-3 shrink-0 rounded-full"
-                                    style={{ backgroundColor: project.accentColor }}
-                                />
-                                <div className="min-w-0">
-                                    <div className="truncate text-[13px] font-semibold text-[var(--text)]">{project.name}</div>
-                                    <div className="truncate text-[10px] uppercase tracking-[0.18em] text-[var(--text-subtle)]">
-                                        Active graph: {activeGraphName}
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="rounded-[18px] border border-[var(--panel-border)] bg-[var(--panel-muted)] px-3 py-2">
-                                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-subtle)]">
-                                    Workspace
-                                </div>
-                                <div className="text-[13px] font-semibold text-[var(--text)]">{activeGraphName}</div>
-                            </div>
-                        )}
-                    </div>
-                    <div className="ui-topbar-actions flex flex-wrap items-center justify-end gap-2">
-                        <McpStatusBadge />
-                        <button
-                            type="button"
-                            onClick={togglePalette}
-                            className="ui-collapse-button rounded-xl border border-[var(--panel-border)] px-3 py-1 text-[11px] font-semibold text-[var(--text-subtle)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
-                            title={isPaletteCollapsed ? 'Show palette' : 'Hide palette'}
-                            aria-label={isPaletteCollapsed ? 'Expand palette' : 'Collapse palette'}
-                        >
-                            {isPaletteCollapsed ? '>' : '<'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={toggleInspector}
-                            className="ui-collapse-button rounded-xl border border-[var(--panel-border)] px-3 py-1 text-[11px] font-semibold text-[var(--text-subtle)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
-                            title={isInspectorCollapsed ? 'Show inspector' : 'Hide inspector'}
-                            aria-label={isInspectorCollapsed ? 'Expand inspector' : 'Collapse inspector'}
-                        >
-                            {isInspectorCollapsed ? '<' : '>'}
-                        </button>
-                        <label className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-subtle)]">
-                            Graph
-                        </label>
-                        <input
-                            type="text"
-                            value={nameDraft}
-                            onChange={(e) => setNameDraft(e.target.value)}
-                            onBlur={commitGraphName}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    commitGraphName();
-                                    e.currentTarget.blur();
-                                }
-                            }}
-                            placeholder="Graph name"
-                            className="h-8 w-40 rounded-md border border-[var(--panel-border)] bg-[var(--panel-muted)] px-2 text-[11px] text-[var(--text)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-soft)]"
-                        />
-                        <span className="font-mono text-[10px] text-[var(--text-subtle)]">
-                            {componentName}
-                        </span>
-                        <button
-                            type="button"
-                            className="rounded-md border border-[var(--panel-border)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                            onClick={() => void handleCopyPatch()}
-                            title="Copy patch JSON"
-                        >
-                            Copy Patch
-                        </button>
-                        <button
-                            type="button"
-                            className="rounded-md border border-[var(--panel-border)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                            onClick={handleDownloadPatch}
-                            title="Download patch JSON"
-                        >
-                            Download Patch
-                        </button>
-                        <button
-                            type="button"
-                            className="rounded-md border border-[var(--panel-border)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                            onClick={() => patchImportRef.current?.click()}
-                            title="Import patch JSON"
-                        >
-                            Import Patch
-                        </button>
-                        <button
-                            type="button"
-                            className="rounded-md border border-[var(--panel-border)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--danger)] transition hover:border-[var(--danger)] hover:bg-[var(--danger-soft)]"
-                            onClick={() => handleDeleteGraph(activeGraphId)}
-                            title="Delete graph"
-                            disabled={!activeGraphId}
-                        >
-                            🗑 Delete
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setTheme(isDark ? 'light' : 'dark')}
-                            className="flex items-center gap-2 rounded-full border border-[var(--panel-border)] bg-[var(--panel-muted)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)] transition hover:border-[var(--accent)]"
-                            aria-pressed={isDark}
-                            title="Toggle theme"
-                        >
-                            <span className="text-xs">{isDark ? '🌙' : '☀️'}</span>
-                            <span className="relative inline-flex h-4 w-8 items-center rounded-full bg-[var(--panel-border)]">
-                                <span
-                                    className={`h-3 w-3 rounded-full bg-[var(--panel-bg)] shadow-sm transition-transform ${isDark ? 'translate-x-4' : 'translate-x-1'}`}
-                                />
-                            </span>
-                            <span className="hidden sm:inline">{isDark ? 'Dark' : 'Light'}</span>
-                        </button>
-                    </div>
-                </div>
+                <input
+                    ref={patchImportRef}
+                    type="file"
+                    accept="application/json,.json"
+                    onChange={handleImportPatch}
+                    style={{ display: 'none' }}
+                />
+                <EditorTopbar
+                    project={project ? { name: project.name, accentColor: project.accentColor } : undefined}
+                    activeGraphName={activeGraphName}
+                    componentName={componentName}
+                    nameDraft={nameDraft}
+                    onNameDraftChange={(event) => setNameDraft(event.target.value)}
+                    onNameBlur={commitGraphName}
+                    onNameKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                            commitGraphName();
+                            event.currentTarget.blur();
+                        }
+                    }}
+                    isDark={isDark}
+                    onToggleTheme={() => setTheme(isDark ? 'light' : 'dark')}
+                    onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+                    onAutoArrange={handleAutoArrangeNodes}
+                    onFitCanvas={handleFitCanvas}
+                    mcpBadge={<McpStatusBadge />}
+                />
 
                 <div className="border-b border-[var(--panel-border)] bg-[var(--panel-muted)] px-4 py-2">
                     {graphDiagnostics.length === 0 ? (
@@ -2607,180 +2742,39 @@ const EditorDemoContent: FC<EditorDemoProps> = ({ project }) => {
                             <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--canvas-grid)" />
                             <Controls />
                             <MiniMap
-                                nodeColor={(node) => {
-                                    switch (node.type) {
-                                        case 'oscNode': return '#ff8844';
-                                        case 'gainNode': return '#44cc44';
-                                        case 'filterNode': return '#aa44ff';
-                                        case 'outputNode': return '#ff4466';
-                                        case 'noiseNode': return '#666666';
-                                        case 'delayNode': return '#4488ff';
-                                        case 'reverbNode': return '#8844ff';
-                                        case 'compressorNode': return '#5fcd70';
-                                        case 'phaserNode': return '#7a9cff';
-                                        case 'flangerNode': return '#7a9cff';
-                                        case 'tremoloNode': return '#7a9cff';
-                                        case 'eq3Node': return '#7a9cff';
-                                        case 'distortionNode': return '#ff7f50';
-                                        case 'chorusNode': return '#44ccff';
-                                        case 'noiseBurstNode': return '#666666';
-                                        case 'waveShaperNode': return '#ff7f50';
-                                        case 'convolverNode': return '#8844ff';
-                                        case 'analyzerNode': return '#7bd1ff';
-                                        case 'pannerNode': return '#44cccc';
-                                        case 'panner3dNode': return '#44cccc';
-                                        case 'mixerNode': return '#ffaa44';
-                                        case 'auxSendNode': return '#ffaa44';
-                                        case 'auxReturnNode': return '#ffaa44';
-                                        case 'matrixMixerNode': return '#ffaa44';
-                                        case 'uiTokensNode': return '#68a5ff';
-                                        case 'constantSourceNode': return '#7bd1ff';
-                                        case 'mediaStreamNode': return '#7bd1ff';
-                                        case 'eventTriggerNode': return '#ffd166';
-                                        default: return '#888';
-                                    }
-                                }}
+                                nodeColor={(node) => getMiniMapNodeColor((node.type ?? 'inputNode').replace(/Node$/, '') as EditorNodeType)}
                                 maskColor="var(--minimap-mask)"
                             />
                         </ReactFlow>
                     </div>
                 </div>
 
-                <div className="ui-library-panel border-t border-[var(--panel-border)] bg-[var(--panel-muted)]/65">
-                    <div className="flex items-center justify-between gap-3 px-4 py-2">
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-subtle)]">
-                                Audio Library
-                            </span>
-                            <span className="rounded border border-[var(--panel-border)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]">
-                                {libraryAssets.length}
-                            </span>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={toggleLibraryPanel}
-                            className="ui-collapse-button rounded-xl border border-[var(--panel-border)] px-3 py-1 text-[11px] font-semibold text-[var(--text-subtle)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
-                            aria-pressed={!isLibraryPanelCollapsed}
-                            title={isLibraryPanelCollapsed ? 'Expand audio library' : 'Collapse audio library'}
-                        >
-                            {isLibraryPanelCollapsed ? '^' : 'v'}
-                        </button>
-                    </div>
-
-                    {!isLibraryPanelCollapsed && (
-                        <div className="px-4 pb-3">
-                            <input
-                                ref={libraryUploadRef}
-                                type="file"
-                                accept="audio/*"
-                                multiple
-                                onChange={handleLibraryUpload}
-                                style={{ display: 'none' }}
-                            />
-                            <div
-                                className={`ui-library-dropzone mb-2 rounded-md border border-dashed px-3 py-3 transition ${isLibraryDragOver ? 'is-drag-over' : ''}`}
-                                onDragOver={handleLibraryDragOver}
-                                onDragLeave={handleLibraryDragLeave}
-                                onDrop={handleLibraryDrop}
-                            >
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <div className="text-[11px] text-[var(--text-subtle)]">
-                                        Drag and drop audio files here
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => libraryUploadRef.current?.click()}
-                                        className="rounded border border-[var(--panel-border)] bg-[var(--panel-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                                    >
-                                        Browse Files
-                                    </button>
-                                </div>
-                                <div className="mt-2">
-                                    <input
-                                        type="text"
-                                        value={librarySearch}
-                                        onChange={(event) => setLibrarySearch(event.target.value)}
-                                        placeholder="Search library files"
-                                        aria-label="Search library files"
-                                        className="h-8 w-full rounded-md border border-[var(--panel-border)] bg-[var(--panel-bg)] px-2 text-[11px] text-[var(--text)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-soft)]"
-                                    />
-                                </div>
-                            </div>
-
-                            {libraryPanelError && (
-                                <div className="mb-2 rounded border border-[var(--danger)]/45 bg-[var(--danger-soft)] px-2 py-1 text-[10px] text-[var(--danger)]">
-                                    {libraryPanelError}
-                                </div>
-                            )}
-
-                            <div className="ui-library-list max-h-[260px] overflow-y-auto rounded-md border border-[var(--panel-border)] bg-[var(--panel-bg)] px-2 py-3">
-                                {filteredLibraryAssets.length === 0 ? (
-                                    <div className="px-3 py-6 text-center text-[11px] text-[var(--text-subtle)]">
-                                        No audio files found.
-                                    </div>
-                                ) : (
-                                    <div className="ui-library-grid grid grid-cols-[repeat(auto-fill,minmax(118px,1fr))] gap-3">
-                                        {filteredLibraryAssets.map((asset) => (
-                                            <div key={asset.id} className="ui-library-tile relative rounded-lg px-1 py-1 text-center">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleLibraryDelete(asset)}
-                                                    className="ui-library-delete absolute right-1 top-1 z-10 rounded-full border border-[var(--danger)]/50 bg-[var(--panel-bg)] px-1.5 py-0.5 text-[10px] text-[var(--danger)] transition hover:bg-[var(--danger-soft)]"
-                                                    title="Delete file from library"
-                                                >
-                                                    x
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handlePreviewToggle(asset.id)}
-                                                    className="ui-library-icon mx-auto mb-2 flex h-[106px] w-[96px] items-center justify-center rounded-xl border border-[var(--panel-border)]"
-                                                    title={previewAssetId === asset.id ? 'Stop preview' : 'Preview audio'}
-                                                >
-                                                    <span className="ui-library-note-glyph">♪</span>
-                                                    <span className="ui-library-play-overlay" aria-hidden="true">
-                                                        {previewAssetId === asset.id ? '■' : '▶'}
-                                                    </span>
-                                                </button>
-                                                <div className="truncate px-1 text-[11px] font-semibold text-[var(--text)]" title={asset.name}>
-                                                    {asset.name}
-                                                </div>
-                                                <div className="text-[10px] text-[var(--text-subtle)]">
-                                                    {formatBytes(asset.size)} · {formatDuration(asset.durationSec)}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
+                <BottomDrawer
+                    open={bottomDrawerOpen}
+                    activeTab={bottomDrawerTab}
+                    height={bottomDrawerHeight}
+                    onToggle={handleToggleBottomDrawer}
+                    onTabChange={handleOpenBottomDrawerTab}
+                    onHeightChange={updateBottomDrawerHeight}
+                    libraryContent={libraryDrawerContent}
+                    runtimeContent={runtimeDrawerContent}
+                    diagnosticsContent={diagnosticsDrawerContent}
+                />
             </section>
 
-            <aside className="ui-panel ui-panel-right flex h-full min-h-0 flex-col border-l border-[var(--panel-border)]">
-                <div className="ui-panel-header border-b border-[var(--panel-border)] px-3 py-2">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--text-subtle)]">
-                        Inspect
-                    </span>
-                    <button
-                        type="button"
-                        onClick={toggleInspector}
-                        className="ui-collapse-button rounded-xl border border-[var(--panel-border)] bg-[var(--panel-muted)] px-3 py-1 text-[11px] font-semibold text-[var(--text-subtle)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
-                        aria-pressed={!isInspectorCollapsed}
-                        title={isInspectorCollapsed ? 'Expand inspector' : 'Collapse inspector'}
-                    >
-                        {isInspectorCollapsed ? '<' : '>'}
-                    </button>
-                </div>
-                {isInspectorCollapsed ? (
-                    <div className="flex flex-1 items-center justify-center px-2 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)]">
-                        Select a node
-                    </div>
-                ) : (
-                    <Inspector />
-                )}
-            </aside>
+            <InspectorPane
+                collapsed={isInspectorCollapsed}
+                tab={inspectorTab}
+                onToggleCollapse={toggleInspector}
+                onTabChange={openInspectorTab}
+                hasSelection={Boolean(selectedNodeId)}
+                selectedNodeLabel={selectedNodeLabel}
+                inspectContent={<Inspector />}
+                codeContent={<CodeGenerator />}
+            />
         </div>
+        <CommandPalette open={commandPaletteOpen} actions={commandPaletteActions} onClose={closeCommandPalette} />
+        </>
     );
 };
 

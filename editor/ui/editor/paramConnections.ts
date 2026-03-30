@@ -21,6 +21,47 @@ export interface TargetHandleConnectionInfo {
     value: number | null;
 }
 
+type LiveConnectionListener = () => void;
+
+const liveConnectionListeners = new Set<LiveConnectionListener>();
+let liveConnectionTimerId: number | null = null;
+
+function notifyLiveConnectionListeners() {
+    liveConnectionListeners.forEach((listener) => listener());
+}
+
+function startLiveConnectionBroadcast() {
+    if (liveConnectionTimerId !== null || typeof window === 'undefined') return;
+
+    liveConnectionTimerId = window.setInterval(() => {
+        if (liveConnectionListeners.size === 0) {
+            stopLiveConnectionBroadcast();
+            return;
+        }
+
+        notifyLiveConnectionListeners();
+    }, 50);
+}
+
+function stopLiveConnectionBroadcast() {
+    if (liveConnectionTimerId === null) return;
+    window.clearInterval(liveConnectionTimerId);
+    liveConnectionTimerId = null;
+}
+
+function subscribeToLiveConnectionBroadcast(listener: LiveConnectionListener): () => void {
+    liveConnectionListeners.add(listener);
+    startLiveConnectionBroadcast();
+    listener();
+
+    return () => {
+        liveConnectionListeners.delete(listener);
+        if (liveConnectionListeners.size === 0) {
+            stopLiveConnectionBroadcast();
+        }
+    };
+}
+
 function resolveSourceHandleValue(
     sourceNode: Node<AudioNodeData>,
     sourceHandle: string | null | undefined,
@@ -187,47 +228,35 @@ export function getTargetHandleConnectionInfo(
 export function useTargetHandleConnection(nodeId: string, targetHandle: string): TargetHandleConnectionInfo {
     const nodes = useAudioGraphStore((state) => state.nodes);
     const edges = useAudioGraphStore((state) => state.edges);
-    const [liveValue, setLiveValue] = useState<number | null>(null);
+    const [, setRevision] = useState(0);
+    const hasTargetHandle = targetHandle.trim().length > 0;
 
     const connectionInfo = useMemo(
-        () => getTargetHandleConnectionInfo(nodes, edges, nodeId, targetHandle),
-        [nodes, edges, nodeId, targetHandle]
+        () => (hasTargetHandle ? getTargetHandleConnectionInfo(nodes, edges, nodeId, targetHandle) : { connected: false, value: null }),
+        [hasTargetHandle, nodes, edges, nodeId, targetHandle]
     );
 
     useEffect(() => {
-        if (!connectionInfo.connected || typeof window === 'undefined') {
-            setLiveValue(null);
-            return;
+        if (!hasTargetHandle || !connectionInfo.connected) {
+            setRevision(0);
+            return undefined;
         }
 
-        const updateValue = () => {
-            const engineValue = audioEngine.getControlInputValue(nodeId, targetHandle);
-            const nextValue = engineValue ?? connectionInfo.value;
-            setLiveValue((prev) => {
-                if (prev === nextValue) return prev;
-                if (
-                    typeof prev === 'number'
-                    && typeof nextValue === 'number'
-                    && Math.abs(prev - nextValue) < 1e-6
-                ) {
-                    return prev;
-                }
-                return nextValue;
-            });
-        };
-
-        updateValue();
-        const intervalId = window.setInterval(updateValue, 50);
-        return () => window.clearInterval(intervalId);
-    }, [connectionInfo.connected, connectionInfo.value, nodeId, targetHandle]);
+        return subscribeToLiveConnectionBroadcast(() => {
+            setRevision((value) => value + 1);
+        });
+    }, [connectionInfo.connected, hasTargetHandle, nodeId, targetHandle]);
 
     if (!connectionInfo.connected) {
         return connectionInfo;
     }
 
+    const engineValue = audioEngine.getControlInputValue(nodeId, targetHandle);
+    const liveValue = engineValue ?? connectionInfo.value;
+
     return {
         connected: true,
-        value: liveValue ?? connectionInfo.value,
+        value: liveValue,
     };
 }
 
