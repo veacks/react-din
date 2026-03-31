@@ -41,7 +41,7 @@ export function InspectorPane({
                                     : 'text-[var(--text-subtle)] hover:text-[var(--text)]'
                             }`}
                         >
-                            {item}
+                            {item === 'inspect' ? 'Inspect' : 'Code'}
                         </button>
                     ))}
                 </div>

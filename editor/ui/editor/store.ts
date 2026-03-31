@@ -16,6 +16,7 @@ import {
     canConnect,
     isAudioConnection,
     type NormalizedConnectionDescriptor,
+    type ConnectionAssistStart,
     migrateGraphEdges,
     migrateGraphNodes,
     normalizeInputNodeData,
@@ -23,6 +24,7 @@ import {
     normalizeTransportNodeData,
     getSingletonNodeTypes,
 } from './nodeHelpers';
+import type { XYPosition } from '@xyflow/react';
 import type { EditorNodeType } from './nodeCatalog';
 import {
     createEditorNode,
@@ -705,6 +707,15 @@ interface AudioGraphState {
     setPlaying: (playing: boolean) => void;
     setSelectedNode: (nodeId: string | null) => void;
     initAudioContext: () => void;
+    clearAssetReferences: (assetId: string) => void;
+    
+    // Connection Assist State
+    connectionAssist: ConnectionAssistStart | null;
+    assistPosition: XYPosition | null;
+    assistQuery: string;
+    setConnectionAssist: (assist: ConnectionAssistStart | null) => void;
+    setAssistPosition: (position: XYPosition | null) => void;
+    setAssistQuery: (query: string) => void;
 }
 
 let nodeIdCounter = 0;
@@ -1407,57 +1418,59 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
             const fallbackGraph: GraphDocument = createInitialGraphDocument(
                 createEditorGraphId(),
                 normalizeGraphName('Graph 1'),
-                0,
+                0
             );
-            const normalizedFallbackGraph = normalizeGraphDocument(fallbackGraph, 0, now);
-
-            syncNodeIdCounter(normalizedFallbackGraph.nodes);
+            const normalized = normalizeGraphDocument(fallbackGraph, 0, now);
+            syncNodeIdCounter(normalized.nodes);
             audioEngine.stop();
 
             set({
-                graphs: [normalizedFallbackGraph],
-                activeGraphId: normalizedFallbackGraph.id,
-                nodes: normalizedFallbackGraph.nodes,
-                edges: normalizedFallbackGraph.edges,
+                graphs: [normalized],
+                activeGraphId: normalized.id,
+                nodes: normalized.nodes,
+                edges: normalized.edges,
                 selectedNodeId: null,
-                historyByGraph,
-                ...getHistoryAvailability(historyByGraph, normalizedFallbackGraph.id),
+                historyByGraph: {},
+                canUndo: false,
+                canRedo: false,
             });
 
-            audioEngine.refreshConnections(normalizedFallbackGraph.nodes, normalizedFallbackGraph.edges);
-            return targetGraph;
+            audioEngine.refreshConnections(normalized.nodes, normalized.edges);
+            return normalized;
         }
 
-        if (state.activeGraphId === graphId) {
-            const ordered = [...remaining].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-            const nextGraph = ordered[0] ?? remaining[0];
+        const nextActiveId = graphId === state.activeGraphId ? remaining[0].id : state.activeGraphId;
+        const nextActiveGraph = remaining.find((g) => g.id === nextActiveId)!;
 
-            audioEngine.stop();
-            syncNodeIdCounter(nextGraph.nodes);
+        syncNodeIdCounter(nextActiveGraph.nodes);
+        audioEngine.stop();
 
-            set({
-                graphs: remaining,
-                activeGraphId: nextGraph.id,
-                nodes: nextGraph.nodes,
-                edges: nextGraph.edges,
-                selectedNodeId: null,
-                historyByGraph,
-                ...getHistoryAvailability(historyByGraph, nextGraph.id),
-            });
+        set({
+            graphs: remaining,
+            activeGraphId: nextActiveId,
+            nodes: nextActiveGraph.nodes,
+            edges: nextActiveGraph.edges,
+            selectedNodeId: null,
+            historyByGraph,
+            ...getHistoryAvailability(historyByGraph, nextActiveId),
+        });
 
-            audioEngine.refreshConnections(nextGraph.nodes, nextGraph.edges);
-        } else {
-            set({
-                graphs: remaining,
-                historyByGraph,
-                ...getHistoryAvailability(historyByGraph, state.activeGraphId),
-            });
-        }
-
-        return targetGraph;
+        audioEngine.refreshConnections(nextActiveGraph.nodes, nextActiveGraph.edges);
+        return nextActiveGraph;
     },
 
-    setSelectedNode: (nodeId) => {
+    setGraphsList: (graphs: GraphDocument[]) => {
+        set({ graphs });
+    },
+
+    setPlaying: (playing: boolean) => {
+        const outputNode = get().nodes.find((n) => (n.data as AudioNodeData).type === 'output');
+        if (outputNode) {
+            get().updateNodeData(outputNode.id, { playing }, { history: 'skip' });
+        }
+    },
+
+    setSelectedNode: (nodeId: string | null) => {
         set((state) => {
             const nodes = state.nodes.map((node) => ({
                 ...node,
@@ -1479,6 +1492,15 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
             };
         });
     },
+
+    // Connection Assist State
+    connectionAssist: null,
+    assistPosition: null,
+    assistQuery: '',
+
+    setConnectionAssist: (connectionAssist) => set({ connectionAssist }),
+    setAssistPosition: (assistPosition) => set({ assistPosition }),
+    setAssistQuery: (assistQuery) => set({ assistQuery }),
 
     onNodesChange: (changes) => {
         const state = get();
@@ -1844,11 +1866,50 @@ export const useAudioGraphStore = create<AudioGraphState>((set, get) => ({
         audioEngine.refreshConnections(normalizedNodes, normalizedEdges);
     },
 
-    setPlaying: (playing) => {
-        const outputNode = get().nodes.find((n) => (n.data as AudioNodeData).type === 'output');
-        if (outputNode) {
-            get().updateNodeData(outputNode.id, { playing }, { history: 'skip' });
-        }
+    clearAssetReferences: (assetId: string) => {
+        set((state) => {
+            const clearNode = (node: Node<AudioNodeData>): Node<AudioNodeData> => {
+                if (node.data.type === 'sampler' && node.data.sampleId === assetId) {
+                    return {
+                        ...node,
+                        data: {
+                            ...node.data,
+                            sampleId: '',
+                            src: '',
+                            fileName: '',
+                            loaded: false,
+                        }
+                    };
+                }
+                if (node.data.type === 'convolver' && node.data.impulseId === assetId) {
+                    return {
+                        ...node,
+                        data: {
+                            ...node.data,
+                            impulseId: '',
+                            impulseSrc: '',
+                            impulseFileName: '',
+                        }
+                    };
+                }
+                return node;
+            };
+
+            const nodes = state.nodes.map(clearNode);
+            const graphs = state.graphs.map((graph) => ({
+                ...graph,
+                nodes: graph.nodes.map(clearNode),
+                updatedAt: graph.id === state.activeGraphId || graph.nodes.some(n => 
+                    (n.data.type === 'sampler' && n.data.sampleId === assetId) ||
+                    (n.data.type === 'convolver' && n.data.impulseId === assetId)
+                ) ? Date.now() : graph.updatedAt,
+            }));
+
+            // Sync audio engine for current nodes
+            audioEngine.refreshDataValues(nodes, state.edges);
+
+            return { nodes, graphs };
+        });
     },
 
     initAudioContext: () => {

@@ -18,8 +18,8 @@ vi.mock('../../project', () => ({
     setActiveProjectController: projectModuleMock.setActiveProjectController,
 }));
 
-vi.mock('../../ui/EditorDemo', () => ({
-    EditorDemo: ({ project }: { project?: { name?: string } }) => (
+vi.mock('../../ui/Editor', () => ({
+    Editor: ({ project }: { project?: { name?: string } }) => (
         <div data-testid="workspace-screen">{project?.name ?? 'workspace'}</div>
     ),
     default: ({ project }: { project?: { name?: string } }) => (

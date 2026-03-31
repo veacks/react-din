@@ -1,8 +1,9 @@
 import { memo } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Position, type NodeProps } from '@xyflow/react';
 import { useAudioGraphStore, type OscNodeData } from '../store';
 import { audioEngine } from '../AudioEngine';
 import { formatConnectedValue, useTargetHandleConnection } from '../paramConnections';
+import { CustomHandle } from '../components/CustomHandle';
 
 const waveforms: OscillatorType[] = ['sine', 'square', 'sawtooth', 'triangle'];
 
@@ -34,10 +35,9 @@ const OscNode = memo(({ id, data, selected }: NodeProps) => {
                     <span className="node-icon">◐</span>
                     <span className="node-title">Oscillator</span>
                 </div>
-                {/* Audio Out aligned with header/top */}
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                     <span className="handle-label-static" style={{ fontSize: '9px', color: '#888', marginRight: '8px', textTransform: 'uppercase' }}>Audio Out</span>
-                    <Handle type="source" position={Position.Right} id="out" className="handle handle-out handle-audio" />
+                    <CustomHandle type="source" position={Position.Right} id="out" className="handle handle-out handle-audio" />
                 </div>
             </div>
             <div className="node-content">
@@ -70,7 +70,7 @@ const OscNode = memo(({ id, data, selected }: NodeProps) => {
                         />
                     )}
                     {!frequencyConnection.connected && <span className="value">{Math.round(oscData.frequency)} Hz</span>}
-                    <Handle
+                    <CustomHandle
                         type="target"
                         position={Position.Left}
                         id="frequency"
@@ -95,7 +95,7 @@ const OscNode = memo(({ id, data, selected }: NodeProps) => {
                         />
                     )}
                     {!detuneConnection.connected && <span className="value">{oscData.detune} c</span>}
-                    <Handle
+                    <CustomHandle
                         type="target"
                         position={Position.Left}
                         id="detune"

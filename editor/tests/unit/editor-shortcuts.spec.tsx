@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getLatestReactFlowProps, installEditorShellGlobals, installEditorShellViewport, renderEditorDemo } from './editor-shell-test-utils';
+import { getLatestReactFlowProps, installEditorShellGlobals, installEditorShellViewport, renderEditor } from './editor-shell-test-utils';
 
 describe('editor shortcuts', () => {
     beforeEach(() => {
@@ -15,7 +15,7 @@ describe('editor shortcuts', () => {
 
     it('supports undo and redo from the global keyboard handler', async () => {
         await act(async () => {
-            await renderEditorDemo();
+            await renderEditor();
         });
 
         await waitFor(async () => {
@@ -36,7 +36,7 @@ describe('editor shortcuts', () => {
 
     it('ignores global undo when the event target is editable', async () => {
         await act(async () => {
-            await renderEditorDemo();
+            await renderEditor();
         });
 
         const graphNameInput = screen.getByPlaceholderText('Graph name');

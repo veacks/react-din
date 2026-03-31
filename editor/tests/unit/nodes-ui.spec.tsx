@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
-import { afterEach, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import OscNode from '../../ui/editor/nodes/OscNode';
 import GainNode from '../../ui/editor/nodes/GainNode';
@@ -133,6 +133,7 @@ vi.mock('@xyflow/react', () => ({
     Position: { Left: 'left', Right: 'right', Top: 'top', Bottom: 'bottom' },
     useHandleConnections: () => [],
     useNodesData: () => null,
+    useOnSelectionChange: () => null,
 }));
 
 vi.mock('../../ui/editor/store', () => ({
@@ -536,10 +537,12 @@ describe('editor node UIs', () => {
         const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement | null;
         expect(fileInput).not.toBeNull();
 
-        fireEvent.change(fileInput!, {
-            target: {
-                files: [new File(['fake-impulse'], 'plate.wav', { type: 'audio/wav' })],
-            },
+        await act(async () => {
+            fireEvent.change(fileInput!, {
+                target: {
+                    files: [new File(['fake-impulse'], 'plate.wav', { type: 'audio/wav' })],
+                },
+            });
         });
 
         await waitFor(() => {

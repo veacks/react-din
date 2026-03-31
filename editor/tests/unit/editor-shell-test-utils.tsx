@@ -71,6 +71,7 @@ vi.mock('@xyflow/react', async () => {
         addEdge: (edge: any, edges: any[]) => [...edges, { id: edge.id ?? `edge-${edges.length + 1}`, ...edge }],
         useHandleConnections: () => [],
         useNodesData: () => null,
+        useOnSelectionChange: () => null,
         __getLatestReactFlowProps: () => reactFlowState.latestProps,
     };
 });
@@ -160,9 +161,9 @@ export const installEditorShellGlobals = () => {
     });
 };
 
-export const renderEditorDemo = async (project?: { id: string; name: string; accentColor: string; onRevealProject?: () => void | Promise<void> }) => {
-    const { EditorDemo } = await import('../../ui/EditorDemo');
-    return render(<EditorDemo project={project} />);
+export const renderEditor = async (project?: { id: string; name: string; accentColor: string; onRevealProject?: () => void | Promise<void> }) => {
+    const { Editor } = await import('../../ui/Editor');
+    return render(<Editor project={project} />);
 };
 
 export const getLatestReactFlowProps = async () => {

@@ -6,7 +6,7 @@ import {
     type ProjectController,
     type ProjectManifest,
 } from '../project';
-import { EditorDemo } from './EditorDemo';
+import { Editor } from './Editor';
 import ProjectLauncher from './ProjectLauncher';
 
 type AppScreen =
@@ -177,7 +177,7 @@ function App() {
     return (
         <>
             <AgentBridgeClient />
-            <EditorDemo
+            <Editor
                 project={{
                     id: screen.controller.project.id,
                     name: screen.controller.project.name,

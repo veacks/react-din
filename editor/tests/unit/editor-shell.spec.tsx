@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getLatestReactFlowProps, installEditorShellGlobals, installEditorShellViewport, renderEditorDemo } from './editor-shell-test-utils';
+import { getLatestReactFlowProps, installEditorShellGlobals, installEditorShellViewport, renderEditor } from './editor-shell-test-utils';
 
 describe('editor shell', () => {
     beforeEach(() => {
@@ -21,7 +21,7 @@ describe('editor shell', () => {
             onRevealProject: vi.fn(),
         };
 
-        await renderEditorDemo(project);
+        await renderEditor(project);
 
         await waitFor(async () => {
             expect(await getLatestReactFlowProps()).toBeTruthy();
@@ -29,7 +29,7 @@ describe('editor shell', () => {
 
         expect(screen.getByText('Catalog')).toBeInTheDocument();
         expect(screen.getByText('Templates')).toBeInTheDocument();
-        expect(screen.getByText('Inspect')).toBeInTheDocument();
+        expect(screen.getByText('Properties')).toBeInTheDocument();
         expect(screen.getAllByText('Library').length).toBeGreaterThan(0);
         expect(screen.getAllByText('Runtime').length).toBeGreaterThan(0);
         expect(screen.getAllByText('Diagnostics').length).toBeGreaterThan(0);

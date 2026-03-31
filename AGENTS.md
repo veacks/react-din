@@ -34,7 +34,7 @@
 - A new public component is incomplete until it updates exports, docs, tests, and `project/COVERAGE_MANIFEST.json`.
 - A new editor node is incomplete until it updates:
   - `editor/ui/editor/nodes/index.ts`
-  - `editor/ui/EditorDemo.tsx`
+  - `editor/ui/Editor.tsx`
   - `editor/ui/editor/store.ts`
   - `editor/ui/editor/AudioEngine.ts`
   - `editor/ui/editor/CodeGenerator.tsx`

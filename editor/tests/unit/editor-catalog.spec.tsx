@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getLatestReactFlowProps, installEditorShellGlobals, installEditorShellViewport, renderEditorDemo } from './editor-shell-test-utils';
+import { getLatestReactFlowProps, installEditorShellGlobals, installEditorShellViewport, renderEditor } from './editor-shell-test-utils';
 
 describe('editor catalog', () => {
     beforeEach(() => {
@@ -14,7 +14,7 @@ describe('editor catalog', () => {
     });
 
     it('shows the node browser and adds nodes from the palette', async () => {
-        await renderEditorDemo();
+        await renderEditor();
 
         await waitFor(async () => {
             expect(await getLatestReactFlowProps()).toBeTruthy();
@@ -32,7 +32,7 @@ describe('editor catalog', () => {
     });
 
     it('loads a template graph from the browser panel', async () => {
-        await renderEditorDemo();
+        await renderEditor();
 
         await waitFor(async () => {
             expect(await getLatestReactFlowProps()).toBeTruthy();

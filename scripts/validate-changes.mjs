@@ -117,7 +117,7 @@ for (const entry of diffEntries) {
             const expectedDocs = `docs/editor-nodes/${baseName}.md`;
             const requiredFiles = [
                 'editor/ui/editor/nodes/index.ts',
-                'editor/ui/EditorDemo.tsx',
+                'editor/ui/Editor.tsx',
                 'editor/ui/editor/store.ts',
                 'editor/ui/editor/AudioEngine.ts',
                 'editor/ui/editor/CodeGenerator.tsx',

@@ -70,6 +70,7 @@ vi.mock('@xyflow/react', async () => {
         addEdge: (edge: any, edges: any[]) => [...edges, { id: edge.id ?? `edge-${edges.length + 1}`, ...edge }],
         useHandleConnections: () => [],
         useNodesData: () => null,
+        useOnSelectionChange: () => null,
         __getLatestReactFlowProps: () => reactFlowState.latestProps,
     };
 });
@@ -121,7 +122,7 @@ vi.mock('../../ui/editor/AudioEngine', () => ({
 }));
 
 describe('Editor connection assist', () => {
-    let boundingRectSpy: ReturnType<typeof vi.spyOn>;
+    let boundingRectSpy: any;
 
     beforeEach(() => {
         vi.resetModules();
@@ -146,17 +147,17 @@ describe('Editor connection assist', () => {
                 dispatchEvent: vi.fn(),
             }),
         });
-        boundingRectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+        boundingRectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => ({
+            width: 100,
+            height: 100,
+            top: 0,
+            left: 0,
+            bottom: 100,
+            right: 100,
             x: 0,
             y: 0,
-            left: 0,
-            top: 0,
-            right: 1280,
-            bottom: 720,
-            width: 1280,
-            height: 720,
             toJSON: () => ({}),
-        } as DOMRect);
+        } as DOMRect));
     });
 
     afterEach(() => {
@@ -171,13 +172,11 @@ describe('Editor connection assist', () => {
     };
 
     it('highlights compatible handles, opens the menu on invalid drop, and adds a connected node', async () => {
-        const reactFlowModule = await import('@xyflow/react') as typeof import('@xyflow/react') & {
-            __getLatestReactFlowProps: () => any;
-        };
+        const reactFlowModule = await import('@xyflow/react') as any;
         const { useAudioGraphStore } = await import('../../ui/editor/store');
-        const { EditorDemo } = await import('../../ui/EditorDemo');
+        const { Editor } = await import('../../ui/Editor');
 
-        render(<EditorDemo />);
+        render(<Editor />);
 
         await waitFor(() => {
             expect(reactFlowModule.__getLatestReactFlowProps()).toBeTruthy();
@@ -205,7 +204,9 @@ describe('Editor connection assist', () => {
             expect(screen.getByLabelText('Search nodes')).toBeInTheDocument();
         });
 
-        fireEvent.click(screen.getByRole('option', { name: /Filter -> In/i }));
+        act(() => {
+            fireEvent.click(screen.getByRole('option', { name: /Filter -> In/i }));
+        });
 
         await waitFor(() => {
             const state = useAudioGraphStore.getState();
@@ -222,18 +223,22 @@ describe('Editor connection assist', () => {
         const audioLibrary = await import('../../ui/editor/audioLibrary');
         vi.mocked(audioLibrary.listAssets).mockResolvedValue([]);
 
-        const { EditorDemo } = await import('../../ui/EditorDemo');
-        render(<EditorDemo />);
+        const { Editor } = await import('../../ui/Editor');
+        render(<Editor />);
 
         await waitFor(() => {
             expect(screen.getByLabelText('Search library files')).toBeInTheDocument();
         });
 
-        fireEvent.click(screen.getByTitle('Collapse bottom drawer'));
+        act(() => {
+            fireEvent.click(screen.getByTitle('Collapse bottom drawer'));
+        });
 
         expect(screen.queryByLabelText('Search library files')).not.toBeInTheDocument();
 
-        fireEvent.click(screen.getByTitle('Expand bottom drawer'));
+        act(() => {
+            fireEvent.click(screen.getByTitle('Expand bottom drawer'));
+        });
 
         await waitFor(() => {
             expect(screen.getByLabelText('Search library files')).toBeInTheDocument();
@@ -249,14 +254,17 @@ describe('Editor connection assist', () => {
                 name: 'kick.wav',
                 mimeType: 'audio/wav',
                 size: 100,
+                fileName: 'kick.wav',
+                kind: 'asset',
+                relativePath: 'kick.wav',
                 createdAt: 1,
                 updatedAt: 1,
-            },
+            } as any,
         ]);
 
         const { useAudioGraphStore } = await import('../../ui/editor/store');
-        const { EditorDemo } = await import('../../ui/EditorDemo');
-        render(<EditorDemo />);
+        const { Editor } = await import('../../ui/Editor');
+        render(<Editor />);
 
         act(() => {
             useAudioGraphStore.getState().loadGraph(
@@ -294,7 +302,9 @@ describe('Editor connection assist', () => {
         });
 
         vi.spyOn(window, 'confirm').mockReturnValue(true);
-        fireEvent.click(screen.getByTitle('Delete file from library'));
+        act(() => {
+            fireEvent.click(screen.getByTitle('Delete file from library'));
+        });
 
         await waitFor(() => {
             expect(audioLibrary.deleteAsset).toHaveBeenCalledWith('asset-kick');
@@ -310,8 +320,8 @@ describe('Editor connection assist', () => {
         vi.mocked(audioLibrary.listAssets).mockResolvedValue([]);
         vi.spyOn(HTMLMediaElement.prototype, 'canPlayType').mockReturnValue('probably');
 
-        const { EditorDemo } = await import('../../ui/EditorDemo');
-        render(<EditorDemo />);
+        const { Editor } = await import('../../ui/Editor');
+        render(<Editor />);
 
         await waitFor(() => {
             expect(screen.getByLabelText('Search library files')).toBeInTheDocument();
@@ -333,8 +343,8 @@ describe('Editor connection assist', () => {
         vi.mocked(audioLibrary.listAssets).mockResolvedValue([]);
         vi.mocked(audioLibrary.addAssetFromFile).mockClear();
 
-        const { EditorDemo } = await import('../../ui/EditorDemo');
-        render(<EditorDemo />);
+        const { Editor } = await import('../../ui/Editor');
+        render(<Editor />);
 
         await waitFor(() => {
             expect(screen.getByLabelText('Search library files')).toBeInTheDocument();
@@ -355,8 +365,8 @@ describe('Editor connection assist', () => {
         setNavigatorPlatform('Linux x86_64');
 
         const { useAudioGraphStore } = await import('../../ui/editor/store');
-        const { EditorDemo } = await import('../../ui/EditorDemo');
-        render(<EditorDemo />);
+        const { Editor } = await import('../../ui/Editor');
+        render(<Editor />);
 
         act(() => {
             useAudioGraphStore.getState().addNode('mix');
@@ -378,8 +388,8 @@ describe('Editor connection assist', () => {
         setNavigatorPlatform('MacIntel');
 
         const { useAudioGraphStore } = await import('../../ui/editor/store');
-        const { EditorDemo } = await import('../../ui/EditorDemo');
-        render(<EditorDemo />);
+        const { Editor } = await import('../../ui/Editor');
+        render(<Editor />);
 
         act(() => {
             useAudioGraphStore.getState().addNode('mix');
@@ -401,8 +411,8 @@ describe('Editor connection assist', () => {
         setNavigatorPlatform('Linux x86_64');
 
         const { useAudioGraphStore } = await import('../../ui/editor/store');
-        const { EditorDemo } = await import('../../ui/EditorDemo');
-        render(<EditorDemo />);
+        const { Editor } = await import('../../ui/Editor');
+        render(<Editor />);
 
         act(() => {
             useAudioGraphStore.getState().addNode('mix');
