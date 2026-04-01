@@ -4,8 +4,8 @@ import { vi } from 'vitest';
 
 
 // Explicitly mock AudioEngine to the stub to ensure esbuild never tries to transform the 3k line file
-vi.mock('./ui/editor/AudioEngine', () => {
-  const stub = require('./ui/editor/AudioEngine.stub');
+vi.mock('./ui/editor/AudioEngine', async () => {
+  const stub = await import('./ui/editor/AudioEngine.stub');
   return {
     ...stub,
     default: stub.audioEngine,

@@ -9,13 +9,11 @@ interface BottomDrawerProps {
     onToggle: () => void;
     onTabChange: (tab: BottomDrawerTab) => void;
     onHeightChange: (height: number) => void;
-    libraryContent: ReactNode;
     runtimeContent: ReactNode;
     diagnosticsContent: ReactNode;
 }
 
 const DRAWER_TABS: Array<{ id: BottomDrawerTab; label: string }> = [
-    { id: 'library', label: 'Library' },
     { id: 'runtime', label: 'Runtime' },
     { id: 'diagnostics', label: 'Diagnostics' },
 ];
@@ -27,7 +25,6 @@ export function BottomDrawer({
     onToggle,
     onTabChange,
     onHeightChange,
-    libraryContent,
     runtimeContent,
     diagnosticsContent,
 }: BottomDrawerProps) {
@@ -49,16 +46,15 @@ export function BottomDrawer({
         window.addEventListener('mouseup', handleUp);
     }, [height, onHeightChange]);
 
-    const content = activeTab === 'library'
-        ? libraryContent
-        : activeTab === 'runtime'
-            ? runtimeContent
-            : diagnosticsContent;
+    const content = activeTab === 'runtime'
+        ? runtimeContent
+        : diagnosticsContent;
 
     return (
         <section
             className="ui-panel border-t border-[var(--panel-border)] bg-[var(--panel-muted)]/65"
             style={{ height: open ? `${height}px` : '56px' }}
+            data-testid="bottom-drawer"
         >
             <div
                 className="h-2 cursor-row-resize border-b border-[var(--panel-border)] bg-[var(--panel-bg)]/40"

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getLatestReactFlowProps, installEditorShellGlobals, installEditorShellViewport, renderEditor } from './editor-shell-test-utils';
 
@@ -27,16 +27,28 @@ describe('editor shell', () => {
             expect(await getLatestReactFlowProps()).toBeTruthy();
         });
 
-        expect(screen.getByText('Catalog')).toBeInTheDocument();
+        expect(screen.getByTestId('activity-rail')).toBeInTheDocument();
+        expect(screen.getByTestId('left-drawer')).toBeInTheDocument();
+        expect(screen.getByTestId('canvas-panel')).toBeInTheDocument();
+        expect(screen.getByTestId('graph-tabs')).toBeInTheDocument();
+        expect(screen.getByTestId('inspector-pane')).toBeInTheDocument();
+        expect(screen.getByTestId('editor-footer')).toBeInTheDocument();
+        expect(screen.getByText('Graph Explorer')).toBeInTheDocument();
         expect(screen.getByText('Templates')).toBeInTheDocument();
-        expect(screen.getByText('Properties')).toBeInTheDocument();
-        expect(screen.getAllByText('Library').length).toBeGreaterThan(0);
-        expect(screen.getAllByText('Runtime').length).toBeGreaterThan(0);
-        expect(screen.getAllByText('Diagnostics').length).toBeGreaterThan(0);
+        expect(screen.getByText('Graph defaults')).toBeInTheDocument();
         expect(screen.getByPlaceholderText('Graph name')).toBeInTheDocument();
+        expect(screen.queryByLabelText('Search library files')).not.toBeInTheDocument();
+
+        const bottomDrawer = screen.getByTestId('bottom-drawer');
+        expect(within(bottomDrawer).getByText('Runtime')).toBeInTheDocument();
+        expect(within(bottomDrawer).getByText('Diagnostics')).toBeInTheDocument();
+        expect(within(bottomDrawer).queryByText('Library')).not.toBeInTheDocument();
 
         fireEvent.click(screen.getByTitle('Explorer'));
-        expect(screen.getByRole('button', { name: 'Reveal' })).toBeInTheDocument();
+        expect(screen.getByTitle('Reveal in list')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByTitle('Library'));
+        expect(screen.getByLabelText('Search library files')).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', { name: 'Command' }));
 
@@ -44,5 +56,26 @@ describe('editor shell', () => {
         expect(screen.getByText('Copy Patch JSON')).toBeInTheDocument();
         expect(screen.getByText('Download Patch JSON')).toBeInTheDocument();
         expect(screen.getByText('Import Patch JSON')).toBeInTheDocument();
+    });
+
+    it('migrates the legacy library drawer tab into the left drawer layout', async () => {
+        cleanup();
+        installEditorShellGlobals({
+            'din-editor-bottom-drawer-tab': 'library',
+            'din-editor-bottom-drawer-open': 'false',
+        });
+
+        await renderEditor();
+
+        await waitFor(async () => {
+            expect(await getLatestReactFlowProps()).toBeTruthy();
+        });
+
+        expect(screen.getByText('Audio Library')).toBeInTheDocument();
+        expect(screen.getByLabelText('Search library files')).toBeInTheDocument();
+
+        const bottomDrawer = screen.getByTestId('bottom-drawer');
+        expect(within(bottomDrawer).getByText('Runtime')).toBeInTheDocument();
+        expect(within(bottomDrawer).queryByText('Library')).not.toBeInTheDocument();
     });
 });

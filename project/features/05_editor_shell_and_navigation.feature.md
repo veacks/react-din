@@ -11,7 +11,7 @@ Describe the cross-platform shell, navigation model, and persistent orientation 
 **UX Laws** `Jakob's Law`, `Selective Attention`
 
 **Given** a contributor reviews the DIN Editor shell in its default desktop state
-**When** they move between the activity rail, the primary workspace, the contextual side pane, and the footer status area
+**When** they move between the activity rail, the left drawer, the primary workspace, the inspector, and the footer status area
 **Then** each region keeps a stable responsibility, a stable hierarchy, and clear navigation affordances
 
 ### F05-S02 Navigation changes preserve focus and immediate orientation
@@ -20,7 +20,7 @@ Describe the cross-platform shell, navigation model, and persistent orientation 
 **Future Test Layer** `e2e` via `playwright`
 **UX Laws** `Doherty Threshold`, `Selective Attention`
 
-**Given** a contributor switches between the major editor surfaces
+**Given** a contributor switches between `Explorer`, `Catalog`, `Library`, `Runtime`, and `Inspect`
 **When** the active panel or tab changes
 **Then** the app acknowledges the change immediately and keeps the new focus target visually explicit
 

@@ -11,6 +11,7 @@ vi.mock('@xyflow/react', async () => {
     const NodeIdContext = React.createContext<string | null>(null);
 
     return {
+        ReactFlowProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
         ReactFlow: ({ nodes, nodeTypes, children, onInit, ...props }: any) => {
             reactFlowState.latestProps = props;
 
@@ -69,6 +70,7 @@ vi.mock('@xyflow/react', async () => {
         applyNodeChanges: (_changes: unknown, nodes: unknown) => nodes,
         applyEdgeChanges: (_changes: unknown, edges: unknown) => edges,
         addEdge: (edge: any, edges: any[]) => [...edges, { id: edge.id ?? `edge-${edges.length + 1}`, ...edge }],
+        useNodeId: () => React.useContext(NodeIdContext),
         useHandleConnections: () => [],
         useNodesData: () => null,
         useOnSelectionChange: () => null,
@@ -132,14 +134,22 @@ export const installEditorShellViewport = (width: number) => {
     window.dispatchEvent(new Event('resize'));
 };
 
-export const installEditorShellGlobals = () => {
+export const installEditorShellGlobals = (storageEntries: Record<string, string | null> = {}) => {
+    const storageState = new Map(Object.entries(storageEntries));
+
     Object.defineProperty(window, 'localStorage', {
         configurable: true,
         value: {
-            getItem: vi.fn(() => null),
-            setItem: vi.fn(),
-            removeItem: vi.fn(),
-            clear: vi.fn(),
+            getItem: vi.fn((key: string) => storageState.get(key) ?? null),
+            setItem: vi.fn((key: string, value: string) => {
+                storageState.set(key, String(value));
+            }),
+            removeItem: vi.fn((key: string) => {
+                storageState.delete(key);
+            }),
+            clear: vi.fn(() => {
+                storageState.clear();
+            }),
         },
     });
 

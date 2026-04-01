@@ -1,5 +1,5 @@
-export type LeftPanelView = 'catalog' | 'explorer';
-export type BottomDrawerTab = 'library' | 'runtime' | 'diagnostics';
+export type LeftPanelView = 'explorer' | 'catalog' | 'library';
+export type BottomDrawerTab = 'runtime' | 'diagnostics';
 export type InspectorTab = 'inspect' | 'code';
 
 export interface CommandPaletteAction {

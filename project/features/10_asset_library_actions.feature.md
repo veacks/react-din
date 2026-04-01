@@ -2,7 +2,7 @@
 
 ## Feature
 
-Describe how contributors search, preview, import, relink, and recover assets through the Asset Library.
+Describe how contributors search, preview, import, relink, and recover assets through the left-drawer Asset Library.
 
 ### F10-S01 Asset search and filtering reduce the visible decision set
 
@@ -10,7 +10,7 @@ Describe how contributors search, preview, import, relink, and recover assets th
 **Future Test Layer** `e2e` via `playwright`
 **UX Laws** `Hick's Law`, `Selective Attention`
 
-**Given** the Asset Library contains multiple asset types and many files
+**Given** the Asset Library is opened from the left drawer and contains multiple asset types and many files
 **When** the contributor searches or filters the list
 **Then** the result set narrows predictably and keeps the next likely action obvious
 

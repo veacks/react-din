@@ -1,43 +1,29 @@
-import type { ChangeEventHandler, KeyboardEventHandler, ReactNode } from 'react';
+import { SHELL_LAYOUT } from './shellTokens';
 
 interface ProjectMeta {
     name: string;
     accentColor: string;
+    onRevealProject?: () => void | Promise<void>;
 }
 
 interface EditorTopbarProps {
     project?: ProjectMeta;
-    activeGraphName: string;
-    componentName: string;
-    nameDraft: string;
-    onNameDraftChange: ChangeEventHandler<HTMLInputElement>;
-    onNameKeyDown: KeyboardEventHandler<HTMLInputElement>;
-    onNameBlur: () => void;
     isDark: boolean;
     onToggleTheme: () => void;
     onOpenCommandPalette: () => void;
-    onAutoArrange: () => void;
-    onFitCanvas: () => void;
-    mcpBadge: ReactNode;
 }
 
 export function EditorTopbar({
     project,
-    activeGraphName,
-    componentName,
-    nameDraft,
-    onNameDraftChange,
-    onNameKeyDown,
-    onNameBlur,
     isDark,
     onToggleTheme,
     onOpenCommandPalette,
-    onAutoArrange,
-    onFitCanvas,
-    mcpBadge,
 }: EditorTopbarProps) {
     return (
-        <div className="ui-topbar flex flex-wrap items-center justify-between gap-3 border-b border-[var(--panel-border)] px-4 py-3">
+        <div
+            className="ui-topbar flex flex-wrap items-center justify-between gap-3 border-b border-[var(--panel-border)] px-4 py-2"
+            style={{ minHeight: `${SHELL_LAYOUT.topbarHeight}px` }}
+        >
             <div className="flex min-w-0 items-center gap-3">
                 {project ? (
                     <div className="flex min-w-0 items-center gap-3 rounded-[18px] border border-[var(--panel-border)] bg-[var(--panel-muted)] px-3 py-2">
@@ -45,48 +31,28 @@ export function EditorTopbar({
                         <div className="min-w-0">
                             <div className="truncate text-[13px] font-semibold text-[var(--text)]">{project.name}</div>
                             <div className="truncate text-[10px] uppercase tracking-[0.18em] text-[var(--text-subtle)]">
-                                Active graph: {activeGraphName}
+                                Desktop authoring workspace
                             </div>
                         </div>
                     </div>
                 ) : (
                     <div className="rounded-[18px] border border-[var(--panel-border)] bg-[var(--panel-muted)] px-3 py-2">
                         <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-subtle)]">Workspace</div>
-                        <div className="text-[13px] font-semibold text-[var(--text)]">{activeGraphName}</div>
+                        <div className="text-[13px] font-semibold text-[var(--text)]">DIN Editor</div>
                     </div>
                 )}
-
-                <div className="flex min-w-0 items-center gap-2 rounded-[18px] border border-[var(--panel-border)] bg-[var(--panel-muted)] px-3 py-2">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-subtle)]">Graph</span>
-                    <input
-                        type="text"
-                        value={nameDraft}
-                        onChange={onNameDraftChange}
-                        onKeyDown={onNameKeyDown}
-                        onBlur={onNameBlur}
-                        placeholder="Graph name"
-                        className="h-8 w-40 rounded-md border border-[var(--panel-border)] bg-[var(--panel-bg)] px-2 text-[11px] text-[var(--text)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-soft)]"
-                    />
-                    <span className="font-mono text-[10px] text-[var(--text-subtle)]">{componentName}</span>
-                </div>
             </div>
 
             <div className="ui-topbar-actions flex flex-wrap items-center justify-end gap-2">
-                {mcpBadge}
-                <button
-                    type="button"
-                    onClick={onAutoArrange}
-                    className="rounded-xl border border-[var(--panel-border)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                >
-                    Arrange
-                </button>
-                <button
-                    type="button"
-                    onClick={onFitCanvas}
-                    className="rounded-xl border border-[var(--panel-border)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                >
-                    Fit
-                </button>
+                {project?.onRevealProject ? (
+                    <button
+                        type="button"
+                        onClick={() => void project.onRevealProject?.()}
+                        className="rounded-xl border border-[var(--panel-border)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                    >
+                        Reveal
+                    </button>
+                ) : null}
                 <button
                     type="button"
                     onClick={onOpenCommandPalette}

@@ -18,6 +18,7 @@ export function ActivityRail({ items }: ActivityRailProps) {
         <nav
             className="flex h-full flex-col items-center gap-2 bg-[var(--panel-muted)]/60 px-2 py-3"
             aria-label="Editor activity rail"
+            data-testid="activity-rail"
         >
             {items.map((item) => (
                 <button

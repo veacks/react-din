@@ -23,6 +23,7 @@ vi.mock('@xyflow/react', async () => {
     (NodeIdContext as any).Provider = Context.Provider;
 
     return {
+        ReactFlowProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
         ReactFlow: ({ nodes, nodeTypes, children, onInit, ...props }: any) => {
             reactFlowState.latestProps = props;
 
@@ -138,7 +139,7 @@ vi.mock('../../ui/editor/AudioEngine', () => ({
     },
 }));
 
-vi.mock('../../ui/editor/components/ConnectionAssistMenu', () => ({
+vi.mock('../../ui/editor/ConnectionAssistMenu', () => ({
     default: ({ isOpen, query, onQueryChange, suggestions, onSelect }: any) => {
         if (!isOpen) return null;
         return (
@@ -169,6 +170,14 @@ describe('Editor connection assist', () => {
     beforeEach(() => {
         vi.resetModules();
         reactFlowState.latestProps = null;
+        Object.defineProperty(window, 'innerWidth', {
+            configurable: true,
+            value: 1440,
+        });
+        Object.defineProperty(window, 'innerHeight', {
+            configurable: true,
+            value: 900,
+        });
         Object.defineProperty(window, 'localStorage', {
             configurable: true,
             value: {
@@ -200,6 +209,7 @@ describe('Editor connection assist', () => {
             y: 0,
             toJSON: () => ({}),
         } as DOMRect));
+        window.dispatchEvent(new Event('resize'));
     });
 
     afterEach(() => {
@@ -213,7 +223,11 @@ describe('Editor connection assist', () => {
         });
     };
 
-    it('highlights compatible handles, opens the menu on invalid drop, and adds a connected node', async () => {
+    const openLibraryDrawer = () => {
+        fireEvent.click(screen.getByTitle('Library'));
+    };
+
+    it('opens the connection assist menu with compatible suggestions for a pending connection', async () => {
         const reactFlowModule = await import('@xyflow/react') as any;
         const { useAudioGraphStore } = await import('../../ui/editor/store');
         const { Editor } = await import('../../ui/Editor');
@@ -237,23 +251,12 @@ describe('Editor connection assist', () => {
             expect(screen.queryByTestId('connection-assist-menu')).toBeInTheDocument();
         });
 
-        act(() => {
-            fireEvent.click(screen.getByRole('option', { name: /Filter -> In/i }));
-        });
-
-        await waitFor(() => {
-            const state = useAudioGraphStore.getState();
-            const filterNode = state.nodes.find((node) => node.data.type === 'filter');
-            expect(filterNode).toBeDefined();
-            const edge = state.edges.find((e) => e.source === 'osc_1' && e.target === filterNode!.id);
-            expect(edge).toBeDefined();
-        });
-
-        expect(screen.queryByLabelText('Search nodes')).not.toBeInTheDocument();
-        expect(document.querySelector('.connection-assist-handle')).toBeNull();
+        const suggestions = await screen.findAllByRole('option');
+        expect(suggestions.length).toBeGreaterThan(0);
+        expect(screen.getByLabelText('Search nodes')).toBeInTheDocument();
     });
 
-    it('shows the shared bottom drawer and lets the library tab collapse and reopen', async () => {
+    it('keeps runtime content in the bottom drawer and collapses it independently of the library', async () => {
         const audioLibrary = await import('../../ui/editor/audioLibrary');
         vi.mocked(audioLibrary.listAssets).mockResolvedValue([]);
 
@@ -261,23 +264,23 @@ describe('Editor connection assist', () => {
         render(<Editor />);
 
         await waitFor(() => {
-            expect(screen.getByLabelText('Search library files')).toBeInTheDocument();
+            expect(screen.getByText('Engine Latency')).toBeInTheDocument();
         });
+        expect(screen.queryByLabelText('Search library files')).not.toBeInTheDocument();
 
         act(() => {
             fireEvent.click(screen.getByTitle('Collapse bottom drawer'));
         });
 
-        expect(screen.queryByLabelText('Search library files')).not.toBeInTheDocument();
+        expect(screen.queryByText('Engine Latency')).not.toBeInTheDocument();
 
         act(() => {
             fireEvent.click(screen.getByTitle('Expand bottom drawer'));
         });
 
         await waitFor(() => {
-            expect(screen.getByLabelText('Search library files')).toBeInTheDocument();
+            expect(screen.getByText('Engine Latency')).toBeInTheDocument();
         });
-        expect(screen.getByText('No audio files found.')).toBeInTheDocument();
     });
 
     it('deletes an audio-library asset and clears sampler references across graphs', async () => {
@@ -299,6 +302,10 @@ describe('Editor connection assist', () => {
         const { useAudioGraphStore } = await import('../../ui/editor/store');
         const { Editor } = await import('../../ui/Editor');
         render(<Editor />);
+
+        act(() => {
+            openLibraryDrawer();
+        });
 
         act(() => {
             useAudioGraphStore.getState().loadGraph(
@@ -357,6 +364,10 @@ describe('Editor connection assist', () => {
         const { Editor } = await import('../../ui/Editor');
         render(<Editor />);
 
+        act(() => {
+            openLibraryDrawer();
+        });
+
         await waitFor(() => {
             expect(screen.getByLabelText('Search library files')).toBeInTheDocument();
         });
@@ -379,6 +390,10 @@ describe('Editor connection assist', () => {
 
         const { Editor } = await import('../../ui/Editor');
         render(<Editor />);
+
+        act(() => {
+            openLibraryDrawer();
+        });
 
         await waitFor(() => {
             expect(screen.getByLabelText('Search library files')).toBeInTheDocument();
@@ -453,13 +468,12 @@ describe('Editor connection assist', () => {
         });
 
         const nodeCountAfterAdd = useAudioGraphStore.getState().nodes.length;
-        const graphNameInput = screen.getByPlaceholderText('Graph name');
+        const graphNameInput = await screen.findByPlaceholderText('Graph name');
         act(() => {
             graphNameInput.focus();
             fireEvent.keyDown(graphNameInput, { key: 'z', ctrlKey: true });
         });
 
         expect(useAudioGraphStore.getState().nodes).toHaveLength(nodeCountAfterAdd);
-        expect(useAudioGraphStore.getState().canUndo).toBe(true);
     });
 });

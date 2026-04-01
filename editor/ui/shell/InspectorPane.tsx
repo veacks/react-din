@@ -9,6 +9,7 @@ interface InspectorPaneProps {
     hasSelection: boolean;
     selectedNodeLabel: string | null;
     inspectContent: ReactNode;
+    emptyInspectContent: ReactNode;
     codeContent: ReactNode;
 }
 
@@ -20,6 +21,7 @@ export function InspectorPane({
     hasSelection,
     selectedNodeLabel,
     inspectContent,
+    emptyInspectContent,
     codeContent,
 }: InspectorPaneProps) {
     if (collapsed) {
@@ -27,7 +29,7 @@ export function InspectorPane({
     }
 
     return (
-        <aside className="ui-panel flex h-full min-h-0 flex-col border-l border-[var(--panel-border)]">
+        <aside className="ui-panel flex h-full min-h-0 flex-col border-l border-[var(--panel-border)]" data-testid="inspector-pane">
             <div className="ui-panel-header border-b border-[var(--panel-border)] px-3 py-2">
                 <div className="flex items-center gap-2 rounded-full border border-[var(--panel-border)] bg-[var(--panel-muted)] p-1">
                     {(['inspect', 'code'] as const).map((item) => (
@@ -60,18 +62,14 @@ export function InspectorPane({
                     {tab === 'inspect' ? 'Selection' : 'Code'}
                 </div>
                 <div className="mt-1 truncate text-[12px] font-semibold text-[var(--text)]">
-                    {tab === 'inspect' ? (selectedNodeLabel ?? 'No node selected') : 'Live code preview'}
+                    {tab === 'inspect' ? (selectedNodeLabel ?? 'Graph defaults') : 'Generated output'}
                 </div>
             </div>
             <div className="min-h-0 flex-1 overflow-hidden">
                 {tab === 'inspect'
                     ? hasSelection
                         ? inspectContent
-                        : (
-                            <div className="flex h-full items-center justify-center px-4 text-center text-[11px] text-[var(--text-subtle)]">
-                                Select a node to edit detailed properties.
-                            </div>
-                        )
+                        : emptyInspectContent
                     : codeContent}
             </div>
         </aside>

@@ -16,12 +16,12 @@ import {
 import '@xyflow/react/dist/style.css';
 import './editor/editor.css';
 import Inspector from './editor/Inspector';
+import { CodeGenerator } from './editor/CodeGenerator';
 import ConnectionAssistMenu from './editor/ConnectionAssistMenu';
 import { MidiProvider } from '../../src/midi';
-import { migratePatchDocument, patchToGraphDocument, type PatchDocument } from '../../src/patch';
 
 import { useAudioGraphStore } from './editor/store';
-import type { AudioNodeData, ConnectionAssistStart } from './editor/types';
+import type { AudioNodeData } from './editor/types';
 import {
     OscNode, GainNode, FilterNode, OutputNode, NoiseNode, DelayNode, ReverbNode,
     CompressorNode, PhaserNode, FlangerNode, TremoloNode, EQ3Node, DistortionNode,
@@ -40,15 +40,20 @@ import {
     getCompatibleNodeSuggestions,
     type NodeSuggestion,
 } from './editor/nodeHelpers';
-import { editorMidiRuntime } from './editor/midiRuntime';
 import { McpStatusBadge } from '../bridge/McpStatusBadge';
 import { createAtmosphericBreakbeatArcTemplate } from './editor/templates/atmosphericBreakbeatArcTemplate';
 import { ActivityRail } from './shell/ActivityRail';
 import { BottomDrawer } from './shell/BottomDrawer';
+import { CatalogExplorerPanel } from './shell/CatalogExplorerPanel';
 import { CommandPalette } from './shell/CommandPalette';
 import { EditorTopbar } from './shell/EditorTopbar';
+import { EditorShell } from './shell/EditorShell';
+import { FooterStatus } from './shell/FooterStatus';
+import { GraphDefaultsPanel } from './shell/GraphDefaultsPanel';
 import { InspectorPane } from './shell/InspectorPane';
 import { useEditorLayout } from './shell/useEditorLayout';
+import { SHELL_LAYOUT } from './shell/shellTokens';
+import { WindowTitlebar } from './shell/WindowTitlebar';
 import { getMiniMapNodeColor } from './editor/nodeColorMap';
 
 // Extracted Utilities
@@ -58,7 +63,6 @@ import {
 } from './editor/templates/feedbackTemplates';
 
 // Extracted Components
-import { MidiStatusStrip } from './editor/components/MidiStatusStrip';
 import { NodePalette } from './editor/components/NodePalette';
 import { ExplorerPanel } from './editor/components/ExplorerPanel';
 import { LibraryDrawerContent, RuntimeDrawerContent, DiagnosticsDrawerContent, type LibraryItem, type AudioPreviewState } from './editor/components/Drawers';
@@ -122,20 +126,13 @@ export interface ProjectMeta {
     id: string;
     name: string;
     accentColor: string;
+    path?: string;
     onRevealProject?: () => void | Promise<void>;
 }
 
 export interface EditorProps {
     project?: ProjectMeta;
 }
-
-const isMacPlatform = () => {
-    const platform = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform
-        ?? navigator.platform
-        ?? navigator.userAgent
-        ?? '';
-    return /mac|iphone|ipad|ipod/i.test(platform);
-};
 
 const isEditableTarget = (target: EventTarget | null) => {
     if (!(target instanceof HTMLElement)) return false;
@@ -158,6 +155,7 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
     const edges = useAudioGraphStore((s) => s.edges);
     const graphs = useAudioGraphStore((s) => s.graphs);
     const activeGraphId = useAudioGraphStore((s) => s.activeGraphId);
+    const selectedNodeId = useAudioGraphStore((s) => s.selectedNodeId);
     
     // Store Actions
     const onNodesChange = useAudioGraphStore((s) => s.onNodesChange);
@@ -168,6 +166,9 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
     const loadGraph = useAudioGraphStore((s) => s.loadGraph);
     const setGraphs = useAudioGraphStore((s) => s.setGraphs);
     const setActiveGraph = useAudioGraphStore((s) => s.setActiveGraph);
+    const setSelectedNode = useAudioGraphStore((s) => s.setSelectedNode);
+    const setPlaying = useAudioGraphStore((s) => s.setPlaying);
+    const updateNodeData = useAudioGraphStore((s) => s.updateNodeData);
     const renameGraph = useAudioGraphStore((s) => s.renameGraph);
     const undo = useAudioGraphStore((s) => s.undo);
     const redo = useAudioGraphStore((s) => s.redo);
@@ -177,14 +178,13 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
     const [libraryFilter, setLibraryFilter] = useState('');
     const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
     const [audioPreview, setAudioPreview] = useState<AudioPreviewState>({ activeId: null, playing: false });
-    const [midiActivity, setMidiActivity] = useState(false);
     const [nameDraft, setNameDraft] = useState('');
-    const [selectedNode, setSelectedNode] = useState<Node<AudioNodeData> | null>(null);
     
     const {
         isDark,
         setTheme,
         leftPanelView,
+        leftPanelCollapsed,
         rightPanelCollapsed,
         bottomDrawerOpen,
         bottomDrawerTab,
@@ -192,6 +192,7 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
         inspectorTab,
         commandPaletteOpen,
         setCommandPaletteOpen,
+        toggleLeftPanel,
         toggleRightPanel,
         toggleBottomDrawer,
         openLeftPanelView,
@@ -211,6 +212,18 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
     const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
 
     const activeGraph = graphs.find(g => g.id === activeGraphId);
+    const selectedNode = useMemo(
+        () => (selectedNodeId ? nodes.find((node) => node.id === selectedNodeId) ?? null : null),
+        [nodes, selectedNodeId]
+    );
+    const outputNode = useMemo(
+        () => nodes.find((node) => node.data.type === 'output') ?? null,
+        [nodes]
+    );
+    const transportNode = useMemo(
+        () => nodes.find((node) => node.data.type === 'transport') ?? null,
+        [nodes]
+    );
     const activeGraphName = activeGraph?.name;
     useEffect(() => {
         if (activeGraphName !== undefined) {
@@ -221,7 +234,8 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
     // Track selection for inspector
     useOnSelectionChange({
         onChange: ({ nodes: selectedNodes }) => {
-            setSelectedNode(selectedNodes[0] as Node<AudioNodeData> || null);
+            const nextNode = selectedNodes[0] as Node<AudioNodeData> | undefined;
+            setSelectedNode(nextNode?.id ?? null);
         },
     });
 
@@ -239,11 +253,6 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
         loadGraph(graphData.nodes, graphData.edges);
         syncAudioEngine();
     }, [loadGraph, syncAudioEngine]);
-
-    const applyPatch = useCallback((patch: PatchDocument) => {
-        const doc = patchToGraphDocument(migratePatchDocument(patch));
-        initializeFromGraphData({ nodes: doc.nodes as Node<AudioNodeData>[], edges: doc.edges });
-    }, [initializeFromGraphData]);
 
     const loadTemplate = useCallback((template: { nodes: any[], edges: any[] }) => {
         initializeFromGraphData({ nodes: template.nodes as Node<AudioNodeData>[], edges: template.edges });
@@ -282,24 +291,24 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
         refreshAssets();
         const unsubscribeAssets = subscribeAssets(refreshAssets);
 
-        const unsubscribeMidi = editorMidiRuntime.subscribe(() => {
-            setMidiActivity(true);
-            setTimeout(() => setMidiActivity(false), 100);
-        });
-
         return () => {
             unsubscribeAssets();
-            unsubscribeMidi();
         };
     }, []);
 
     // Save active graph
-    const handleSaveActiveGraph = useCallback(async () => {
+    const handleSaveActiveGraph = useCallback(async (nameOverride?: string) => {
         if (!activeGraphId) return;
         const graph = graphs.find(g => g.id === activeGraphId);
         if (!graph) return;
 
-        const updatedGraph = { ...graph, nodes, edges, updatedAt: Date.now() };
+        const updatedGraph = {
+            ...graph,
+            name: nameOverride ?? graph.name,
+            nodes,
+            edges,
+            updatedAt: Date.now(),
+        };
         await saveGraph(updatedGraph);
         setGraphs(graphs.map(g => g.id === activeGraphId ? updatedGraph : g));
     }, [activeGraphId, nodes, edges, graphs, setGraphs]);
@@ -317,7 +326,7 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
     const handleNameBlur = useCallback(() => {
         if (!activeGraphId) return;
         renameGraph(activeGraphId, nameDraft);
-        handleSaveActiveGraph();
+        void handleSaveActiveGraph(nameDraft);
     }, [activeGraphId, nameDraft, renameGraph, handleSaveActiveGraph]);
 
     const handleNameKeyDown = useCallback((e: ReactKeyboardEvent<HTMLInputElement>) => {
@@ -334,6 +343,12 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
         })) as Node<AudioNodeData>[];
         loadGraph(repositionedNodes, edges);
     }, [nodes, edges, loadGraph]);
+
+    const handleTransportBpmChange = useCallback((value: number) => {
+        if (!transportNode || !Number.isFinite(value)) return;
+        const nextBpm = Math.min(300, Math.max(20, Math.round(value)));
+        updateNodeData(transportNode.id, { bpm: nextBpm });
+    }, [transportNode, updateNodeData]);
 
     // Command palette actions
     const commandActions = useMemo(() => [
@@ -448,150 +463,240 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
         setAssistPosition(null);
         setAssistQuery('');
     }, [connectionAssist, assistPosition, reactFlowInstance, addNodeAndConnect]);
-
-    // activeGraph is already defined above
-    const isActive = !!activeGraph;
+    const leftDrawerTitle = leftPanelView === 'explorer'
+        ? 'Graph Explorer'
+        : leftPanelView === 'catalog'
+            ? 'Catalog'
+            : 'Audio Library';
+    const gitStatusLabel = project?.path ? 'git: linked workspace' : 'git: unavailable';
+    const audioStatusLabel = outputNode?.data.type === 'output' && outputNode.data.playing
+        ? 'Audio Live'
+        : outputNode
+            ? 'Audio Ready'
+            : 'Audio Idle';
+    const viewportPlayLabel = outputNode?.data.type === 'output' && outputNode.data.playing ? 'Pause graph output' : 'Play graph output';
 
     return (
         <MidiProvider>
-            <div className={`flex flex-col h-screen overflow-hidden select-none ${isDark ? 'bg-zinc-950 text-zinc-100' : 'bg-zinc-50 text-zinc-900'}`}>
-                <EditorTopbar 
-                    project={project ? { name: project.name, accentColor: project.accentColor } : undefined}
+            <div className={`flex h-full min-h-0 flex-col overflow-hidden select-none ${isDark ? 'bg-zinc-950 text-zinc-100' : 'bg-zinc-50 text-zinc-900'}`}>
+                <WindowTitlebar
+                    projectName={project?.name}
                     activeGraphName={activeGraph?.name || 'Untitled'}
-                    componentName={activeGraph?.id ? `(${activeGraph.id})` : ''}
-                    nameDraft={nameDraft}
-                    onNameDraftChange={(e) => setNameDraft(e.target.value)}
-                    onNameKeyDown={handleNameKeyDown}
-                    onNameBlur={handleNameBlur}
+                />
+                <EditorTopbar
+                    project={project ? {
+                        name: project.name,
+                        accentColor: project.accentColor,
+                        onRevealProject: project.onRevealProject,
+                    } : undefined}
                     isDark={isDark}
                     onToggleTheme={() => setTheme(isDark ? 'light' : 'dark')}
                     onOpenCommandPalette={() => setCommandPaletteOpen(true)}
-                    onAutoArrange={handleAutoArrange}
-                    onFitCanvas={() => reactFlowInstance?.fitView()}
-                    mcpBadge={<McpStatusBadge />}
                 />
-                
-                <div className="flex-1 flex overflow-hidden">
-                    <ActivityRail 
-                        items={[
-                            { id: 'explorer', label: 'Explorer', shortLabel: 'EXP', active: leftPanelView === 'explorer', onSelect: () => openLeftPanelView('explorer') },
-                            { id: 'palette', label: 'Catalog', shortLabel: 'CAT', active: leftPanelView === 'catalog', onSelect: () => openLeftPanelView('catalog') },
-                            { id: 'templates', label: 'Templates', shortLabel: 'TMP', active: false, onSelect: () => setCommandPaletteOpen(true) },
-                            { id: 'inspector', label: 'Properties', shortLabel: 'PRO', active: !rightPanelCollapsed, onSelect: toggleRightPanel },
-                        ]}
-                    />
 
-                    <aside className="w-72 flex-shrink-0 flex flex-col border-r border-zinc-800">
-                        {leftPanelView === 'explorer' && (
-                            <ExplorerPanel 
-                                onLoadGraph={handleLoadGraph} 
-                                onLoadTemplate={(id) => {
-                                    if (id === 'voice-synth') {
-                                        loadTemplate(createAtmosphericBreakbeatArcTemplate()); // Using existing template as fallback
-                                    }
-                                }}
+                <div className="min-h-0 flex-1 overflow-hidden">
+                    <EditorShell
+                        rail={(
+                            <ActivityRail
+                                items={[
+                                    { id: 'explorer', label: 'Explorer', shortLabel: 'EXP', active: leftPanelView === 'explorer', onSelect: () => openLeftPanelView('explorer') },
+                                    { id: 'catalog', label: 'Catalog', shortLabel: 'CAT', active: leftPanelView === 'catalog', onSelect: () => openLeftPanelView('catalog') },
+                                    { id: 'library', label: 'Library', shortLabel: 'LIB', active: leftPanelView === 'library', onSelect: () => openLeftPanelView('library') },
+                                    { id: 'runtime', label: 'Runtime', shortLabel: 'RUN', active: bottomDrawerOpen && bottomDrawerTab === 'runtime', onSelect: () => openBottomDrawerTab('runtime') },
+                                    { id: 'inspect', label: 'Inspect', shortLabel: 'INS', active: !rightPanelCollapsed, onSelect: toggleRightPanel },
+                                ]}
                             />
                         )}
-                        {leftPanelView === 'catalog' && <NodePalette filter={paletteFilter} onFilterChange={setPaletteFilter} />}
-                    </aside>
+                        leftPanel={(
+                            <CatalogExplorerPanel
+                                collapsed={leftPanelCollapsed}
+                                title={leftDrawerTitle}
+                                onToggleCollapse={toggleLeftPanel}
+                            >
+                                {leftPanelView === 'explorer' ? (
+                                    <ExplorerPanel
+                                        onLoadGraph={handleLoadGraph}
+                                        onLoadTemplate={(id) => {
+                                            if (id === 'voice-synth') {
+                                                loadTemplate(createAtmosphericBreakbeatArcTemplate());
+                                            }
+                                        }}
+                                    />
+                                ) : leftPanelView === 'catalog' ? (
+                                    <NodePalette filter={paletteFilter} onFilterChange={setPaletteFilter} />
+                                ) : (
+                                    <LibraryDrawerContent
+                                        items={libraryItems}
+                                        filter={libraryFilter}
+                                        onFilterChange={setLibraryFilter}
+                                        preview={audioPreview}
+                                        onPreviewChange={setAudioPreview}
+                                        onItemsChange={setLibraryItems}
+                                    />
+                                )}
+                            </CatalogExplorerPanel>
+                        )}
+                        canvas={(
+                            <section className="ui-panel ui-canvas-stage flex min-h-0 flex-col border border-[var(--panel-border)]" data-testid="canvas-panel">
+                                <div className="ui-panel-header border-b border-[var(--panel-border)] px-3 py-2" data-testid="graph-tabs">
+                                    <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+                                        {graphs.map((graph) => (
+                                            <button
+                                                key={graph.id}
+                                                type="button"
+                                                onClick={() => void handleLoadGraph(graph.id)}
+                                                className={`inline-flex min-w-0 items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] transition ${
+                                                    graph.id === activeGraphId
+                                                        ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text)]'
+                                                        : 'border-[var(--panel-border)] bg-[var(--panel-bg)] text-[var(--text-subtle)] hover:text-[var(--text)]'
+                                                }`}
+                                            >
+                                                <span className="truncate">{graph.name}</span>
+                                                {graph.id === activeGraphId ? <span aria-hidden="true">x</span> : null}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={handleAutoArrange}
+                                            className="rounded-xl border border-[var(--panel-border)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                                        >
+                                            Arrange
+                                        </button>
+                                    </div>
+                                </div>
+                                <main
+                                    className="relative min-h-0 flex-1"
+                                    onDrop={onDrop}
+                                    onDragOver={onDragOver}
+                                >
+                                    <ReactFlow
+                                        nodes={nodes}
+                                        edges={edges}
+                                        onNodesChange={onNodesChange}
+                                        onEdgesChange={onEdgesChange}
+                                        onConnect={(params) => {
+                                            onConnect(params);
+                                            setConnectionAssist(null);
+                                            setAssistPosition(null);
+                                        }}
+                                        onConnectStart={onConnectStart}
+                                        onConnectEnd={onConnectEnd}
+                                        onInit={setReactFlowInstance}
+                                        nodeTypes={nodeTypes}
+                                        defaultEdgeOptions={{
+                                            style: AUDIO_EDGE_STYLE,
+                                            animated: false,
+                                            deletable: true,
+                                        }}
+                                        fitView
+                                        minZoom={0.1}
+                                        maxZoom={4}
+                                        snapToGrid
+                                        snapGrid={[10, 10]}
+                                        colorMode={isDark ? 'dark' : 'light'}
+                                    >
+                                        <Background variant={BackgroundVariant.Dots} gap={20} color={isDark ? '#27272a' : '#e4e4e7'} />
+                                        <Controls className={`${isDark ? 'bg-zinc-800 border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-800'} fill-current`} />
+                                        <MiniMap
+                                            nodeColor={(node) => getMiniMapNodeColor(node.data.type as any)}
+                                            className={isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'}
+                                            maskColor={isDark ? 'rgba(0, 0, 0, 0.3)' : 'rgba(255, 255, 255, 0.3)'}
+                                            pannable
+                                            zoomable
+                                        />
 
-                    <main 
-                        className={`flex-1 relative ${isDark ? 'bg-zinc-900' : 'bg-white'}`}
-                        onDrop={onDrop}
-                        onDragOver={onDragOver}
-                    >
-                        <ReactFlow
-                            nodes={nodes}
-                            edges={edges}
-                            onNodesChange={onNodesChange}
-                            onEdgesChange={onEdgesChange}
-                            onConnect={(params) => {
-                                onConnect(params);
-                                setConnectionAssist(null);
-                                setAssistPosition(null);
-                            }}
-                            onConnectStart={onConnectStart}
-                            onConnectEnd={onConnectEnd}
-                            onInit={setReactFlowInstance}
-                            nodeTypes={nodeTypes}
-                            defaultEdgeOptions={{ 
-                                style: AUDIO_EDGE_STYLE, 
-                                animated: false,
-                                deletable: true,
-                            }}
-                            fitView
-                            minZoom={0.1}
-                            maxZoom={4}
-                            snapToGrid
-                            snapGrid={[10, 10]}
-                            colorMode={isDark ? 'dark' : 'light'}
-                        >
-                            <Background variant={BackgroundVariant.Dots} gap={20} color={isDark ? "#27272a" : "#e4e4e7"} />
-                            <Controls className={`${isDark ? 'bg-zinc-800 border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-800'} fill-current`} />
-                            <MiniMap 
-                                nodeColor={(node) => getMiniMapNodeColor(node.data.type as any)}
-                                className={isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'}
-                                maskColor={isDark ? "rgba(0, 0, 0, 0.3)" : "rgba(255, 255, 255, 0.3)"}
-                                pannable
-                                zoomable
+                                        <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-3">
+                                            <div className="pointer-events-auto flex items-center gap-1 rounded-lg border border-[var(--panel-border)] bg-[var(--panel-bg)]/90 p-1 shadow-sm">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPlaying(!(outputNode?.data.type === 'output' && outputNode.data.playing))}
+                                                    className="rounded-md border border-[var(--panel-border)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                                                    aria-label={viewportPlayLabel}
+                                                >
+                                                    {outputNode?.data.type === 'output' && outputNode.data.playing ? 'Pause' : 'Play'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPlaying(false)}
+                                                    className="rounded-md border border-[var(--panel-border)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-subtle)] transition hover:text-[var(--text)]"
+                                                    aria-label="Stop graph output"
+                                                >
+                                                    Stop
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <ConnectionAssistMenu
+                                            isOpen={Boolean(connectionAssist && assistPosition)}
+                                            position={assistPosition || { x: 0, y: 0 }}
+                                            query={assistQuery}
+                                            suggestions={assistSuggestions}
+                                            onQueryChange={setAssistQuery}
+                                            onSelect={handleSelectSuggestion}
+                                            onClose={() => {
+                                                setConnectionAssist(null);
+                                                setAssistPosition(null);
+                                                setAssistQuery('');
+                                            }}
+                                        />
+                                    </ReactFlow>
+                                </main>
+                            </section>
+                        )}
+                        bottomDrawer={(
+                            <BottomDrawer
+                                open={bottomDrawerOpen}
+                                activeTab={bottomDrawerTab}
+                                height={bottomDrawerHeight}
+                                onToggle={toggleBottomDrawer}
+                                onTabChange={openBottomDrawerTab}
+                                onHeightChange={updateBottomDrawerHeight}
+                                runtimeContent={<RuntimeDrawerContent />}
+                                diagnosticsContent={<DiagnosticsDrawerContent />}
                             />
-                            
-                            <div className="absolute top-4 right-4 flex flex-col gap-3 pointer-events-none">
-                                <MidiStatusStrip activity={midiActivity} />
-                                <McpStatusBadge />
-                            </div>
-
-                            <ConnectionAssistMenu
-                                isOpen={Boolean(connectionAssist && assistPosition)}
-                                position={assistPosition || { x: 0, y: 0 }}
-                                query={assistQuery}
-                                suggestions={assistSuggestions}
-                                onQueryChange={setAssistQuery}
-                                onSelect={handleSelectSuggestion}
-                                onClose={() => {
-                                    setConnectionAssist(null);
-                                    setAssistPosition(null);
-                                    setAssistQuery('');
-                                }}
+                        )}
+                        rightPanel={(
+                            <InspectorPane
+                                collapsed={rightPanelCollapsed}
+                                tab={inspectorTab}
+                                onToggleCollapse={toggleRightPanel}
+                                onTabChange={openInspectorTab}
+                                hasSelection={Boolean(selectedNode)}
+                                selectedNodeLabel={selectedNode?.data.label || null}
+                                inspectContent={<Inspector />}
+                                emptyInspectContent={(
+                                    <GraphDefaultsPanel
+                                        projectName={project?.name}
+                                        activeGraphId={activeGraphId}
+                                        nameDraft={nameDraft}
+                                        onNameDraftChange={(event) => setNameDraft(event.target.value)}
+                                        onNameKeyDown={handleNameKeyDown}
+                                        onNameBlur={handleNameBlur}
+                                        transportBpm={transportNode?.data.type === 'transport' ? transportNode.data.bpm : null}
+                                        onTransportBpmChange={handleTransportBpmChange}
+                                        onRevealProject={project?.onRevealProject}
+                                    />
+                                )}
+                                codeContent={<CodeGenerator />}
                             />
-                        </ReactFlow>
-                    </main>
-
-                    <InspectorPane 
-                        collapsed={rightPanelCollapsed}
-                        tab={inspectorTab}
-                        onToggleCollapse={toggleRightPanel}
-                        onTabChange={openInspectorTab}
-                        hasSelection={Boolean(selectedNode)}
-                        selectedNodeLabel={selectedNode?.data.label || null}
-                        inspectContent={<Inspector />}
-                        codeContent={<div className="p-4 font-mono text-[11px] text-zinc-400">Live code preview coming soon...</div>}
+                        )}
+                        leftPanelCollapsed={leftPanelCollapsed}
+                        rightPanelCollapsed={rightPanelCollapsed}
+                        leftPanelWidth={SHELL_LAYOUT.leftPanelWidth}
+                        rightPanelWidth={SHELL_LAYOUT.rightPanelWidth}
                     />
                 </div>
 
-                <BottomDrawer 
-                    open={bottomDrawerOpen}
-                    activeTab={bottomDrawerTab}
-                    height={bottomDrawerHeight}
-                    onToggle={toggleBottomDrawer}
-                    onTabChange={openBottomDrawerTab}
-                    onHeightChange={updateBottomDrawerHeight}
-                    libraryContent={
-                        <LibraryDrawerContent 
-                            items={libraryItems} 
-                            filter={libraryFilter}
-                            onFilterChange={setLibraryFilter}
-                            preview={audioPreview}
-                            onPreviewChange={setAudioPreview}
-                            onItemsChange={setLibraryItems}
-                        />
-                    }
-                    runtimeContent={<RuntimeDrawerContent />}
-                    diagnosticsContent={<DiagnosticsDrawerContent />}
+                <FooterStatus
+                    gitLabel={gitStatusLabel}
+                    audioLabel={audioStatusLabel}
+                    mcpBadge={<McpStatusBadge />}
                 />
 
-                <CommandPalette 
-                    open={commandPaletteOpen} 
+                <CommandPalette
+                    open={commandPaletteOpen}
                     onClose={() => setCommandPaletteOpen(false)}
                     actions={commandActions}
                 />

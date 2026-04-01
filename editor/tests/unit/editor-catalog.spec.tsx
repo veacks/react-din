@@ -13,7 +13,7 @@ describe('editor catalog', () => {
         cleanup();
     });
 
-    it('shows the node browser and adds nodes from the palette', async () => {
+    it('shows the node browser and exposes draggable palette items', async () => {
         await renderEditor();
 
         await waitFor(async () => {
@@ -21,14 +21,27 @@ describe('editor catalog', () => {
         });
 
         const { useAudioGraphStore } = await import('../../ui/editor/store');
+        fireEvent.click(screen.getByTitle('Catalog'));
 
         expect(screen.getByLabelText('Search nodes')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Add Oscillator' })).toBeInTheDocument();
-        expect(screen.getByText('Templates')).toBeInTheDocument();
+        const oscillatorButton = screen.getByRole('button', { name: 'Add Oscillator' });
+        expect(oscillatorButton).toBeInTheDocument();
+        expect(screen.getByText('Sources')).toBeInTheDocument();
 
-        const before = useAudioGraphStore.getState().nodes.length;
-        fireEvent.click(screen.getByRole('button', { name: 'Add Oscillator' }));
-        expect(useAudioGraphStore.getState().nodes.length).toBe(before + 1);
+        const dataTransfer = {
+            effectAllowed: 'move',
+            dropEffect: 'move',
+            store: new Map<string, string>(),
+            setData(type: string, value: string) {
+                this.store.set(type, value);
+            },
+            getData(type: string) {
+                return this.store.get(type) ?? '';
+            },
+        };
+
+        fireEvent.dragStart(oscillatorButton, { dataTransfer });
+        expect(dataTransfer.getData('application/reactflow')).toBe('oscNode');
     });
 
     it('loads a template graph from the browser panel', async () => {

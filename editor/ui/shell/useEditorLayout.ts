@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { BottomDrawerTab, InspectorTab, LeftPanelView } from './editor-shell.types';
+import { SHELL_LAYOUT } from './shellTokens';
 
 const STORAGE_KEYS = {
     theme: 'din-editor-theme',
@@ -14,8 +15,8 @@ const STORAGE_KEYS = {
 
 const getViewportWidth = () => (typeof window === 'undefined' ? 1440 : window.innerWidth);
 const getViewportHeight = () => (typeof window === 'undefined' ? 900 : window.innerHeight);
-const getDefaultLeftPanelCollapsed = (viewportWidth: number) => viewportWidth < 1220;
-const getDefaultRightPanelCollapsed = (viewportWidth: number) => viewportWidth < 1040;
+const getDefaultLeftPanelCollapsed = (viewportWidth: number) => viewportWidth < 1240;
+const getDefaultRightPanelCollapsed = (viewportWidth: number) => viewportWidth < 1100;
 
 const getInitialTheme = (): 'light' | 'dark' => {
     if (typeof window === 'undefined') return 'dark';
@@ -46,33 +47,61 @@ const readNumber = (key: string, fallback: number) => {
 
 const clampBottomDrawerHeight = (value: number) => {
     const viewportHeight = getViewportHeight();
-    const min = 180;
-    const max = Math.max(min, viewportHeight - 220);
+    const min = SHELL_LAYOUT.bottomDrawerMinHeight;
+    const max = Math.max(min, viewportHeight - SHELL_LAYOUT.bottomDrawerViewportOffset);
     return Math.min(max, Math.max(min, Math.round(value)));
 };
+
+function readLegacyLibraryMigration() {
+    if (typeof window === 'undefined') {
+        return { migrateLibraryTab: false, storedLeftPanelView: null as LeftPanelView | null };
+    }
+
+    const storedBottomDrawerTab = window.localStorage.getItem(STORAGE_KEYS.bottomDrawerTab);
+    const storedLeftPanelView = window.localStorage.getItem(STORAGE_KEYS.leftPanelView);
+    const nextLeftPanelView = storedLeftPanelView === 'explorer'
+        || storedLeftPanelView === 'catalog'
+        || storedLeftPanelView === 'library'
+        ? storedLeftPanelView
+        : null;
+
+    return {
+        migrateLibraryTab: storedBottomDrawerTab === 'library',
+        storedLeftPanelView: nextLeftPanelView,
+    };
+}
 
 export function useEditorLayout() {
     const viewportWidth = getViewportWidth();
     const manualOverrideRef = useRef(false);
+    const migrationRef = useRef(readLegacyLibraryMigration());
     const [theme, setTheme] = useState<'light' | 'dark'>(() => getInitialTheme());
     const [currentViewportWidth, setCurrentViewportWidth] = useState(viewportWidth);
     const [leftPanelView, setLeftPanelView] = useState<LeftPanelView>(() =>
-        readEnum(STORAGE_KEYS.leftPanelView, ['catalog', 'explorer'], 'catalog')
+        migrationRef.current.migrateLibraryTab
+            ? 'library'
+            : readEnum(STORAGE_KEYS.leftPanelView, ['explorer', 'catalog', 'library'], 'explorer')
     );
     const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(() =>
-        readBoolean(STORAGE_KEYS.leftPanelCollapsed, getDefaultLeftPanelCollapsed(viewportWidth))
+        migrationRef.current.migrateLibraryTab
+            ? false
+            : readBoolean(STORAGE_KEYS.leftPanelCollapsed, getDefaultLeftPanelCollapsed(viewportWidth))
     );
     const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() =>
         readBoolean(STORAGE_KEYS.rightPanelCollapsed, getDefaultRightPanelCollapsed(viewportWidth))
     );
     const [bottomDrawerOpen, setBottomDrawerOpen] = useState(() =>
-        readBoolean(STORAGE_KEYS.bottomDrawerOpen, true)
+        migrationRef.current.migrateLibraryTab
+            ? true
+            : readBoolean(STORAGE_KEYS.bottomDrawerOpen, true)
     );
     const [bottomDrawerTab, setBottomDrawerTab] = useState<BottomDrawerTab>(() =>
-        readEnum(STORAGE_KEYS.bottomDrawerTab, ['library', 'runtime', 'diagnostics'], 'library')
+        migrationRef.current.migrateLibraryTab
+            ? 'runtime'
+            : readEnum(STORAGE_KEYS.bottomDrawerTab, ['runtime', 'diagnostics'], 'runtime')
     );
     const [bottomDrawerHeight, setBottomDrawerHeight] = useState(() =>
-        clampBottomDrawerHeight(readNumber(STORAGE_KEYS.bottomDrawerHeight, 260))
+        clampBottomDrawerHeight(readNumber(STORAGE_KEYS.bottomDrawerHeight, SHELL_LAYOUT.bottomDrawerDefaultHeight))
     );
     const [inspectorTab, setInspectorTab] = useState<InspectorTab>(() =>
         readEnum(STORAGE_KEYS.inspectorTab, ['inspect', 'code'], 'inspect')

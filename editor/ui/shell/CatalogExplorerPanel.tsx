@@ -1,45 +1,30 @@
 import type { ReactNode } from 'react';
-import type { LeftPanelView } from './editor-shell.types';
 
 interface CatalogExplorerPanelProps {
     collapsed: boolean;
-    view: LeftPanelView;
+    title: string;
     onToggleCollapse: () => void;
-    onViewChange: (view: LeftPanelView) => void;
-    catalogContent: ReactNode;
-    explorerContent: ReactNode;
+    children: ReactNode;
 }
 
 export function CatalogExplorerPanel({
     collapsed,
-    view,
+    title,
     onToggleCollapse,
-    onViewChange,
-    catalogContent,
-    explorerContent,
+    children,
 }: CatalogExplorerPanelProps) {
     if (collapsed) {
         return null;
     }
 
     return (
-        <aside className="ui-panel flex h-full min-h-0 flex-col border-r border-[var(--panel-border)]">
+        <aside className="ui-panel flex h-full min-h-0 flex-col border-r border-[var(--panel-border)]" data-testid="left-drawer">
             <div className="ui-panel-header border-b border-[var(--panel-border)] px-3 py-2">
-                <div className="flex items-center gap-2 rounded-full border border-[var(--panel-border)] bg-[var(--panel-muted)] p-1">
-                    {(['catalog', 'explorer'] as const).map((item) => (
-                        <button
-                            key={item}
-                            type="button"
-                            onClick={() => onViewChange(item)}
-                            className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] transition ${
-                                view === item
-                                    ? 'bg-[var(--accent-soft)] text-[var(--text)]'
-                                    : 'text-[var(--text-subtle)] hover:text-[var(--text)]'
-                            }`}
-                        >
-                            {item}
-                        </button>
-                    ))}
+                <div className="min-w-0">
+                    <div className="truncate text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-subtle)]">
+                        Left Drawer
+                    </div>
+                    <div className="truncate text-[13px] font-semibold text-[var(--text)]">{title}</div>
                 </div>
                 <button
                     type="button"
@@ -52,7 +37,7 @@ export function CatalogExplorerPanel({
                 </button>
             </div>
             <div className="min-h-0 flex-1 overflow-hidden">
-                {view === 'catalog' ? catalogContent : explorerContent}
+                {children}
             </div>
         </aside>
     );

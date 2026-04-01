@@ -131,6 +131,8 @@ const midiHookState = vi.hoisted(() => ({
 vi.mock('@xyflow/react', () => ({
     Handle: ({ id }: { id?: string }) => <div data-testid={`handle-${id ?? 'default'}`} />,
     Position: { Left: 'left', Right: 'right', Top: 'top', Bottom: 'bottom' },
+    ReactFlowProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    useNodeId: () => 'node-under-test',
     useHandleConnections: () => [],
     useNodesData: () => null,
     useOnSelectionChange: () => null,
@@ -253,7 +255,7 @@ describe('editor node UIs', () => {
         );
 
         expect(screen.getByTestId('handle-param:cutoff')).toBeInTheDocument();
-        expect(screen.getByText('Oscillator')).toBeInTheDocument();
+        expect(screen.getByDisplayValue('Oscillator')).toBeInTheDocument();
         expect(screen.getByText('Output')).toBeInTheDocument();
         expect(screen.getByText('Step Sequencer')).toBeInTheDocument();
         expect(screen.getByText('Playing step 3 / 4')).toBeInTheDocument();
@@ -430,7 +432,7 @@ describe('editor node UIs', () => {
         );
 
         expect(screen.queryByTitle('Gain level')).not.toBeInTheDocument();
-        expect(screen.getByText('72%')).toBeInTheDocument();
+        expect(screen.getByText('0.72')).toBeInTheDocument();
     });
 
     it('renders extended MVP feedback and routing node controls with stable handles', () => {

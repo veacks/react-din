@@ -43,40 +43,33 @@ export const ExplorerPanel: FC<ExplorerPanelProps> = ({ onLoadGraph, onLoadTempl
     const activeGraphId = useAudioGraphStore((s) => s.activeGraphId);
     
     return (
-        <div className="flex flex-col h-full bg-zinc-900 border-r border-zinc-800">
-            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-zinc-400">
-                    <FolderOpenIcon className="w-4 h-4" />
-                    <h3 className="text-[11px] font-bold uppercase tracking-[0.14em]">Explorer</h3>
-                </div>
-                <button className="p-1 hover:bg-zinc-800 rounded transition-colors text-zinc-500 hover:text-zinc-200" title="New Graph">
-                    <PlusIcon className="w-4 h-4" />
-                </button>
-            </div>
- 
-            <div className="flex-1 overflow-y-auto p-2">
+        <div className="flex h-full flex-col bg-transparent">
+            <div className="flex-1 overflow-y-auto p-3">
                 <div className="space-y-4">
                     <div className="space-y-1">
-                        <h4 className="px-2 py-2 text-[10px] font-bold text-zinc-600 uppercase tracking-wider">Graphs</h4>
+                        <div className="flex items-center gap-2 px-2 py-2 text-[10px] font-bold uppercase tracking-wider text-[var(--text-subtle)]">
+                            <FolderOpenIcon className="h-4 w-4" />
+                            <span>Graphs</span>
+                        </div>
                         {graphs.map(graph => (
                             <div 
                                 key={graph.id}
                                 onClick={() => onLoadGraph(graph.id)}
-                                className={`group flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all ${
+                                className={`group flex cursor-pointer items-center justify-between rounded-xl border p-2 transition-all ${
                                     activeGraphId === graph.id 
-                                        ? 'bg-blue-500/10 border border-blue-500/20' 
-                                        : 'hover:bg-zinc-800 border border-transparent'
+                                        ? 'border-[var(--accent)] bg-[var(--accent-soft)]' 
+                                        : 'border-transparent hover:border-[var(--panel-border)] hover:bg-[var(--panel-muted)]/60'
                                 }`}
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className={`p-1.5 rounded ${activeGraphId === graph.id ? 'bg-blue-500 text-white' : 'bg-zinc-800 text-zinc-500'}`}>
+                                    <div className={`rounded p-1.5 ${activeGraphId === graph.id ? 'bg-[var(--accent)] text-[var(--panel-bg)]' : 'bg-[var(--panel-muted)] text-[var(--text-subtle)]'}`}>
                                         <FileCodeIcon className="w-3.5 h-3.5" />
                                     </div>
                                     <div className="flex flex-col">
-                                        <span className={`text-xs font-semibold ${activeGraphId === graph.id ? 'text-blue-400' : 'text-zinc-300'}`}>
+                                        <span className={`text-xs font-semibold ${activeGraphId === graph.id ? 'text-[var(--text)]' : 'text-[var(--text)]'}`}>
                                             {graph.name}
                                         </span>
-                                        <span className="text-[10px] text-zinc-600 font-mono">
+                                        <span className="font-mono text-[10px] text-[var(--text-subtle)]">
                                             {new Date(graph.updatedAt).toLocaleDateString()}
                                         </span>
                                     </div>
@@ -84,12 +77,12 @@ export const ExplorerPanel: FC<ExplorerPanelProps> = ({ onLoadGraph, onLoadTempl
                                 
                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button 
-                                        className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-blue-500 hover:bg-blue-500/10 rounded transition-colors"
+                                        className="rounded px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-[var(--accent)] transition-colors hover:bg-[var(--accent-soft)]"
                                         title="Reveal in list"
                                     >
                                         Reveal
                                     </button>
-                                    <button className="p-1.5 hover:bg-red-500/20 rounded-md transition-all text-zinc-500 hover:text-red-400">
+                                    <button className="rounded-md p-1.5 text-[var(--text-subtle)] transition-all hover:bg-[var(--danger-soft)] hover:text-[var(--danger)]">
                                         <Trash2Icon className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
@@ -98,13 +91,18 @@ export const ExplorerPanel: FC<ExplorerPanelProps> = ({ onLoadGraph, onLoadTempl
                     </div>
  
                     <div className="space-y-1 mt-6">
-                        <h4 className="px-2 py-2 text-[10px] font-bold text-zinc-600 uppercase tracking-wider">Templates</h4>
+                        <div className="flex items-center justify-between px-2 py-2">
+                            <h4 className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-subtle)]">Templates</h4>
+                            <button className="rounded p-1 text-[var(--text-subtle)] transition-colors hover:bg-[var(--panel-muted)] hover:text-[var(--text)]" title="New Graph">
+                                <PlusIcon className="h-4 w-4" />
+                            </button>
+                        </div>
                         <div className="px-2 space-y-1">
                             <button 
                                 onClick={() => onLoadTemplate?.('voice-synth')}
-                                className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-zinc-800 text-zinc-300 transition-all border border-transparent"
+                                className="flex w-full items-center gap-3 rounded-xl border border-transparent p-2 text-[var(--text)] transition-all hover:border-[var(--panel-border)] hover:bg-[var(--panel-muted)]/60"
                             >
-                                <div className="p-1.5 rounded bg-purple-500/20 text-purple-400">
+                                <div className="rounded bg-[var(--accent-soft)] p-1.5 text-[var(--accent)]">
                                     <FileCodeIcon className="w-3.5 h-3.5" />
                                 </div>
                                 <span className="text-xs font-semibold">Voice Synth</span>

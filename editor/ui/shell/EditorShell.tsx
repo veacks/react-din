@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
+import { SHELL_LAYOUT } from './shellTokens';
 
 interface EditorShellProps {
     rail: ReactNode;
     leftPanel: ReactNode;
-    topbar: ReactNode;
     canvas: ReactNode;
     bottomDrawer: ReactNode;
     rightPanel: ReactNode;
@@ -16,7 +16,6 @@ interface EditorShellProps {
 export function EditorShell({
     rail,
     leftPanel,
-    topbar,
     canvas,
     bottomDrawer,
     rightPanel,
@@ -27,15 +26,14 @@ export function EditorShell({
 }: EditorShellProps) {
     return (
         <div
-            className="ui-shell grid h-screen w-full overflow-hidden text-[var(--text)]"
+            className="ui-shell grid h-full w-full overflow-hidden text-[var(--text)]"
             style={{
-                gridTemplateColumns: `64px ${leftPanelCollapsed ? 0 : leftPanelWidth}px minmax(0, 1fr) ${rightPanelCollapsed ? 0 : rightPanelWidth}px`,
+                gridTemplateColumns: `${SHELL_LAYOUT.railWidth}px ${leftPanelCollapsed ? 0 : leftPanelWidth}px minmax(0, 1fr) ${rightPanelCollapsed ? 0 : rightPanelWidth}px`,
             }}
         >
             <div className="min-h-0 border-r border-[var(--panel-border)]">{rail}</div>
             <div className="min-h-0 overflow-hidden">{leftPanel}</div>
-            <div className="min-h-0 grid overflow-hidden" style={{ gridTemplateRows: 'auto minmax(0, 1fr) auto' }}>
-                {topbar}
+            <div className="min-h-0 grid overflow-hidden" style={{ gridTemplateRows: 'minmax(0, 1fr) auto' }}>
                 {canvas}
                 {bottomDrawer}
             </div>
