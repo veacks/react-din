@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, type FC, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import {
     ReactFlow,
+    ReactFlowProvider,
     Background,
     Controls,
     MiniMap,
@@ -600,7 +601,9 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
 };
 
 export const Editor: FC<EditorProps> = (props) => (
-    <EditorContent {...props} />
+    <ReactFlowProvider>
+        <EditorContent {...props} />
+    </ReactFlowProvider>
 );
 
 export default Editor;

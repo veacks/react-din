@@ -13,6 +13,7 @@ Expose oscillator waveform, frequency, and detune controls in the editor canvas.
 ## Integration Notes
 - Every numeric parameter exposes a dedicated target pin and uses connected-value mode when wired.
 - Keep `OscNode` aligned with `nodes/index.ts`, the palette in `Editor`, store defaults, `AudioEngine`, and `CodeGenerator`.
+- Keep the module export contract stable for both direct imports and the node registry (`default` export plus named `OscNode` export).
 - Use it with `NoteNode`, `LFONode`, or `VoiceNode` control outputs.
 
 ## Failure Modes

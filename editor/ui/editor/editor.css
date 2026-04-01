@@ -945,7 +945,7 @@
     /* translate(0, width of container) */
     margin: 0;
     padding: 0;
-    -webkit-appearance: slider-vertical;
+    appearance: none;
 }
 
 /* Fallback/Correction for input range if needed */

@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import OscNode from '../../ui/editor/nodes/OscNode';
+import OscNode, { OscNode as OscNodeNamed } from '../../ui/editor/nodes/OscNode';
 import GainNode from '../../ui/editor/nodes/GainNode';
 import OutputNode from '../../ui/editor/nodes/OutputNode';
 import InputNode from '../../ui/editor/nodes/InputNode';
@@ -208,6 +208,10 @@ describe('editor node UIs', () => {
         midiHookState.clock.lastTickAt = null;
         midiHookState.clock.source = { id: null, name: null };
         vi.unstubAllGlobals();
+    });
+
+    it('keeps OscNode default and named exports aligned', () => {
+        expect(OscNode).toBe(OscNodeNamed);
     });
 
     it('renders representative node families with their controls', () => {

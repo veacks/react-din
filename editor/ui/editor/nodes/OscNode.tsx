@@ -113,3 +113,4 @@ const OscNode = memo(({ id, data, selected }: NodeProps) => {
 OscNode.displayName = 'OscNode';
 
 export { OscNode };
+export default OscNode;
