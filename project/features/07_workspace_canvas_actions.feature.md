@@ -2,7 +2,7 @@
 
 ## Feature
 
-Describe how contributors place, select, connect, and manipulate nodes on the DIN Editor canvas.
+Describe how contributors place, select, connect, and manipulate nodes inside the Phase 3A graph canvas.
 
 ### F07-S01 Node placement from the canvas flow stays discoverable and direct
 
@@ -11,7 +11,7 @@ Describe how contributors place, select, connect, and manipulate nodes on the DI
 **UX Laws** `Hick's Law`, `Fitts's Law`
 
 **Given** a contributor is working inside the graph canvas
-**When** they add a new node from the in-canvas flow or menu
+**When** they add a new node from the in-canvas flow, catalog, or assist menu
 **Then** the node appears in context with a predictable selection and placement result
 
 ### F07-S02 Compatible handle connection and assist flows stay visible while dragging

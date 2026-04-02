@@ -15,6 +15,7 @@ Document the bottom drawer that exposes live runtime status and diagnostics bene
 - The audio library no longer lives in this drawer; library browsing belongs to the left drawer.
 - Runtime information must reflect live audio and MIDI state rather than cached snapshots.
 - Diagnostics should report graph issues without becoming a blocking modal surface.
+- Publish and commit confirmation belong to Source Control and top-bar handoff states, not to the bottom drawer.
 
 ## Failure Modes
 

@@ -18,6 +18,9 @@
 
 ## DIN Editor UX
 
+- [DIN Editor Docs](./editor/README.md)
+- [LauncherEntryFlows](./editor/LauncherEntryFlows.md)
+- [SourceControlPanel](./editor/SourceControlPanel.md)
 - [AudioLibraryPanel](./editor/AudioLibraryPanel.md)
 
 ## DIN Editor Automation

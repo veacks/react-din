@@ -31,5 +31,5 @@ Describe the cross-cutting editor actions that preserve progress, support recove
 **UX Laws** `Zeigarnik Effect`, `Goal-Gradient Effect`
 
 **Given** the contributor leaves an in-progress draft, generation, or repair task unfinished
-**When** they return to the editor later
-**Then** the editor exposes a resumable entry point and removes that tension only after completion
+**When** they return through the launcher or the editor later
+**Then** the product exposes a resumable entry point in the right place and removes that tension only after completion

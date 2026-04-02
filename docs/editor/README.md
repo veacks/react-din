@@ -1,10 +1,12 @@
 # DIN Editor Docs
 
-This folder documents the editor shell, its panels, and the design rules that support the desktop workspace.
+This folder documents the Phase 3A desktop surfaces, their panels, and the reusable design rules that support launcher and workspace flows.
 
 ## Included Docs
 
+- [LauncherEntryFlows](./LauncherEntryFlows.md)
 - [EditorShell](./EditorShell.md)
+- [SourceControlPanel](./SourceControlPanel.md)
 - [CatalogExplorerPanel](./CatalogExplorerPanel.md)
 - [InspectorPanel](./InspectorPanel.md)
 - [RuntimeDrawer](./RuntimeDrawer.md)
@@ -15,5 +17,6 @@ This folder documents the editor shell, its panels, and the design rules that su
 
 ## Notes
 
-- These docs describe the target shell architecture that the editor is moving toward.
+- Figma board `217:2` is the canonical Phase 3A desktop spec for these docs.
+- Older editor wireframes are fallback references only when Phase 3A does not restate a behavior.
 - Keep them in English so they remain usable for contributors and review tooling.

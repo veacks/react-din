@@ -14,6 +14,7 @@ Provide a shared, graph-agnostic audio-file manager for editor sampler and convo
 - Deleting an asset removes cache metadata and clears all sampler/convolver references across all loaded graphs.
 - The node-level searchable dropdowns and this panel read from the same asset inventory.
 - The left drawer owns library browsing; the bottom drawer should not reintroduce a second library tab.
+- Project-entry import flows belong to the launcher entry IA; this panel remains focused on in-workspace asset management.
 - Upload validation accepts likely audio files only and rejects files not playable by the current browser (`canPlayType`), with a cross-browser hint favoring MP3/WAV/M4A/AAC.
 
 ## Limitations

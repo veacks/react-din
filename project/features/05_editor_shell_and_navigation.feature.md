@@ -2,16 +2,16 @@
 
 ## Feature
 
-Describe the cross-platform shell, navigation model, and persistent orientation cues that anchor all DIN Editor work.
+Describe the Phase 3A in-editor shell, navigation model, and persistent orientation cues that anchor all workspace authoring work.
 
-### F05-S01 Shell layout keeps activity rail, workspace, inspector, and status bar responsibilities explicit
+### F05-S01 Shell layout keeps rail, canvas, inspector, and status responsibilities explicit
 
 **User Story** As a DIN Editor operator, I want the shell regions to stay stable so I can navigate the app without re-learning the layout on each screen.
 **Future Test Layer** `e2e` via `playwright`
 **UX Laws** `Jakob's Law`, `Selective Attention`
 
-**Given** a contributor reviews the DIN Editor shell in its default desktop state
-**When** they move between the activity rail, the left drawer, the primary workspace, the inspector, and the footer status area
+**Given** a contributor reviews the DIN Editor workspace in its default Phase 3A desktop state
+**When** they move between the title bar, top bar, activity rail, browse drawer, canvas, runtime drawer, inspector, and footer status area
 **Then** each region keeps a stable responsibility, a stable hierarchy, and clear navigation affordances
 
 ### F05-S02 Navigation changes preserve focus and immediate orientation
@@ -20,7 +20,7 @@ Describe the cross-platform shell, navigation model, and persistent orientation 
 **Future Test Layer** `e2e` via `playwright`
 **UX Laws** `Doherty Threshold`, `Selective Attention`
 
-**Given** a contributor switches between `Explorer`, `Catalog`, `Library`, `Runtime`, and `Inspect`
+**Given** a contributor switches between `Explorer`, `Catalog`, `Library`, `Runtime`, `Review`, and `Inspect`
 **When** the active panel or tab changes
 **Then** the app acknowledges the change immediately and keeps the new focus target visually explicit
 
@@ -30,6 +30,6 @@ Describe the cross-platform shell, navigation model, and persistent orientation 
 **Future Test Layer** `e2e` via `playwright`
 **UX Laws** `Selective Attention`, `Von Restorff Effect`
 
-**Given** the editor exposes connection, dirty-state, or audio telemetry in the footer
+**Given** the editor exposes git branch, MCP, and audio telemetry in the footer while review or publish work can happen elsewhere
 **When** the user is focused on graph authoring or review work
 **Then** the footer remains scannable, non-blocking, and visually subordinate to the main task area

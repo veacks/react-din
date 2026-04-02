@@ -2,7 +2,7 @@
 
 ## Feature
 
-Describe how the inspector, code surface, and generation flows react to selection, graph changes, and long-running editor actions.
+Describe how the inspector, code surface, and generation flows react to selection, graph changes, and long-running editor actions inside the Phase 3A workspace.
 
 ### F08-S01 Inspector changes follow the current node or graph context
 
@@ -30,6 +30,6 @@ Describe how the inspector, code surface, and generation flows react to selectio
 **Future Test Layer** `e2e` via `playwright`
 **UX Laws** `Doherty Threshold`, `Goal-Gradient Effect`, `Peak-End Rule`
 
-**Given** the contributor starts a generate or refresh action from the right panel
+**Given** the contributor starts a generate or refresh action from the right panel or its linked review workflow
 **When** the operation begins and later completes
-**Then** the UI provides immediate acknowledgment, visible progress cues, and a clear completion state
+**Then** the UI provides immediate acknowledgment, visible progress cues, and a clear completion or handoff state

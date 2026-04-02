@@ -17,6 +17,7 @@ Document the right-side panel that exposes the selected node's details and techn
 - Inline node controls should stay compact and defer advanced settings to this panel.
 - Graph defaults should expose graph name and graph-level metadata without forcing a node selection.
 - Code output must stay in sync with the active graph and selected project name.
+- Review, publish, and commit phases belong to the Source Control surface; the inspector stays focused on graph and node context.
 
 ## Failure Modes
 

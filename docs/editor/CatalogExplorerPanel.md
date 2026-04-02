@@ -16,6 +16,7 @@ Document the left drawer shell used to show graph browsing, node browsing, or li
 - The panel should reuse the same node catalog data that powers drag creation on the canvas.
 - Templates should load complete starter graphs, not partial fragments.
 - Library browsing should reuse the shared asset inventory used by sampler and convolver nodes.
+- Source Control and publish work belong to the `review` rail mode, not to this browse drawer.
 - The drawer must remain useful even when reopened from the compact activity rail.
 
 ## Failure Modes

@@ -21,10 +21,10 @@
 | `F04-S02` | Docs And Change Gates | Mapped source changes update docs and tests | unit | `node` validation scripts | baseline | - | - |
 | `F04-S03` | Docs And Change Gates | New nodes and public components update all required touch points | unit | `node` validation scripts | baseline | - | - |
 | `F04-S04` | Docs And Change Gates | Patch schema stays aligned with the public patch contract | unit | `node` validation scripts | baseline | - | - |
-| `F05-S01` | DIN Editor Shell And Navigation | Shell layout keeps activity rail, workspace, inspector, and status bar responsibilities explicit | e2e | `playwright` | planned | `Jakob's Law`, `Selective Attention` | VEA-88 |
+| `F05-S01` | DIN Editor Shell And Navigation | Shell layout keeps rail, canvas, inspector, and status responsibilities explicit | e2e | `playwright` | planned | `Jakob's Law`, `Selective Attention` | VEA-88 |
 | `F05-S02` | DIN Editor Shell And Navigation | Navigation changes preserve focus and immediate orientation | e2e | `playwright` | planned | `Doherty Threshold`, `Selective Attention` | VEA-91 |
 | `F05-S03` | DIN Editor Shell And Navigation | Footer status remains informative without competing with the active task | e2e | `playwright` | planned | `Selective Attention`, `Von Restorff Effect` | VEA-139 |
-| `F06-S01` | Graph Explorer And Graph Lifecycle | Graph Explorer exposes empty, single-graph, and multi-graph browsing states | e2e | `playwright` | planned | `Hick's Law`, `Selective Attention` | VEA-93 |
+| `F06-S01` | Graph Explorer And Graph Lifecycle | Graph Explorer exposes empty, single-graph, and multi-graph browsing states without competing with launcher entry flows | e2e | `playwright` | planned | `Hick's Law`, `Selective Attention` | VEA-93 |
 | `F06-S02` | Graph Explorer And Graph Lifecycle | Graph creation and renaming stay immediate and resilient | e2e | `playwright` | planned | `Doherty Threshold`, `Peak-End Rule` | VEA-95 |
 | `F06-S03` | Graph Explorer And Graph Lifecycle | Graph tabs preserve context while switching between working surfaces | e2e | `playwright` | planned | `Zeigarnik Effect`, `Selective Attention` | VEA-97 |
 | `F07-S01` | Workspace Canvas Actions | Node placement from the canvas flow stays discoverable and direct | e2e | `playwright` | planned | `Hick's Law`, `Fitts's Law` | VEA-99 |
@@ -35,13 +35,17 @@
 | `F08-S03` | Inspector Code And Generation | Generation flows acknowledge long-running work before completion | e2e | `playwright` | planned | `Doherty Threshold`, `Goal-Gradient Effect`, `Peak-End Rule` | VEA-148 |
 | `F09-S01` | Source Control Actions | Source Control prioritizes the next relevant review action | e2e | `playwright` | planned | `Hick's Law`, `Selective Attention` | VEA-149 |
 | `F09-S02` | Source Control Actions | Generate and review actions acknowledge progress without silent waiting | e2e | `playwright` | planned | `Doherty Threshold`, `Goal-Gradient Effect` | VEA-151 |
-| `F09-S03` | Source Control Actions | Commit completion lands on a memorable, confidence-building end state | e2e | `playwright` | planned | `Peak-End Rule`, `Von Restorff Effect` | VEA-153 |
+| `F09-S03` | Source Control Actions | Commit controls keep message, changed-file context, and primary action explicit before write | e2e | `playwright` | planned | `Hick's Law`, `Selective Attention` | - |
+| `F09-S04` | Source Control Actions | Commit completion lands on a memorable, confidence-building end state | e2e | `playwright` | planned | `Peak-End Rule`, `Von Restorff Effect` | VEA-153 |
 | `F10-S01` | Asset Library Actions | Asset search and filtering reduce the visible decision set | e2e | `playwright` | planned | `Hick's Law`, `Selective Attention` | VEA-156 |
 | `F10-S02` | Asset Library Actions | Asset preview and relink flows recover from imperfect input gracefully | e2e | `playwright` | planned | `Postel's Law`, `Doherty Threshold` | VEA-158 |
 | `F10-S03` | Asset Library Actions | Missing asset repair ends on a clear and satisfying recovery state | e2e | `playwright` | planned | `Peak-End Rule`, `Von Restorff Effect` | VEA-160 |
 | `F11-S01` | Editor System Actions | Undo and redo preserve graph intent without corrupting the active session | e2e | `playwright` | planned | `Zeigarnik Effect`, `Peak-End Rule` | VEA-161 |
 | `F11-S02` | Editor System Actions | Save and reload flows restore durable graph state while sanitizing transient runtime state | e2e | `playwright` | planned | `Doherty Threshold`, `Zeigarnik Effect` | VEA-163 |
 | `F11-S03` | Editor System Actions | Interrupted work remains visible and resumable until it is completed | e2e | `playwright` | planned | `Zeigarnik Effect`, `Goal-Gradient Effect` | VEA-164 |
+| `F12-S01` | Launcher Entry Flows | Recent work, search, and open actions preserve immediate orientation | e2e | `playwright` | planned | `Jakob's Law`, `Selective Attention` | - |
+| `F12-S02` | Launcher Entry Flows | Templates, import, and recover stay first-class entry actions | e2e | `playwright` | planned | `Hick's Law`, `Postel's Law` | - |
+| `F12-S03` | Launcher Entry Flows | Interrupted-work resume stays visible at product entry | e2e | `playwright` | planned | `Zeigarnik Effect`, `Goal-Gradient Effect` | - |
 | `F20-S01` | Params Node | Params node is discoverable and placeable from the Sources catalog | integration | `vitest` | planned | `Postel's Law`, `Fitts's Law` | VEA-166 |
 | `F20-S02` | Params Node | Params node exposes its contract handles and editable settings | integration | `vitest` | planned | `Selective Attention` | VEA-168 |
 | `F20-S03` | Params Node | Params node stays coherent through graph, runtime, and code generation | integration | `vitest` | planned | `Doherty Threshold` | VEA-171 |

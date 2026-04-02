@@ -2,7 +2,7 @@
 
 ## Feature
 
-Describe how contributors search, preview, import, relink, and recover assets through the left-drawer Asset Library.
+Describe how contributors search, preview, import, relink, and recover assets through the workspace Asset Library without overlapping launcher import ownership.
 
 ### F10-S01 Asset search and filtering reduce the visible decision set
 
