@@ -32,6 +32,8 @@ export const CustomHandle = memo((props: HandleProps) => {
     return (
         <Handle
             {...props}
+            data-nodeid={nodeId ?? undefined}
+            data-handleid={handleId ?? undefined}
             className={`${className} ${isCompatible ? 'connection-assist-handle' : ''}`}
         />
     );

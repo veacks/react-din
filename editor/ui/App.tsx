@@ -1,4 +1,5 @@
 import { startTransition, useEffect, useState } from 'react';
+import { patchToGraphDocument, type PatchDocument } from '../../src/patch';
 import { AgentBridgeClient } from '../bridge/AgentBridgeClient';
 import {
     getProjectRepository,
@@ -6,8 +7,10 @@ import {
     type ProjectController,
     type ProjectManifest,
 } from '../project';
+import { createTemplateGraphDocument, EDITOR_TEMPLATES } from './editor/templateLibrary';
+import { listProjectInterruptedWork, writeProjectResumeIntent } from './projectUiState';
 import { Editor } from './Editor';
-import ProjectLauncher from './ProjectLauncher';
+import ProjectLauncher, { type LauncherImportRequest, type LauncherResumeItem } from './ProjectLauncher';
 
 type AppScreen =
     | { kind: 'loading' }
@@ -18,6 +21,7 @@ function App() {
     const [repository] = useState(() => getProjectRepository());
     const [screen, setScreen] = useState<AppScreen>({ kind: 'loading' });
     const [projects, setProjects] = useState<ProjectManifest[]>([]);
+    const [resumableWork, setResumableWork] = useState<LauncherResumeItem[]>([]);
     const [hasLegacyWorkspace, setHasLegacyWorkspace] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -29,6 +33,20 @@ function App() {
         ]);
 
         setProjects(nextProjects);
+        setResumableWork(
+            listProjectInterruptedWork(nextProjects)
+                .map((summary) => {
+                    const project = nextProjects.find((entry) => entry.id === summary.projectId);
+                    if (!project) return null;
+                    return {
+                        ...summary,
+                        projectName: project.name,
+                        accentColor: project.accentColor,
+                        storageKind: project.storageKind,
+                    } satisfies LauncherResumeItem;
+                })
+                .filter((entry): entry is LauncherResumeItem => Boolean(entry))
+        );
         setHasLegacyWorkspace(legacyWorkspacePresent);
     };
 
@@ -127,6 +145,95 @@ function App() {
         }
     };
 
+    const saveGraphIntoProject = async (
+        projectId: string,
+        graph: {
+            id: string;
+            name: string;
+            nodes: any[];
+            edges: any[];
+            createdAt: number;
+            updatedAt: number;
+            order: number;
+        },
+        replaceInitialGraph: boolean,
+    ) => {
+        const controller = await repository.openProject(projectId);
+        const workspace = await controller.loadWorkspace();
+        const initialGraphId = replaceInitialGraph ? workspace.graphs[0]?.id ?? null : null;
+        const nextGraph = {
+            ...graph,
+            order: replaceInitialGraph ? 0 : workspace.graphs.length,
+            updatedAt: Date.now(),
+        };
+
+        await controller.saveGraph(nextGraph);
+
+        if (replaceInitialGraph && initialGraphId && initialGraphId !== nextGraph.id) {
+            await controller.deleteGraph(initialGraphId);
+        }
+
+        await controller.saveActiveGraphId(nextGraph.id);
+        return controller.project.id;
+    };
+
+    const openPreparedProject = async (projectId: string) => {
+        await refreshLauncherState();
+        if (repository.supportsDedicatedWindows && repository.windowKind === 'launcher') {
+            await repository.openProjectWindow(projectId);
+            return;
+        }
+        await openProjectInCurrentWindow(projectId);
+    };
+
+    const handleCreateProjectFromTemplate = async (templateId: string, name: string) => {
+        setBusy(true);
+        setError(null);
+        try {
+            const project = await repository.createProject({ name });
+            const templateGraph = createTemplateGraphDocument(templateId, 0);
+            await saveGraphIntoProject(project.id, templateGraph, true);
+            await openPreparedProject(project.id);
+        } catch (nextError) {
+            setError(nextError instanceof Error ? nextError.message : 'Failed to create the project from template.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const handleImportPatch = async ({
+        patch,
+        fileName,
+        targetProjectId,
+        projectName,
+    }: LauncherImportRequest) => {
+        setBusy(true);
+        setError(null);
+        try {
+            const now = Date.now();
+            const project = targetProjectId
+                ? null
+                : await repository.createProject({
+                    name: projectName?.trim() || stripImportedProjectName(fileName),
+                });
+            const graph = patchToGraphDocument(patch, {
+                updatedAt: now,
+                createdAt: now,
+            });
+            const projectId = targetProjectId ?? project?.id;
+            if (!projectId) {
+                throw new Error('No project target available for the patch import.');
+            }
+
+            await saveGraphIntoProject(projectId, graph, !targetProjectId);
+            await openPreparedProject(projectId);
+        } catch (nextError) {
+            setError(nextError instanceof Error ? nextError.message : 'Failed to import the patch.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
     const handleRecoverLegacyWorkspace = async () => {
         setBusy(true);
         setError(null);
@@ -148,6 +255,18 @@ function App() {
         }
     };
 
+    const handleResumeInterruptedWork = async (projectId: string) => {
+        const resume = resumableWork.find((entry) => entry.projectId === projectId);
+        if (resume) {
+            writeProjectResumeIntent(projectId, {
+                railMode: resume.railMode,
+                graphId: resume.graphId ?? null,
+                createdAt: Date.now(),
+            });
+        }
+        await handleOpenProject(projectId);
+    };
+
     if (screen.kind === 'loading') {
         return (
             <main className="flex min-h-screen items-center justify-center bg-[#080912] text-[var(--text)]">
@@ -162,13 +281,18 @@ function App() {
         return (
             <ProjectLauncher
                 projects={projects}
+                templates={EDITOR_TEMPLATES}
+                resumableWork={resumableWork}
                 hasLegacyWorkspace={hasLegacyWorkspace}
                 supportsDedicatedWindows={repository.supportsDedicatedWindows}
                 supportsFileSystemAccess={repository.supportsFileSystemAccess}
                 busy={busy}
                 error={error}
                 onOpenProject={handleOpenProject}
+                onResumeInterruptedWork={handleResumeInterruptedWork}
                 onCreateProject={handleCreateProject}
+                onCreateProjectFromTemplate={handleCreateProjectFromTemplate}
+                onImportPatch={handleImportPatch}
                 onRecoverLegacyWorkspace={handleRecoverLegacyWorkspace}
             />
         );
@@ -182,11 +306,18 @@ function App() {
                     id: screen.controller.project.id,
                     name: screen.controller.project.name,
                     accentColor: screen.controller.project.accentColor,
+                    path: screen.controller.project.path,
                     onRevealProject: () => repository.revealProject(screen.controller.project.id),
                 }}
             />
         </>
     );
+}
+
+function stripImportedProjectName(fileName: string) {
+    const index = fileName.lastIndexOf('.');
+    const base = index > 0 ? fileName.slice(0, index) : fileName;
+    return `${base || 'Imported Patch'} Project`;
 }
 
 export default App;

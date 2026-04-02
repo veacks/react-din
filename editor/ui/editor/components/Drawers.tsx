@@ -1,6 +1,6 @@
-import { type FC, useMemo, useState } from 'react';
+import { type FC, useMemo, useRef, useState } from 'react';
 import { useAudioGraphStore } from '../store';
-import { addAssetFromFile, listAssets, deleteAsset, type AudioLibraryAsset } from '../audioLibrary';
+import { addAssetFromFile, deleteAsset, listAssets, type AudioLibraryAsset } from '../audioLibrary';
 
 // Custom SVG Icons
 const SearchIcon = ({ className }: { className?: string }) => (
@@ -106,6 +106,14 @@ export interface AudioPreviewState {
     playing: boolean;
 }
 
+export interface MissingLibraryReference {
+    assetId: string;
+    kind: 'sample' | 'impulse';
+    nodeId: string;
+    nodeLabel: string;
+    assetPath: string;
+}
+
 interface LibraryDrawerContentProps {
     items: LibraryItem[];
     filter: string;
@@ -113,6 +121,8 @@ interface LibraryDrawerContentProps {
     preview: AudioPreviewState;
     onPreviewChange: (p: AudioPreviewState) => void;
     onItemsChange: (items: LibraryItem[]) => void;
+    repairItems: MissingLibraryReference[];
+    onRepairAsset: (item: MissingLibraryReference, file: File) => Promise<void> | void;
 }
 
 const mapProjectAssetToLibraryItem = (asset: AudioLibraryAsset): LibraryItem => ({
@@ -125,9 +135,11 @@ const mapProjectAssetToLibraryItem = (asset: AudioLibraryAsset): LibraryItem => 
 });
 
 export const LibraryDrawerContent: FC<LibraryDrawerContentProps> = ({ 
-    items, filter, onFilterChange, preview, onPreviewChange, onItemsChange 
+    items, filter, onFilterChange, preview, onPreviewChange, onItemsChange, repairItems, onRepairAsset
 }) => {
     const [error, setError] = useState<string | null>(null);
+    const [repairingAssetId, setRepairingAssetId] = useState<string | null>(null);
+    const uploadInputRef = useRef<HTMLInputElement>(null);
 
     const formatSize = (bytes: number) => {
         if (bytes < 1024) return `${bytes} B`;
@@ -163,15 +175,17 @@ export const LibraryDrawerContent: FC<LibraryDrawerContentProps> = ({
         }
     };
 
-    const handleDrop = async (e: React.DragEvent) => {
-        e.preventDefault();
+    const refreshItems = async () => {
+        const assets = await listAssets();
+        onItemsChange(assets.map(mapProjectAssetToLibraryItem));
+    };
+
+    const importFiles = async (files: File[]) => {
         setError(null);
-        
-        const files = Array.from(e.dataTransfer.files);
         if (files.length === 0) return;
 
         const hasNonAudio = files.some(file => !file.type.startsWith('audio/'));
-        
+
         if (hasNonAudio) {
             setError('Only audio files are accepted.');
             return;
@@ -179,10 +193,39 @@ export const LibraryDrawerContent: FC<LibraryDrawerContentProps> = ({
 
         try {
             await Promise.all(files.map(file => addAssetFromFile(file)));
-            const assets = await listAssets();
-            onItemsChange(assets.map(mapProjectAssetToLibraryItem));
+            await refreshItems();
         } catch (err) {
             setError('Failed to upload audio files.');
+        }
+    };
+
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        await importFiles(Array.from(e.dataTransfer.files));
+    };
+
+    const handleImportInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const nextFiles = Array.from(event.target.files ?? []);
+        await importFiles(nextFiles);
+        if (uploadInputRef.current) {
+            uploadInputRef.current.value = '';
+        }
+    };
+
+    const handleRepairInputChange = async (item: MissingLibraryReference, event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        setRepairingAssetId(item.assetId);
+        setError(null);
+        try {
+            await onRepairAsset(item, file);
+            await refreshItems();
+        } catch (err) {
+            setError('Failed to repair the missing asset reference.');
+        } finally {
+            setRepairingAssetId(null);
+            event.target.value = '';
         }
     };
 
@@ -200,7 +243,20 @@ export const LibraryDrawerContent: FC<LibraryDrawerContentProps> = ({
                         className="w-full bg-black/40 border border-white/5 rounded-full pl-9 pr-4 py-2 text-[13px] text-zinc-300 focus:outline-none focus:border-blue-500/50 transition-all font-medium"
                     />
                 </div>
-                <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-full text-xs font-bold transition-all shadow-lg active:scale-95">
+                <input
+                    ref={uploadInputRef}
+                    type="file"
+                    accept="audio/*"
+                    multiple
+                    onChange={handleImportInputChange}
+                    className="sr-only"
+                    aria-label="Import library files"
+                />
+                <button
+                    type="button"
+                    onClick={() => uploadInputRef.current?.click()}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-full text-xs font-bold transition-all shadow-lg active:scale-95"
+                >
                     <DownloadIcon className="w-3.5 h-3.5" />
                     <span>IMPORT</span>
                 </button>
@@ -218,6 +274,43 @@ export const LibraryDrawerContent: FC<LibraryDrawerContentProps> = ({
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
             >
+                {repairItems.length > 0 ? (
+                    <div className="mb-4 rounded-2xl border border-amber-500/20 bg-amber-500/8 p-4">
+                        <div className="flex items-center gap-2 text-amber-300">
+                            <AlertTriangleIcon className="w-4 h-4" />
+                            <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Missing asset repair</span>
+                        </div>
+                        <div className="mt-2 text-[12px] leading-6 text-amber-50/90">
+                            Repair missing sample or impulse references directly from the library without leaving the current drawer context.
+                        </div>
+                        <div className="mt-3 grid gap-3">
+                            {repairItems.map((item) => (
+                                <label
+                                    key={`${item.nodeId}:${item.assetId}`}
+                                    className="rounded-2xl border border-amber-500/20 bg-black/20 px-4 py-3"
+                                >
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div>
+                                            <div className="text-[13px] font-semibold text-zinc-100">{item.nodeLabel}</div>
+                                            <div className="mt-1 text-[11px] text-amber-50/80">{item.assetPath || item.assetId}</div>
+                                        </div>
+                                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-200">
+                                            {repairingAssetId === item.assetId ? 'Repairing…' : item.kind}
+                                        </span>
+                                    </div>
+                                    <input
+                                        type="file"
+                                        accept="audio/*"
+                                        aria-label={`Repair ${item.nodeLabel}`}
+                                        onChange={(event) => void handleRepairInputChange(item, event)}
+                                        className="mt-3 block w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-[11px] text-zinc-200 file:mr-3 file:rounded-full file:border-0 file:bg-amber-500/20 file:px-3 file:py-1 file:text-[10px] file:font-bold file:uppercase file:tracking-[0.18em] file:text-amber-50"
+                                    />
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                ) : null}
+
                 {filteredItems.length === 0 ? (
                     <div className="h-40 flex flex-col items-center justify-center text-zinc-600 gap-3">
                         <MusicIcon className="w-8 h-8 opacity-20" />

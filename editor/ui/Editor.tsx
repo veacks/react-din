@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, type FC, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, type FC, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import {
     ReactFlow,
     ReactFlowProvider,
@@ -34,7 +34,7 @@ import {
     MixNode, ClampNode, SwitchNode,
 } from './editor/nodes';
 import { loadActiveGraphId, loadGraphs, saveActiveGraphId, saveGraph } from './editor/graphStorage';
-import { subscribeAssets, listAssets } from './editor/audioLibrary';
+import { addAssetFromFile, getAssetObjectUrl, subscribeAssets, listAssets } from './editor/audioLibrary';
 import { audioEngine } from './editor/AudioEngine';
 import {
     getCompatibleNodeSuggestions,
@@ -51,10 +51,13 @@ import { EditorShell } from './shell/EditorShell';
 import { FooterStatus } from './shell/FooterStatus';
 import { GraphDefaultsPanel } from './shell/GraphDefaultsPanel';
 import { InspectorPane } from './shell/InspectorPane';
+import { SourceControlPanel } from './shell/SourceControlPanel';
 import { useEditorLayout } from './shell/useEditorLayout';
 import { SHELL_LAYOUT } from './shell/shellTokens';
 import { WindowTitlebar } from './shell/WindowTitlebar';
 import { getMiniMapNodeColor } from './editor/nodeColorMap';
+import { consumeProjectResumeIntent, readProjectReviewState, writeProjectInterruptedWork, writeProjectReviewState } from './projectUiState';
+import type { ChangedFileSummary, InterruptedWorkSummary, ResumeIntent, ReviewState, SourceControlPhase } from './phase3a.types';
 
 // Extracted Utilities
 import { computeAutoLayoutPositions } from './editor/layoutUtils';
@@ -65,7 +68,7 @@ import {
 // Extracted Components
 import { NodePalette } from './editor/components/NodePalette';
 import { ExplorerPanel } from './editor/components/ExplorerPanel';
-import { LibraryDrawerContent, RuntimeDrawerContent, DiagnosticsDrawerContent, type LibraryItem, type AudioPreviewState } from './editor/components/Drawers';
+import { DiagnosticsDrawerContent, LibraryDrawerContent, RuntimeDrawerContent, type AudioPreviewState, type LibraryItem, type MissingLibraryReference } from './editor/components/Drawers';
 
 const nodeTypes: NodeTypes = {
     oscNode: OscNode as NodeTypes[string],
@@ -150,6 +153,74 @@ const getClientPosition = (event: MouseEvent | TouchEvent): XYPosition | null =>
     return { x: touch.clientX, y: touch.clientY };
 };
 
+function createDefaultReviewState(graphName?: string): ReviewState {
+    const nextGraphName = graphName || 'active graph';
+    return {
+        phase: 'idle',
+        summary: `Generate a review packet for ${nextGraphName} before preparing the commit handoff.`,
+        changedFiles: [],
+        commitMessage: `Refine ${nextGraphName}`,
+        updatedAt: Date.now(),
+    };
+}
+
+function buildChangedFiles(
+    activeGraph: { id: string; name: string } | undefined,
+    hasProjectPath: boolean,
+    libraryItemCount: number,
+    missingAssetCount: number,
+): ChangedFileSummary[] {
+    const changedFiles: ChangedFileSummary[] = [];
+
+    if (activeGraph) {
+        changedFiles.push({
+            path: `graphs/${activeGraph.id}.patch.json`,
+            status: 'modified',
+            detail: `${activeGraph.name} remains the active authoring graph.`,
+        });
+    }
+
+    changedFiles.push({
+        path: hasProjectPath ? 'workspace/review-state.json' : 'project/review-state.json',
+        status: 'modified',
+        detail: 'Review preparation and handoff metadata.',
+    });
+
+    if (libraryItemCount > 0) {
+        changedFiles.push({
+            path: 'samples/library.manifest.json',
+            status: 'modified',
+            detail: `${libraryItemCount} tracked asset${libraryItemCount === 1 ? '' : 's'} available to the workspace.`,
+        });
+    }
+
+    if (missingAssetCount > 0) {
+        changedFiles.push({
+            path: 'samples/missing-assets.todo',
+            status: 'modified',
+            detail: `${missingAssetCount} asset repair task${missingAssetCount === 1 ? '' : 's'} still needs resolution.`,
+        });
+    }
+
+    return changedFiles;
+}
+
+function getTopbarPhaseChip(phase: SourceControlPhase) {
+    switch (phase) {
+        case 'generating':
+            return { id: 'review-progress', label: 'Generating Review', tone: 'info' as const };
+        case 'ready':
+            return { id: 'review-ready', label: 'Review Ready', tone: 'warning' as const };
+        case 'committing':
+            return { id: 'review-commit', label: 'Committing', tone: 'warning' as const };
+        case 'success':
+            return { id: 'review-success', label: 'Commit Saved', tone: 'success' as const };
+        case 'idle':
+        default:
+            return null;
+    }
+}
+
 const EditorContent: FC<EditorProps> = ({ project }) => {
     const nodes = useAudioGraphStore((s) => s.nodes);
     const edges = useAudioGraphStore((s) => s.edges);
@@ -170,6 +241,7 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
     const setPlaying = useAudioGraphStore((s) => s.setPlaying);
     const updateNodeData = useAudioGraphStore((s) => s.updateNodeData);
     const renameGraph = useAudioGraphStore((s) => s.renameGraph);
+    const createGraph = useAudioGraphStore((s) => s.createGraph);
     const undo = useAudioGraphStore((s) => s.undo);
     const redo = useAudioGraphStore((s) => s.redo);
     
@@ -179,6 +251,12 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
     const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
     const [audioPreview, setAudioPreview] = useState<AudioPreviewState>({ activeId: null, playing: false });
     const [nameDraft, setNameDraft] = useState('');
+    const [reviewState, setReviewState] = useState<ReviewState>(() => createDefaultReviewState());
+    const [resumeIntent, setResumeIntent] = useState<ResumeIntent | null>(null);
+    const [reviewHydrated, setReviewHydrated] = useState(false);
+    const [initialDataReady, setInitialDataReady] = useState(false);
+    const reviewTimerRef = useRef<number | null>(null);
+    const canvasDropzoneRef = useRef<HTMLElement | null>(null);
     
     const {
         isDark,
@@ -231,6 +309,14 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
         }
     }, [activeGraphName]);
 
+    useEffect(() => {
+        if (!project?.id) return;
+        setReviewHydrated(false);
+        setReviewState(readProjectReviewState(project.id) ?? createDefaultReviewState(activeGraph?.name));
+        setResumeIntent(consumeProjectResumeIntent(project.id));
+        setReviewHydrated(true);
+    }, [project?.id]);
+
     // Track selection for inspector
     useOnSelectionChange({
         onChange: ({ nodes: selectedNodes }) => {
@@ -260,6 +346,8 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
 
     // Initial load
     useEffect(() => {
+        let cancelled = false;
+
         const loadInitialData = async () => {
             const storedGraphs = await loadGraphs();
             setGraphs(storedGraphs);
@@ -274,8 +362,6 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
             }
         };
 
-        loadInitialData();
-
         const refreshAssets = async () => {
             const assets = await listAssets();
             setLibraryItems(assets.map((a: any) => ({
@@ -288,10 +374,15 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
             })));
         };
 
-        refreshAssets();
+        void Promise.all([loadInitialData(), refreshAssets()]).finally(() => {
+            if (!cancelled) {
+                setInitialDataReady(true);
+            }
+        });
         const unsubscribeAssets = subscribeAssets(refreshAssets);
 
         return () => {
+            cancelled = true;
             unsubscribeAssets();
         };
     }, []);
@@ -310,8 +401,7 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
             updatedAt: Date.now(),
         };
         await saveGraph(updatedGraph);
-        setGraphs(graphs.map(g => g.id === activeGraphId ? updatedGraph : g));
-    }, [activeGraphId, nodes, edges, graphs, setGraphs]);
+    }, [activeGraphId, nodes, edges, graphs]);
 
     // Handle graph loading
     const handleLoadGraph = useCallback(async (graphId: string) => {
@@ -323,17 +413,30 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
         initializeFromGraphData({ nodes: graph.nodes, edges: graph.edges });
     }, [graphs, setActiveGraph, initializeFromGraphData]);
 
-    const handleNameBlur = useCallback(() => {
+    const handleCreateGraph = useCallback(async () => {
+        await handleSaveActiveGraph();
+        const graph = createGraph();
+        await saveGraph(graph);
+        await saveActiveGraphId(graph.id);
+    }, [createGraph, handleSaveActiveGraph]);
+
+    const commitGraphName = useCallback((nextName: string) => {
         if (!activeGraphId) return;
-        renameGraph(activeGraphId, nameDraft);
-        void handleSaveActiveGraph(nameDraft);
-    }, [activeGraphId, nameDraft, renameGraph, handleSaveActiveGraph]);
+        renameGraph(activeGraphId, nextName);
+        void handleSaveActiveGraph(nextName);
+    }, [activeGraphId, renameGraph, handleSaveActiveGraph]);
+
+    const handleNameBlur = useCallback(() => {
+        commitGraphName(nameDraft);
+    }, [commitGraphName, nameDraft]);
 
     const handleNameKeyDown = useCallback((e: ReactKeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
+            e.preventDefault();
+            commitGraphName(e.currentTarget.value);
             e.currentTarget.blur();
         }
-    }, []);
+    }, [commitGraphName]);
 
     const handleAutoArrange = useCallback(() => {
         const positions = computeAutoLayoutPositions(nodes, edges);
@@ -350,8 +453,259 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
         updateNodeData(transportNode.id, { bpm: nextBpm });
     }, [transportNode, updateNodeData]);
 
+    const missingLibraryReferences = useMemo<MissingLibraryReference[]>(() => {
+        const knownAssetIds = new Set(libraryItems.map((item) => item.id));
+        const missingEntries: MissingLibraryReference[] = [];
+
+        nodes.forEach((node) => {
+            if (node.data.type === 'sampler') {
+                const sampleId = typeof node.data.sampleId === 'string' ? node.data.sampleId : '';
+                if (sampleId && !knownAssetIds.has(sampleId)) {
+                    missingEntries.push({
+                        assetId: sampleId,
+                        kind: 'sample',
+                        nodeId: node.id,
+                        nodeLabel: node.data.label || 'Sampler',
+                        assetPath: typeof node.data.assetPath === 'string' ? node.data.assetPath : sampleId,
+                    });
+                }
+            }
+
+            if (node.data.type === 'convolver') {
+                const impulseId = typeof node.data.impulseId === 'string' ? node.data.impulseId : '';
+                if (impulseId && !knownAssetIds.has(impulseId)) {
+                    missingEntries.push({
+                        assetId: impulseId,
+                        kind: 'impulse',
+                        nodeId: node.id,
+                        nodeLabel: node.data.label || 'Convolver',
+                        assetPath: typeof node.data.assetPath === 'string' ? node.data.assetPath : impulseId,
+                    });
+                }
+            }
+        });
+
+        return missingEntries;
+    }, [libraryItems, nodes]);
+
+    const computedChangedFiles = useMemo(
+        () => buildChangedFiles(activeGraph, Boolean(project?.path), libraryItems.length, missingLibraryReferences.length),
+        [activeGraph, libraryItems.length, missingLibraryReferences.length, project?.path]
+    );
+
+    const effectiveReviewFiles = reviewState.changedFiles.length > 0 ? reviewState.changedFiles : computedChangedFiles;
+
+    useEffect(() => {
+        if (!project?.id || !reviewHydrated) return;
+        writeProjectReviewState(project.id, reviewState);
+    }, [project?.id, reviewHydrated, reviewState]);
+
+    useEffect(() => {
+        if (!project?.id || !reviewHydrated) return;
+
+        let interruptedWork: InterruptedWorkSummary | null = null;
+
+        if (reviewState.phase === 'generating') {
+            interruptedWork = {
+                projectId: project.id,
+                kind: 'generation',
+                title: 'Review packet generation in progress',
+                description: 'The workspace is preparing the next review summary and changed-file handoff.',
+                actionLabel: 'Resume Review',
+                severity: 'info',
+                updatedAt: reviewState.updatedAt,
+                railMode: 'review',
+                phase: reviewState.phase,
+                graphId: activeGraphId,
+            };
+        } else if (reviewState.phase === 'ready' || reviewState.phase === 'committing') {
+            interruptedWork = {
+                projectId: project.id,
+                kind: 'review',
+                title: reviewState.phase === 'ready' ? 'Review is ready to commit' : 'Commit handoff is still running',
+                description: reviewState.summary,
+                actionLabel: 'Resume Review',
+                severity: reviewState.phase === 'ready' ? 'warning' : 'info',
+                updatedAt: reviewState.updatedAt,
+                railMode: 'review',
+                phase: reviewState.phase,
+                graphId: activeGraphId,
+            };
+        } else if (missingLibraryReferences.length > 0) {
+            interruptedWork = {
+                projectId: project.id,
+                kind: 'asset-repair',
+                title: 'Missing assets need repair',
+                description: `${missingLibraryReferences.length} sample or impulse reference${missingLibraryReferences.length === 1 ? '' : 's'} still points to a missing file.`,
+                actionLabel: 'Open Library',
+                severity: 'warning',
+                updatedAt: Date.now(),
+                railMode: 'library',
+                graphId: activeGraphId,
+            };
+        }
+
+        writeProjectInterruptedWork(project.id, interruptedWork);
+    }, [activeGraphId, missingLibraryReferences.length, project?.id, reviewHydrated, reviewState]);
+
+    useEffect(() => {
+        if (!resumeIntent) return;
+
+        if (resumeIntent.railMode === 'runtime') {
+            openBottomDrawerTab('runtime');
+        } else if (resumeIntent.railMode === 'review' || resumeIntent.railMode === 'explorer' || resumeIntent.railMode === 'catalog' || resumeIntent.railMode === 'library') {
+            openLeftPanelView(resumeIntent.railMode);
+        }
+
+        setResumeIntent(null);
+    }, [openBottomDrawerTab, openLeftPanelView, resumeIntent]);
+
+    useEffect(() => {
+        return () => {
+            if (reviewTimerRef.current != null) {
+                window.clearTimeout(reviewTimerRef.current);
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        const nextWindow = window as typeof window & {
+            __DIN_TEST_BRIDGE_STATE__?: unknown;
+            __DIN_TEST_EDITOR_STORE__?: {
+                undo: () => void;
+                redo: () => void;
+                save: () => void;
+                snapshot: () => {
+                    activeGraphId: string | null;
+                    activeGraphName: string | null;
+                    canUndo: boolean;
+                    canRedo: boolean;
+                    undoDepth: number;
+                    redoDepth: number;
+                };
+            };
+        };
+
+        if (!nextWindow.__DIN_TEST_BRIDGE_STATE__) return;
+
+        nextWindow.__DIN_TEST_EDITOR_STORE__ = {
+            undo: () => undo(),
+            redo: () => redo(),
+            save: () => {
+                void handleSaveActiveGraph();
+            },
+            snapshot: () => {
+                const state = useAudioGraphStore.getState();
+                const activeGraph = state.graphs.find((graph) => graph.id === state.activeGraphId);
+                return {
+                    activeGraphId: state.activeGraphId,
+                    activeGraphName: activeGraph?.name ?? null,
+                    canUndo: state.canUndo,
+                    canRedo: state.canRedo,
+                    undoDepth: activeGraph ? (state.historyByGraph[activeGraph.id]?.undoStack.length ?? 0) : 0,
+                    redoDepth: activeGraph ? (state.historyByGraph[activeGraph.id]?.redoStack.length ?? 0) : 0,
+                };
+            },
+        };
+
+        return () => {
+            delete nextWindow.__DIN_TEST_EDITOR_STORE__;
+        };
+    }, [handleSaveActiveGraph, redo, undo]);
+
+    const handleGenerateReview = useCallback(() => {
+        if (reviewTimerRef.current != null) {
+            window.clearTimeout(reviewTimerRef.current);
+        }
+
+        setReviewState((current) => ({
+            ...current,
+            phase: 'generating',
+            summary: `Preparing a review summary for ${activeGraph?.name ?? 'the active graph'} and ${computedChangedFiles.length} changed files.`,
+            updatedAt: Date.now(),
+        }));
+
+        reviewTimerRef.current = window.setTimeout(() => {
+            setReviewState((current) => ({
+                ...current,
+                phase: 'ready',
+                changedFiles: computedChangedFiles,
+                summary: `Review ready for ${activeGraph?.name ?? 'the active graph'}. Changed files and commit framing are ready for handoff.`,
+                commitMessage: current.commitMessage.trim() || `Refine ${activeGraph?.name ?? 'workspace'}`,
+                updatedAt: Date.now(),
+            }));
+        }, 650);
+    }, [activeGraph?.name, computedChangedFiles]);
+
+    const handleCommitReview = useCallback(() => {
+        if (reviewTimerRef.current != null) {
+            window.clearTimeout(reviewTimerRef.current);
+        }
+
+        setReviewState((current) => ({
+            ...current,
+            phase: 'committing',
+            updatedAt: Date.now(),
+        }));
+
+        reviewTimerRef.current = window.setTimeout(() => {
+            setReviewState((current) => ({
+                ...current,
+                phase: 'success',
+                summary: `Commit handoff recorded for ${activeGraph?.name ?? 'the active graph'}. Continue iterating or switch back to graph authoring.`,
+                lastCompletedAt: Date.now(),
+                updatedAt: Date.now(),
+            }));
+        }, 650);
+    }, [activeGraph?.name]);
+
+    const handleResetReview = useCallback(() => {
+        if (reviewTimerRef.current != null) {
+            window.clearTimeout(reviewTimerRef.current);
+        }
+        setReviewState(createDefaultReviewState(activeGraph?.name));
+    }, [activeGraph?.name]);
+
+    const handleRepairLibraryAsset = useCallback(async (item: MissingLibraryReference, file: File) => {
+        const repairedAsset = await addAssetFromFile(file, {
+            kind: item.kind,
+            preserveAssetId: item.assetId,
+            fileName: file.name,
+        });
+        const objectUrl = await getAssetObjectUrl(repairedAsset.id);
+
+        if (item.kind === 'sample') {
+            updateNodeData(item.nodeId, {
+                sampleId: repairedAsset.id,
+                assetPath: repairedAsset.relativePath,
+                fileName: repairedAsset.fileName,
+                src: objectUrl ?? '',
+                loaded: Boolean(objectUrl),
+            });
+            if (objectUrl) {
+                await audioEngine.loadSamplerBuffer(item.nodeId, objectUrl);
+            }
+            return;
+        }
+
+        updateNodeData(item.nodeId, {
+            impulseId: repairedAsset.id,
+            assetPath: repairedAsset.relativePath,
+            impulseFileName: repairedAsset.fileName,
+            impulseSrc: objectUrl ?? '',
+        });
+        audioEngine.updateNode(item.nodeId, {
+            impulseId: repairedAsset.id,
+            assetPath: repairedAsset.relativePath,
+            impulseFileName: repairedAsset.fileName,
+            impulseSrc: objectUrl ?? '',
+        });
+    }, [updateNodeData]);
+
     // Command palette actions
     const commandActions = useMemo(() => [
+        { id: 'undo', title: 'Undo', shortcut: '⌘Z', onSelect: undo, section: 'Edit' },
+        { id: 'redo', title: 'Redo', shortcut: '⌘⇧Z', onSelect: redo, section: 'Edit' },
         { id: 'save', title: 'Save Graph', shortcut: '⌘S', onSelect: handleSaveActiveGraph, section: 'File' },
         { id: 'clear', title: 'Clear Canvas', onSelect: clearGraph, section: 'Edit' },
         { id: 'arrange', title: 'Auto Arrange', shortcut: '⌘L', onSelect: handleAutoArrange, section: 'Layout' },
@@ -360,7 +714,7 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
         { id: 'import-patch', title: 'Import Patch JSON', section: 'File', onSelect: () => {} },
         { id: 'template-breakbeat', title: 'Load Template: Breakbeat Arc', onSelect: () => loadTemplate(createAtmosphericBreakbeatArcTemplate()), section: 'Templates' },
         { id: 'template-medieval', title: 'Load Template: Medieval Strategy', onSelect: () => loadTemplate(createMedievalStrategyLongformTemplate()), section: 'Templates' },
-    ], [handleSaveActiveGraph, clearGraph, handleAutoArrange, loadTemplate]);
+    ], [undo, redo, handleSaveActiveGraph, clearGraph, handleAutoArrange, loadTemplate]);
 
     // Keyboard shortcuts
     useEffect(() => {
@@ -424,6 +778,19 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
         event.dataTransfer.dropEffect = 'move';
     }, []);
 
+    const handleAddNodeFromPalette = useCallback((type: string) => {
+        const rect = canvasDropzoneRef.current?.getBoundingClientRect();
+        const fallbackPosition = { x: 220 + (nodes.length * 18), y: 160 + (nodes.length * 12) };
+        const position = rect && reactFlowInstance
+            ? reactFlowInstance.screenToFlowPosition({
+                x: rect.left + (rect.width / 2),
+                y: rect.top + (rect.height / 2),
+            })
+            : fallbackPosition;
+
+        addNode(type as any, position);
+    }, [addNode, nodes.length, reactFlowInstance]);
+
     const onConnectStart = useCallback((event: MouseEvent | TouchEvent, params: OnConnectStartParams) => {
         const clientPos = getClientPosition(event);
         if (!clientPos) return;
@@ -467,8 +834,31 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
         ? 'Graph Explorer'
         : leftPanelView === 'catalog'
             ? 'Catalog'
-            : 'Audio Library';
-    const gitStatusLabel = project?.path ? 'git: linked workspace' : 'git: unavailable';
+            : leftPanelView === 'review'
+                ? 'Source Control'
+                : 'Audio Library';
+    const reviewChip = getTopbarPhaseChip(reviewState.phase);
+    const topbarChips = [
+        ...(reviewChip ? [{
+            ...reviewChip,
+            onSelect: () => openLeftPanelView('review'),
+        }] : []),
+        ...(missingLibraryReferences.length > 0 && reviewState.phase === 'idle'
+            ? [{
+                id: 'library-repair',
+                label: `${missingLibraryReferences.length} Asset Repair`,
+                tone: 'warning' as const,
+                onSelect: () => openLeftPanelView('library'),
+            }]
+            : []),
+    ];
+    const gitStatusLabel = reviewState.phase === 'success'
+        ? 'git: local review complete'
+        : reviewState.phase === 'ready'
+            ? 'git: review ready'
+            : project?.path
+                ? 'git: linked workspace'
+                : 'git: unavailable';
     const audioStatusLabel = outputNode?.data.type === 'output' && outputNode.data.playing
         ? 'Audio Live'
         : outputNode
@@ -478,7 +868,11 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
 
     return (
         <MidiProvider>
-            <div className={`flex h-full min-h-0 flex-col overflow-hidden select-none ${isDark ? 'bg-zinc-950 text-zinc-100' : 'bg-zinc-50 text-zinc-900'}`}>
+            <div
+                className={`flex h-full min-h-0 flex-col overflow-hidden select-none ${isDark ? 'bg-zinc-950 text-zinc-100' : 'bg-zinc-50 text-zinc-900'}`}
+                data-testid="editor-root"
+                data-editor-ready={initialDataReady ? 'true' : 'false'}
+            >
                 <WindowTitlebar
                     projectName={project?.name}
                     activeGraphName={activeGraph?.name || 'Untitled'}
@@ -490,7 +884,10 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
                         onRevealProject: project.onRevealProject,
                     } : undefined}
                     isDark={isDark}
+                    inspectorCollapsed={rightPanelCollapsed}
+                    statusChips={topbarChips}
                     onToggleTheme={() => setTheme(isDark ? 'light' : 'dark')}
+                    onToggleInspector={toggleRightPanel}
                     onOpenCommandPalette={() => setCommandPaletteOpen(true)}
                 />
 
@@ -503,7 +900,18 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
                                     { id: 'catalog', label: 'Catalog', shortLabel: 'CAT', active: leftPanelView === 'catalog', onSelect: () => openLeftPanelView('catalog') },
                                     { id: 'library', label: 'Library', shortLabel: 'LIB', active: leftPanelView === 'library', onSelect: () => openLeftPanelView('library') },
                                     { id: 'runtime', label: 'Runtime', shortLabel: 'RUN', active: bottomDrawerOpen && bottomDrawerTab === 'runtime', onSelect: () => openBottomDrawerTab('runtime') },
-                                    { id: 'inspect', label: 'Inspect', shortLabel: 'INS', active: !rightPanelCollapsed, onSelect: toggleRightPanel },
+                                    {
+                                        id: 'review',
+                                        label: 'Review',
+                                        shortLabel: 'REV',
+                                        active: leftPanelView === 'review',
+                                        onSelect: () => openLeftPanelView('review'),
+                                        badge: effectiveReviewFiles.length > 0 ? (
+                                            <span className="rounded-full border border-current/20 px-1.5 py-0.5 text-[8px] font-semibold">
+                                                {effectiveReviewFiles.length}
+                                            </span>
+                                        ) : undefined,
+                                    },
                                 ]}
                             />
                         )}
@@ -515,15 +923,39 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
                             >
                                 {leftPanelView === 'explorer' ? (
                                     <ExplorerPanel
+                                        onCreateGraph={handleCreateGraph}
                                         onLoadGraph={handleLoadGraph}
                                         onLoadTemplate={(id) => {
-                                            if (id === 'voice-synth') {
+                                            if (id === 'atmospheric-breakbeat-arc') {
                                                 loadTemplate(createAtmosphericBreakbeatArcTemplate());
+                                            }
+                                            if (id === 'medieval-strategy-longform') {
+                                                loadTemplate(createMedievalStrategyLongformTemplate());
                                             }
                                         }}
                                     />
                                 ) : leftPanelView === 'catalog' ? (
-                                    <NodePalette filter={paletteFilter} onFilterChange={setPaletteFilter} />
+                                    <NodePalette
+                                        filter={paletteFilter}
+                                        onFilterChange={setPaletteFilter}
+                                        onAddNode={handleAddNodeFromPalette}
+                                    />
+                                ) : leftPanelView === 'review' ? (
+                                    <SourceControlPanel
+                                        phase={reviewState.phase}
+                                        changedFiles={effectiveReviewFiles}
+                                        summary={reviewState.summary}
+                                        commitMessage={reviewState.commitMessage}
+                                        onCommitMessageChange={(value) => setReviewState((current) => ({
+                                            ...current,
+                                            commitMessage: value,
+                                            updatedAt: Date.now(),
+                                        }))}
+                                        onGenerate={handleGenerateReview}
+                                        onCommit={handleCommitReview}
+                                        onReset={handleResetReview}
+                                        onReturnToExplorer={() => openLeftPanelView('explorer')}
+                                    />
                                 ) : (
                                     <LibraryDrawerContent
                                         items={libraryItems}
@@ -532,12 +964,19 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
                                         preview={audioPreview}
                                         onPreviewChange={setAudioPreview}
                                         onItemsChange={setLibraryItems}
+                                        repairItems={missingLibraryReferences}
+                                        onRepairAsset={handleRepairLibraryAsset}
                                     />
                                 )}
                             </CatalogExplorerPanel>
                         )}
                         canvas={(
-                            <section className="ui-panel ui-canvas-stage flex min-h-0 flex-col border border-[var(--panel-border)]" data-testid="canvas-panel">
+                            <section
+                                className="ui-panel ui-canvas-stage flex min-h-0 flex-col border border-[var(--panel-border)]"
+                                data-testid="canvas-panel"
+                                onDrop={onDrop}
+                                onDragOver={onDragOver}
+                            >
                                 <div className="ui-panel-header border-b border-[var(--panel-border)] px-3 py-2" data-testid="graph-tabs">
                                     <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
                                         {graphs.map((graph) => (
@@ -568,8 +1007,10 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
                                 </div>
                                 <main
                                     className="relative min-h-0 flex-1"
-                                    onDrop={onDrop}
-                                    onDragOver={onDragOver}
+                                    data-testid="canvas-dropzone"
+                                    ref={(element) => {
+                                        canvasDropzoneRef.current = element;
+                                    }}
                                 >
                                     <ReactFlow
                                         nodes={nodes}

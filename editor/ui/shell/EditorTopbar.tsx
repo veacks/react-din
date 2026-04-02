@@ -9,14 +9,37 @@ interface ProjectMeta {
 interface EditorTopbarProps {
     project?: ProjectMeta;
     isDark: boolean;
+    inspectorCollapsed: boolean;
+    statusChips?: Array<{
+        id: string;
+        label: string;
+        tone: 'info' | 'success' | 'warning';
+        onSelect?: () => void;
+    }>;
     onToggleTheme: () => void;
+    onToggleInspector: () => void;
     onOpenCommandPalette: () => void;
+}
+
+function getChipToneClass(tone: 'info' | 'success' | 'warning') {
+    switch (tone) {
+        case 'success':
+            return 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100';
+        case 'warning':
+            return 'border-amber-400/30 bg-amber-500/10 text-amber-50';
+        case 'info':
+        default:
+            return 'border-blue-400/30 bg-blue-500/10 text-blue-50';
+    }
 }
 
 export function EditorTopbar({
     project,
     isDark,
+    inspectorCollapsed,
+    statusChips = [],
     onToggleTheme,
+    onToggleInspector,
     onOpenCommandPalette,
 }: EditorTopbarProps) {
     return (
@@ -41,6 +64,21 @@ export function EditorTopbar({
                         <div className="text-[13px] font-semibold text-[var(--text)]">DIN Editor</div>
                     </div>
                 )}
+                {statusChips.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                        {statusChips.map((chip) => (
+                            <button
+                                key={chip.id}
+                                type="button"
+                                onClick={() => chip.onSelect?.()}
+                                className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] transition hover:opacity-90 ${getChipToneClass(chip.tone)}`}
+                                data-testid={`topbar-chip-${chip.id}`}
+                            >
+                                {chip.label}
+                            </button>
+                        ))}
+                    </div>
+                ) : null}
             </div>
 
             <div className="ui-topbar-actions flex flex-wrap items-center justify-end gap-2">
@@ -53,6 +91,14 @@ export function EditorTopbar({
                         Reveal
                     </button>
                 ) : null}
+                <button
+                    type="button"
+                    onClick={onToggleInspector}
+                    className="rounded-xl border border-[var(--panel-border)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                    aria-pressed={!inspectorCollapsed}
+                >
+                    Inspector
+                </button>
                 <button
                     type="button"
                     onClick={onOpenCommandPalette}

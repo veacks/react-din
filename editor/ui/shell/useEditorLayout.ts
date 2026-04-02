@@ -62,6 +62,7 @@ function readLegacyLibraryMigration() {
     const nextLeftPanelView = storedLeftPanelView === 'explorer'
         || storedLeftPanelView === 'catalog'
         || storedLeftPanelView === 'library'
+        || storedLeftPanelView === 'review'
         ? storedLeftPanelView
         : null;
 
@@ -80,7 +81,7 @@ export function useEditorLayout() {
     const [leftPanelView, setLeftPanelView] = useState<LeftPanelView>(() =>
         migrationRef.current.migrateLibraryTab
             ? 'library'
-            : readEnum(STORAGE_KEYS.leftPanelView, ['explorer', 'catalog', 'library'], 'explorer')
+            : readEnum(STORAGE_KEYS.leftPanelView, ['explorer', 'catalog', 'library', 'review'], 'explorer')
     );
     const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(() =>
         migrationRef.current.migrateLibraryTab

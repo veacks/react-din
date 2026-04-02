@@ -538,8 +538,7 @@
       "docs": "docs/editor-nodes/OutputNode.md",
       "tests": [
         "editor/tests/unit/nodes-ui.spec.tsx",
-        "editor/tests/unit/store-and-codegen.spec.ts",
-        "editor/tests/e2e/editor.spec.ts"
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S01",
@@ -957,8 +956,7 @@
       "docs": "docs/editor-nodes/TransportNode.md",
       "tests": [
         "editor/tests/unit/nodes-ui.spec.tsx",
-        "editor/tests/unit/store-and-codegen.spec.ts",
-        "editor/tests/e2e/editor.spec.ts"
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S03",
@@ -973,8 +971,7 @@
       "docs": "docs/editor-nodes/StepSequencerNode.md",
       "tests": [
         "editor/tests/unit/nodes-ui.spec.tsx",
-        "editor/tests/unit/store-and-codegen.spec.ts",
-        "editor/tests/e2e/editor.spec.ts"
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S03",
@@ -1034,8 +1031,7 @@
       "docs": "docs/editor-nodes/VoiceNode.md",
       "tests": [
         "editor/tests/unit/nodes-ui.spec.tsx",
-        "editor/tests/unit/store-and-codegen.spec.ts",
-        "editor/tests/e2e/editor.spec.ts"
+        "editor/tests/unit/store-and-codegen.spec.ts"
       ],
       "scenarios": [
         "F02-S03",

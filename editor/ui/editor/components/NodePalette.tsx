@@ -3,6 +3,7 @@ import { type FC } from 'react';
 interface NodePaletteProps {
     filter: string;
     onFilterChange: (value: string) => void;
+    onAddNode?: (nodeType: string) => void;
 }
 
 const SearchIcon = ({ className }: { className?: string }) => (
@@ -20,17 +21,17 @@ const CATEGORIES = [
 ];
 
 const NODES = [
-    { type: 'oscNode', label: 'Oscillator', category: 'source' },
-    { type: 'noiseNode', label: 'Noise', category: 'source' },
-    { type: 'gainNode', label: 'Gain', category: 'mix' },
-    { type: 'filterNode', label: 'Filter', category: 'effect' },
-    { type: 'delayNode', label: 'Delay', category: 'effect' },
-    { type: 'reverbNode', label: 'Reverb', category: 'effect' },
-    { type: 'lfoNode', label: 'LFO', category: 'control' },
-    { type: 'adsrNode', label: 'ADSR', category: 'control' },
+    { type: 'osc', label: 'Oscillator', category: 'source' },
+    { type: 'noise', label: 'Noise', category: 'source' },
+    { type: 'gain', label: 'Gain', category: 'mix' },
+    { type: 'filter', label: 'Filter', category: 'effect' },
+    { type: 'delay', label: 'Delay', category: 'effect' },
+    { type: 'reverb', label: 'Reverb', category: 'effect' },
+    { type: 'lfo', label: 'LFO', category: 'control' },
+    { type: 'adsr', label: 'ADSR', category: 'control' },
 ];
 
-export const NodePalette: FC<NodePaletteProps> = ({ filter, onFilterChange }) => {
+export const NodePalette: FC<NodePaletteProps> = ({ filter, onFilterChange, onAddNode }) => {
     const onDragStart = (event: React.DragEvent, nodeType: string) => {
         event.dataTransfer.setData('application/reactflow', nodeType);
         event.dataTransfer.effectAllowed = 'move';
@@ -67,6 +68,7 @@ export const NodePalette: FC<NodePaletteProps> = ({ filter, onFilterChange }) =>
                                 <button
                                     key={node.type}
                                     className="group relative cursor-grab active:cursor-grabbing w-full text-left"
+                                    onClick={() => onAddNode?.(node.type)}
                                     onDragStart={(e) => onDragStart(e as unknown as React.DragEvent, node.type)}
                                     draggable
                                     aria-label={`Add ${node.label}`}

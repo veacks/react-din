@@ -69,8 +69,8 @@ describe('project launcher app shell', () => {
         const { default: App } = await import('../../ui/App');
         render(<App />);
 
-        expect(await screen.findByText('Existing projects')).toBeInTheDocument();
-        fireEvent.click(screen.getByText('Alpha Lab'));
+        expect(await screen.findByText('Phase 3A launcher sections')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Open Window' }));
 
         await waitFor(() => {
             expect(repository.openProjectWindow).toHaveBeenCalledWith('project-alpha');
@@ -112,7 +112,10 @@ describe('project launcher app shell', () => {
         const { default: App } = await import('../../ui/App');
         render(<App />);
 
-        expect(await screen.findByText('Recover Legacy Workspace')).toBeInTheDocument();
+        expect(await screen.findByText('Phase 3A launcher sections')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Recover' }));
+        expect(await screen.findAllByText('Recover Legacy Workspace')).not.toHaveLength(0);
+        fireEvent.click(screen.getByRole('button', { name: 'Recent' }));
 
         fireEvent.change(screen.getByLabelText('Project name'), {
             target: { value: 'Browser Lab' },

@@ -78,8 +78,15 @@ interface LegacyAudioAssetRecord {
     updatedAt: number;
 }
 
+interface LegacyWorkspaceTestFixture {
+    graphs: GraphDocument[];
+    activeGraphId: string | null;
+    assets: Array<LegacyAudioAssetRecord & { bytes?: number[] }>;
+}
+
 type BrowserFsWindow = Window & {
     showDirectoryPicker?: (options?: { mode?: 'read' | 'readwrite' }) => Promise<FileSystemDirectoryHandle>;
+    __DIN_EDITOR_TEST_LEGACY_WORKSPACE__?: LegacyWorkspaceTestFixture;
 };
 
 const deepClone = <T>(value: T): T => {
@@ -96,6 +103,12 @@ function isElectronBridge(value: unknown): value is ElectronProjectBridgeApi {
 function getElectronBridge(): ElectronProjectBridgeApi | null {
     if (typeof window === 'undefined') return null;
     return isElectronBridge(window.dinEditorApp) ? window.dinEditorApp : null;
+}
+
+function getLegacyWorkspaceTestFixture(): LegacyWorkspaceTestFixture | null {
+    if (typeof window === 'undefined') return null;
+    const nextWindow = window as BrowserFsWindow;
+    return nextWindow.__DIN_EDITOR_TEST_LEGACY_WORKSPACE__ ?? null;
 }
 
 function getWindowKindFromUrl(): ProjectWindowKind {
@@ -524,6 +537,14 @@ async function readMetaValue<TValue>(key: string): Promise<TValue | undefined> {
 }
 
 async function loadLegacyGraphs(): Promise<{ graphs: GraphDocument[]; activeGraphId: string | null }> {
+    const fixture = getLegacyWorkspaceTestFixture();
+    if (fixture) {
+        return {
+            graphs: deepClone(fixture.graphs),
+            activeGraphId: fixture.activeGraphId,
+        };
+    }
+
     if (typeof indexedDB === 'undefined') {
         return { graphs: [], activeGraphId: null };
     }
@@ -563,6 +584,11 @@ async function loadLegacyGraphs(): Promise<{ graphs: GraphDocument[]; activeGrap
 }
 
 async function loadLegacyAudioAssets(): Promise<LegacyAudioAssetRecord[]> {
+    const fixture = getLegacyWorkspaceTestFixture();
+    if (fixture) {
+        return fixture.assets.map(({ bytes: _bytes, ...asset }) => deepClone(asset));
+    }
+
     if (typeof indexedDB === 'undefined') {
         return [];
     }
@@ -592,6 +618,13 @@ function getLegacyAudioCacheKey(assetId: string): string {
 }
 
 async function loadLegacyAudioBlob(assetId: string): Promise<Blob | null> {
+    const fixture = getLegacyWorkspaceTestFixture();
+    if (fixture) {
+        const asset = fixture.assets.find((entry) => entry.id === assetId);
+        if (!asset?.bytes) return null;
+        return toBlob(asset.bytes, asset.mimeType);
+    }
+
     if (typeof caches === 'undefined') return null;
     try {
         const cache = await caches.open(LEGACY_AUDIO_CACHE);
@@ -1386,4 +1419,3 @@ export function resetProjectRepositoryForTests(): void {
     activeProjectController = null;
     repositorySingleton = null;
 }
-

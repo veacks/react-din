@@ -24,12 +24,15 @@ export function GraphDefaultsPanel({
     onRevealProject,
 }: GraphDefaultsPanelProps) {
     return (
-        <div className="h-full overflow-y-auto px-4 py-4">
+        <div className="h-full overflow-y-auto px-4 py-4" data-testid="graph-defaults-panel">
             <div className="space-y-4">
                 <section className="rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-bg)]">
                     <div className="border-b border-[var(--panel-border)] px-4 py-3">
                         <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-subtle)]">
                             Graph Defaults
+                        </div>
+                        <div className="mt-1 text-[12px] font-semibold text-[var(--text)]">
+                            No node selected
                         </div>
                         <div className="mt-1 text-[10px] leading-4 text-[var(--text-subtle)]">
                             Selection is empty. Graph-level metadata stays available here until you pick a node.

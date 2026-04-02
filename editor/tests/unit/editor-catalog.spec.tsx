@@ -20,7 +20,6 @@ describe('editor catalog', () => {
             expect(await getLatestReactFlowProps()).toBeTruthy();
         });
 
-        const { useAudioGraphStore } = await import('../../ui/editor/store');
         fireEvent.click(screen.getByTitle('Catalog'));
 
         expect(screen.getByLabelText('Search nodes')).toBeInTheDocument();
@@ -41,7 +40,7 @@ describe('editor catalog', () => {
         };
 
         fireEvent.dragStart(oscillatorButton, { dataTransfer });
-        expect(dataTransfer.getData('application/reactflow')).toBe('oscNode');
+        expect(dataTransfer.getData('application/reactflow')).toBe('osc');
     });
 
     it('loads a template graph from the browser panel', async () => {
@@ -53,9 +52,9 @@ describe('editor catalog', () => {
 
         const { useAudioGraphStore } = await import('../../ui/editor/store');
 
-        fireEvent.click(screen.getByRole('button', { name: /Voice Synth/ }));
+        fireEvent.click(screen.getByRole('button', { name: /Atmospheric Breakbeat Arc/ }));
 
-        expect(useAudioGraphStore.getState().nodes.some((node) => node.data.type === 'voice')).toBe(true);
+        expect(useAudioGraphStore.getState().nodes.some((node) => node.data.type === 'transport')).toBe(true);
         expect(useAudioGraphStore.getState().nodes.some((node) => node.data.type === 'output')).toBe(true);
     });
 });
