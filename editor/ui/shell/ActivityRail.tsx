@@ -36,9 +36,9 @@ export function ActivityRail({ items }: ActivityRailProps) {
                         key={item.id}
                         type="button"
                         onClick={item.onSelect}
-                        className={`group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-all duration-200 ${
+                        className={`group relative flex h-10 w-10 shrink-0 items-center justify-center border transition-all duration-200 ${
                             item.active
-                                ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)] shadow-[0_0_12px_rgba(79,117,255,0.2)]'
+                                ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
                                 : 'border-transparent text-[var(--text-subtle)] hover:bg-[var(--panel-bg)] hover:text-[var(--text)]'
                         }`}
                         aria-pressed={item.active}

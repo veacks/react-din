@@ -71,11 +71,11 @@
   /* Component tokens */
   --component-shell-gap: 16px;
   --component-shell-padding: 16px;
-  --component-panel-radius: 12px;
-  --component-topbar-radius: 12px;
-  --component-panel-shadow: 0 4px 12px rgba(0,0,0,0.2), 0 16px 40px rgba(0,0,0,0.3);
+  --component-panel-radius: 0px;
+  --component-topbar-radius: 0px;
+  --component-panel-shadow: none;
   --component-panel-backdrop: blur(24px);
-  --component-canvas-radius: 16px;
+  --component-canvas-radius: 0px;
   --component-canvas-shadow: none;
   --component-drawer-height: 280px;
   --component-rail-width: 54px;

@@ -62,13 +62,13 @@ export function BottomDrawer({
                 aria-hidden="true"
             />
             <div className="flex items-center justify-between gap-3 px-4 py-2">
-                <div className="flex items-center gap-2 rounded-full border border-[var(--panel-border)] bg-[var(--panel-bg)] p-1">
+                <div className="flex items-center gap-2 border border-[var(--panel-border)] bg-[var(--panel-bg)] p-1">
                     {DRAWER_TABS.map((tab) => (
                         <button
                             key={tab.id}
                             type="button"
                             onClick={() => onTabChange(tab.id)}
-                            className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] transition ${
+                            className={`px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] transition ${
                                 activeTab === tab.id
                                     ? 'bg-[var(--accent-soft)] text-[var(--text)]'
                                     : 'text-[var(--text-subtle)] hover:text-[var(--text)]'

@@ -903,7 +903,7 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
                                         active: leftPanelView === 'review',
                                         onSelect: () => openLeftPanelView('review'),
                                         badge: effectiveReviewFiles.length > 0 ? (
-                                            <span className="rounded-full border border-current/20 px-1.5 py-0.5 text-[8px] font-semibold">
+                                            <span className="border border-current/20 px-1.5 py-0.5 text-[8px] font-semibold">
                                                 {effectiveReviewFiles.length}
                                             </span>
                                         ) : undefined,
@@ -980,7 +980,7 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
                                                 key={graph.id}
                                                 type="button"
                                                 onClick={() => void handleLoadGraph(graph.id)}
-                                                className={`inline-flex min-w-0 items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] transition ${
+                                                className={`inline-flex min-w-0 items-center gap-2 border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] transition ${
                                                     graph.id === activeGraphId
                                                         ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text)]'
                                                         : 'border-[var(--panel-border)] bg-[var(--panel-bg)] text-[var(--text-subtle)] hover:text-[var(--text)]'
@@ -995,7 +995,7 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
                                         <button
                                             type="button"
                                             onClick={handleAutoArrange}
-                                            className="rounded-xl border border-[var(--panel-border)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                                            className="border border-[var(--panel-border)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
                                         >
                                             Arrange
                                         </button>
@@ -1045,22 +1045,26 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
                                         />
 
                                         <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-3">
-                                            <div className="pointer-events-auto flex items-center gap-1 rounded-lg border border-[var(--panel-border)] bg-[var(--panel-bg)]/90 p-1 shadow-sm">
+                                            <div className="pointer-events-auto flex items-center gap-1 border border-[var(--panel-border)] bg-[var(--panel-bg)] p-1">
                                                 <button
                                                     type="button"
                                                     onClick={() => setPlaying(!(outputNode?.data.type === 'output' && outputNode.data.playing))}
-                                                    className="rounded-md border border-[var(--panel-border)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                                                    className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] transition ${
+                                                        outputNode?.data.type === 'output' && outputNode.data.playing
+                                                            ? 'bg-[var(--accent-soft)] text-[var(--accent)] hover:bg-[var(--accent-soft)]/80'
+                                                            : 'bg-[var(--panel-muted)] text-[var(--text)] hover:bg-[var(--panel-muted)]/80 hover:text-[var(--accent)]'
+                                                    }`}
                                                     aria-label={viewportPlayLabel}
                                                 >
-                                                    {outputNode?.data.type === 'output' && outputNode.data.playing ? 'Pause' : 'Play'}
+                                                    {outputNode?.data.type === 'output' && outputNode.data.playing ? 'Stop' : 'Play'}
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={() => setPlaying(false)}
-                                                    className="rounded-md border border-[var(--panel-border)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-subtle)] transition hover:text-[var(--text)]"
-                                                    aria-label="Stop graph output"
+                                                    className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] bg-[var(--panel-muted)] text-[var(--danger)] transition hover:bg-[var(--danger-soft)] cursor-not-allowed opacity-60"
+                                                    aria-label="Record graph output"
+                                                    title="Recording coming soon"
                                                 >
-                                                    Stop
+                                                    Record
                                                 </button>
                                             </div>
                                         </div>

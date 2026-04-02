@@ -25,29 +25,20 @@ export function EditorShell({
     rightPanelWidth,
 }: EditorShellProps) {
     return (
-        <div className="ui-shell relative h-full w-full overflow-hidden text-[var(--text)]">
-            <div className="absolute inset-0 z-0">
-                {canvas}
-            </div>
-
-            <div className="absolute z-10 bottom-4 left-0 right-0 pointer-events-none flex justify-center">
-                <div className="pointer-events-auto w-full max-w-[calc(100vw-var(--component-rail-width)-var(--component-inspector-width)-80px)] px-4">
-                    {bottomDrawer}
-                </div>
-            </div>
-
-            <div 
-                className="absolute z-20 bottom-4 left-4 flex pointer-events-none ui-panel overflow-hidden transition-all duration-300"
-                style={{ top: SHELL_LAYOUT.sidebarTopOffset }}
+        <div className="ui-shell relative h-full w-full overflow-hidden text-[var(--text)] flex flex-row">
+            {/* Left Sidebar */}
+            <aside 
+                className="flex flex-none border-r border-[var(--panel-border)]/20 bg-[var(--panel-bg)] transition-all duration-300 z-10"
+                style={{ width: leftPanelCollapsed ? SHELL_LAYOUT.railWidth : leftPanelWidth + SHELL_LAYOUT.railWidth }}
             >
                 <div 
-                    className="pointer-events-auto border-r border-[var(--panel-border)]/40 bg-[var(--panel-muted)]/20"
+                    className="border-r border-[var(--panel-border)]/40 bg-[var(--panel-muted)]/20 overflow-hidden"
                     style={{ width: SHELL_LAYOUT.railWidth }}
                 >
                     {rail}
                 </div>
                 <div 
-                    className="pointer-events-auto min-w-0 transition-all duration-300" 
+                    className="min-w-0 transition-all duration-300 overflow-hidden" 
                     style={{ 
                         width: leftPanelCollapsed ? 0 : leftPanelWidth, 
                         opacity: leftPanelCollapsed ? 0 : 1,
@@ -56,19 +47,29 @@ export function EditorShell({
                 >
                     {leftPanel}
                 </div>
-            </div>
+            </aside>
 
-            <div 
-                className="absolute z-20 bottom-4 right-4 pointer-events-none flex"
-                style={{ top: SHELL_LAYOUT.sidebarTopOffset }}
+            {/* Center Canvas */}
+            <main className="flex-1 flex flex-col min-w-0 relative z-0">
+                <div className="flex-1 relative min-h-0 bg-[var(--canvas-bg)]">
+                    {canvas}
+                </div>
+                
+                {/* Bottom Drawer */}
+                <div className="flex-none pointer-events-auto w-full border-t border-[var(--panel-border)]/20 z-10 relative bg-[var(--panel-bg)]">
+                    {bottomDrawer}
+                </div>
+            </main>
+
+            {/* Right Sidebar */}
+            <aside 
+                className="flex-none border-l border-[var(--panel-border)]/20 bg-[var(--panel-bg)] transition-all duration-300 z-10 overflow-hidden"
+                style={{ width: rightPanelCollapsed ? 0 : rightPanelWidth, opacity: rightPanelCollapsed ? 0 : 1 }}
             >
-                <div 
-                    className="pointer-events-auto ui-panel min-h-0 overflow-hidden transition-all duration-300" 
-                    style={{ width: rightPanelCollapsed ? 0 : rightPanelWidth, opacity: rightPanelCollapsed ? 0 : 1 }}
-                >
+                <div className="w-full h-full min-h-0 overflow-hidden">
                     {rightPanel}
                 </div>
-            </div>
+            </aside>
         </div>
     );
 }

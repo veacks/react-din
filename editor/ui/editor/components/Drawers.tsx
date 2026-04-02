@@ -255,7 +255,7 @@ export const LibraryDrawerContent: FC<LibraryDrawerContentProps> = ({
                 <button
                     type="button"
                     onClick={() => uploadInputRef.current?.click()}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-full text-xs font-bold transition-all shadow-lg active:scale-95"
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-full text-xs font-bold transition-all active:scale-95"
                 >
                     <DownloadIcon className="w-3.5 h-3.5" />
                     <span>IMPORT</span>
@@ -364,7 +364,7 @@ export const RuntimeDrawerContent: FC = () => {
     return (
         <div className="h-full p-6 bg-[#080912] overflow-y-auto">
             <div className="grid grid-cols-3 gap-6">
-                <div className="p-5 rounded-2xl bg-zinc-900/50 border border-zinc-800 shadow-xl">
+                <div className="p-5 rounded-2xl bg-zinc-900/50 border border-zinc-800">
                     <div className="flex items-center gap-3 mb-4 text-emerald-400">
                         <ActivityIcon className="w-5 h-5" />
                         <h4 className="text-[11px] font-bold uppercase tracking-[0.2em]">Engine Latency</h4>
@@ -373,7 +373,7 @@ export const RuntimeDrawerContent: FC = () => {
                     <div className="mt-2 text-[10px] text-zinc-500 uppercase font-bold">Stable @ 44.1kHz</div>
                 </div>
                 
-                <div className="p-5 rounded-2xl bg-zinc-900/50 border border-zinc-800 shadow-xl">
+                <div className="p-5 rounded-2xl bg-zinc-900/50 border border-zinc-800">
                     <div className="flex items-center gap-3 mb-4 text-blue-400">
                         <CpuIcon className="w-5 h-5" />
                         <h4 className="text-[11px] font-bold uppercase tracking-[0.2em]">CPU Load</h4>
@@ -382,7 +382,7 @@ export const RuntimeDrawerContent: FC = () => {
                     <div className="mt-2 text-[10px] text-zinc-500 uppercase font-bold">42 active voices</div>
                 </div>
 
-                <div className="p-5 rounded-2xl bg-zinc-900/50 border border-zinc-800 shadow-xl">
+                <div className="p-5 rounded-2xl bg-zinc-900/50 border border-zinc-800">
                     <div className="flex items-center gap-3 mb-4 text-purple-400">
                         <LayersIcon className="w-5 h-5" />
                         <h4 className="text-[11px] font-bold uppercase tracking-[0.18em]">Active Nodes</h4>
