@@ -29,7 +29,7 @@ export function InspectorPane({
     }
 
     return (
-        <aside className="ui-panel flex h-full min-h-0 flex-col border-l border-[var(--panel-border)]" data-testid="inspector-pane">
+        <aside className="ui-panel flex h-full min-h-0 flex-col" data-testid="inspector-pane">
             <div className="ui-panel-header border-b border-[var(--panel-border)] px-3 py-2">
                 <div className="flex items-center gap-2 rounded-full border border-[var(--panel-border)] bg-[var(--panel-muted)] p-1">
                     {(['inspect', 'code'] as const).map((item) => (
@@ -47,15 +47,6 @@ export function InspectorPane({
                         </button>
                     ))}
                 </div>
-                <button
-                    type="button"
-                    onClick={onToggleCollapse}
-                    className="ui-collapse-button rounded-xl border border-[var(--panel-border)] bg-[var(--panel-muted)] px-3 py-1 text-[11px] font-semibold text-[var(--text-subtle)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
-                    aria-pressed={!collapsed}
-                    title="Collapse inspector"
-                >
-                    <span aria-hidden="true">&gt;</span>
-                </button>
             </div>
             <div className="border-b border-[var(--panel-border)] px-4 py-3">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-subtle)]">

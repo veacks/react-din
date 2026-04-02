@@ -11,6 +11,8 @@ const STORAGE_KEYS = {
     bottomDrawerTab: 'din-editor-bottom-drawer-tab',
     bottomDrawerHeight: 'din-editor-bottom-drawer-height',
     inspectorTab: 'din-editor-inspector-tab',
+    leftPanelWidth: 'din-editor-left-panel-width',
+    rightPanelWidth: 'din-editor-right-panel-width',
 } as const;
 
 const getViewportWidth = () => (typeof window === 'undefined' ? 1440 : window.innerWidth);
@@ -49,6 +51,18 @@ const clampBottomDrawerHeight = (value: number) => {
     const viewportHeight = getViewportHeight();
     const min = SHELL_LAYOUT.bottomDrawerMinHeight;
     const max = Math.max(min, viewportHeight - SHELL_LAYOUT.bottomDrawerViewportOffset);
+    return Math.min(max, Math.max(min, Math.round(value)));
+};
+
+const clampLeftPanelWidth = (value: number) => {
+    const min = SHELL_LAYOUT.leftPanelWidth;
+    const max = Math.max(min, getViewportWidth() / 2);
+    return Math.min(max, Math.max(min, Math.round(value)));
+};
+
+const clampRightPanelWidth = (value: number) => {
+    const min = SHELL_LAYOUT.rightPanelWidth;
+    const max = Math.max(min, getViewportWidth() / 2);
     return Math.min(max, Math.max(min, Math.round(value)));
 };
 
@@ -104,6 +118,12 @@ export function useEditorLayout() {
     const [bottomDrawerHeight, setBottomDrawerHeight] = useState(() =>
         clampBottomDrawerHeight(readNumber(STORAGE_KEYS.bottomDrawerHeight, SHELL_LAYOUT.bottomDrawerDefaultHeight))
     );
+    const [leftPanelWidth, setLeftPanelWidth] = useState(() =>
+        clampLeftPanelWidth(readNumber(STORAGE_KEYS.leftPanelWidth, SHELL_LAYOUT.leftPanelWidth))
+    );
+    const [rightPanelWidth, setRightPanelWidth] = useState(() =>
+        clampRightPanelWidth(readNumber(STORAGE_KEYS.rightPanelWidth, SHELL_LAYOUT.rightPanelWidth))
+    );
     const [inspectorTab, setInspectorTab] = useState<InspectorTab>(() =>
         readEnum(STORAGE_KEYS.inspectorTab, ['inspect', 'code'], 'inspect')
     );
@@ -130,6 +150,8 @@ export function useEditorLayout() {
             }
 
             setBottomDrawerHeight((current) => clampBottomDrawerHeight(current));
+            setLeftPanelWidth((current) => clampLeftPanelWidth(current));
+            setRightPanelWidth((current) => clampRightPanelWidth(current));
         };
 
         window.addEventListener('resize', onResize);
@@ -163,6 +185,14 @@ export function useEditorLayout() {
     useEffect(() => {
         window.localStorage.setItem(STORAGE_KEYS.inspectorTab, inspectorTab);
     }, [inspectorTab]);
+
+    useEffect(() => {
+        window.localStorage.setItem(STORAGE_KEYS.leftPanelWidth, String(leftPanelWidth));
+    }, [leftPanelWidth]);
+
+    useEffect(() => {
+        window.localStorage.setItem(STORAGE_KEYS.rightPanelWidth, String(rightPanelWidth));
+    }, [rightPanelWidth]);
 
     const markManual = () => {
         manualOverrideRef.current = true;
@@ -206,6 +236,16 @@ export function useEditorLayout() {
         setBottomDrawerHeight(clampBottomDrawerHeight(value));
     }, []);
 
+    const updateLeftPanelWidth = useCallback((value: number) => {
+        markManual();
+        setLeftPanelWidth(clampLeftPanelWidth(value));
+    }, []);
+
+    const updateRightPanelWidth = useCallback((value: number) => {
+        markManual();
+        setRightPanelWidth(clampRightPanelWidth(value));
+    }, []);
+
     return {
         theme,
         setTheme,
@@ -227,5 +267,9 @@ export function useEditorLayout() {
         openBottomDrawerTab,
         openInspectorTab,
         updateBottomDrawerHeight,
+        leftPanelWidth,
+        rightPanelWidth,
+        updateLeftPanelWidth,
+        updateRightPanelWidth,
     };
 }

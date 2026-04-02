@@ -15,13 +15,13 @@ export function FooterStatus({ gitLabel, audioLabel, mcpBadge }: FooterStatusPro
             data-testid="editor-footer"
         >
             <div className="min-w-0">
-                <span className="inline-flex min-w-0 items-center rounded-full border border-[var(--panel-border)] bg-[var(--panel-muted)] px-2.5 py-1 text-[10px] font-medium text-[var(--text-subtle)]">
+                <span className="inline-flex min-w-0 items-center px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-subtle)]">
                     <span className="truncate">{gitLabel}</span>
                 </span>
             </div>
             <div className="flex items-center gap-2">
                 {mcpBadge}
-                <span className="inline-flex items-center rounded-full border border-[var(--panel-border)] bg-[var(--panel-muted)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-subtle)]">
+                <span className="inline-flex items-center px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-subtle)]">
                     {audioLabel}
                 </span>
             </div>

@@ -57,6 +57,7 @@ import { SHELL_LAYOUT } from './shell/shellTokens';
 import { getMiniMapNodeColor } from './editor/nodeColorMap';
 import { consumeProjectResumeIntent, readProjectReviewState, writeProjectInterruptedWork, writeProjectReviewState } from './projectUiState';
 import type { ChangedFileSummary, InterruptedWorkSummary, ResumeIntent, ReviewState, SourceControlPhase } from './phase3a.types';
+import { Play, Pause, Circle, Wand2 } from 'lucide-react';
 
 // Extracted Utilities
 import { computeAutoLayoutPositions } from './editor/layoutUtils';
@@ -276,6 +277,10 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
         openBottomDrawerTab,
         openInspectorTab,
         updateBottomDrawerHeight,
+        leftPanelWidth,
+        rightPanelWidth,
+        updateLeftPanelWidth,
+        updateRightPanelWidth,
     } = useEditorLayout();
 
     const connectionAssist = useAudioGraphStore((s) => s.connectionAssist);
@@ -880,9 +885,13 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
                             onRevealProject: project.onRevealProject,
                         } : undefined}
                         isDark={isDark}
+                        leftPanelCollapsed={leftPanelCollapsed}
+                        bottomDrawerOpen={bottomDrawerOpen}
                         inspectorCollapsed={rightPanelCollapsed}
                         statusChips={topbarChips}
                         onToggleTheme={() => setTheme(isDark ? 'light' : 'dark')}
+                        onToggleLeftPanel={toggleLeftPanel}
+                        onToggleBottomDrawer={toggleBottomDrawer}
                         onToggleInspector={toggleRightPanel}
                         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
                     />
@@ -968,37 +977,41 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
                         )}
                         canvas={(
                             <section
-                                className="ui-panel ui-canvas-stage flex h-full w-full min-h-0 flex-col border border-[var(--panel-border)]"
+                                className="ui-panel ui-canvas-stage flex h-full w-full min-h-0 flex-col"
                                 data-testid="canvas-panel"
                                 onDrop={onDrop}
                                 onDragOver={onDragOver}
                             >
-                                <div className="ui-panel-header border-b border-[var(--panel-border)] px-3 py-2" data-testid="graph-tabs">
-                                    <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+                                <div className="flex items-end justify-between border-b border-[var(--panel-border)] bg-[var(--panel-muted)]/30 pr-3" data-testid="graph-tabs">
+                                    <div className="flex min-w-0 flex-1 items-end overflow-x-auto">
                                         {graphs.map((graph) => (
                                             <button
                                                 key={graph.id}
                                                 type="button"
                                                 onClick={() => void handleLoadGraph(graph.id)}
-                                                className={`inline-flex min-w-0 items-center gap-2 border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] transition ${
+                                                className={`group relative inline-flex min-w-[140px] max-w-[200px] items-center justify-between border-r border-[var(--panel-border)] px-3 py-2 text-[11px] font-semibold transition-colors ${
                                                     graph.id === activeGraphId
-                                                        ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text)]'
-                                                        : 'border-[var(--panel-border)] bg-[var(--panel-bg)] text-[var(--text-subtle)] hover:text-[var(--text)]'
+                                                        ? 'bg-[var(--canvas-bg)] text-[var(--text)]'
+                                                        : 'bg-transparent text-[var(--text-subtle)] hover:bg-[var(--panel-bg)] hover:text-[var(--text)]'
                                                 }`}
                                             >
-                                                <span className="truncate">{graph.name}</span>
-                                                {graph.id === activeGraphId ? <span aria-hidden="true">x</span> : null}
+                                                {graph.id === activeGraphId && (
+                                                    <span className="absolute left-0 right-0 top-0 h-[2px] bg-[var(--accent)]" />
+                                                )}
+                                                {/* Blend the bottom of the active tab into the canvas */}
+                                                {graph.id === activeGraphId && (
+                                                    <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[var(--canvas-bg)]" />
+                                                )}
+                                                <span className="truncate pr-4">{graph.name || graph.id || 'Untitled'}</span>
+                                                <div 
+                                                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded transition-colors ${
+                                                        graph.id === activeGraphId ? 'opacity-100 hover:bg-[var(--panel-muted)]' : 'opacity-0 group-hover:opacity-100 hover:bg-[var(--panel-muted)]'
+                                                    }`}
+                                                >
+                                                    <span aria-hidden="true" className="text-[10px]">✕</span>
+                                                </div>
                                             </button>
                                         ))}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={handleAutoArrange}
-                                            className="border border-[var(--panel-border)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                                        >
-                                            Arrange
-                                        </button>
                                     </div>
                                 </div>
                                 <main
@@ -1049,24 +1062,37 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
                                                 <button
                                                     type="button"
                                                     onClick={() => setPlaying(!(outputNode?.data.type === 'output' && outputNode.data.playing))}
-                                                    className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] transition ${
+                                                    className={`flex h-8 w-8 items-center justify-center transition ${
                                                         outputNode?.data.type === 'output' && outputNode.data.playing
                                                             ? 'bg-[var(--accent-soft)] text-[var(--accent)] hover:bg-[var(--accent-soft)]/80'
                                                             : 'bg-[var(--panel-muted)] text-[var(--text)] hover:bg-[var(--panel-muted)]/80 hover:text-[var(--accent)]'
                                                     }`}
                                                     aria-label={viewportPlayLabel}
+                                                    title={outputNode?.data.type === 'output' && outputNode.data.playing ? 'Pause' : 'Play'}
                                                 >
-                                                    {outputNode?.data.type === 'output' && outputNode.data.playing ? 'Stop' : 'Play'}
+                                                    {outputNode?.data.type === 'output' && outputNode.data.playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] bg-[var(--panel-muted)] text-[var(--danger)] transition hover:bg-[var(--danger-soft)] cursor-not-allowed opacity-60"
+                                                    className="flex h-8 w-8 items-center justify-center bg-[var(--panel-muted)] text-[var(--danger)] transition hover:bg-[var(--danger-soft)] cursor-not-allowed opacity-60"
                                                     aria-label="Record graph output"
                                                     title="Recording coming soon"
                                                 >
-                                                    Record
+                                                    <Circle className="h-4 w-4" />
                                                 </button>
                                             </div>
+                                        </div>
+
+                                        {/* Top right floating controls */}
+                                        <div className="pointer-events-none absolute right-4 top-4 flex items-center gap-3 z-10">
+                                            <button
+                                                type="button"
+                                                onClick={handleAutoArrange}
+                                                className="pointer-events-auto flex h-8 w-8 items-center justify-center border border-[var(--panel-border)] bg-[var(--panel-bg)]/80 backdrop-blur-sm text-[var(--text-subtle)] transition hover:bg-[var(--panel-muted)] hover:text-[var(--text)]"
+                                                title="Arrange"
+                                            >
+                                                <Wand2 className="h-4 w-4" />
+                                            </button>
                                         </div>
 
                                         <ConnectionAssistMenu
@@ -1125,8 +1151,10 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
                         )}
                         leftPanelCollapsed={leftPanelCollapsed}
                         rightPanelCollapsed={rightPanelCollapsed}
-                        leftPanelWidth={SHELL_LAYOUT.leftPanelWidth}
-                        rightPanelWidth={SHELL_LAYOUT.rightPanelWidth}
+                        leftPanelWidth={leftPanelWidth}
+                        rightPanelWidth={rightPanelWidth}
+                        onLeftPanelWidthChange={updateLeftPanelWidth}
+                        onRightPanelWidthChange={updateRightPanelWidth}
                     />
                 </main>
 

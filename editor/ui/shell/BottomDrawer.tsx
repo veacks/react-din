@@ -46,14 +46,18 @@ export function BottomDrawer({
         window.addEventListener('mouseup', handleUp);
     }, [height, onHeightChange]);
 
+    if (!open) {
+        return null;
+    }
+
     const content = activeTab === 'runtime'
         ? runtimeContent
         : diagnosticsContent;
 
     return (
         <section
-            className="ui-panel border-t border-[var(--panel-border)] bg-[var(--panel-muted)]/65"
-            style={{ height: open ? `${height}px` : '56px' }}
+            className="ui-panel bg-[var(--panel-bg)] border-t border-[var(--panel-border)]"
+            style={{ height: `${height}px` }}
             data-testid="bottom-drawer"
         >
             <div
@@ -78,17 +82,8 @@ export function BottomDrawer({
                         </button>
                     ))}
                 </div>
-                <button
-                    type="button"
-                    onClick={onToggle}
-                    className="ui-collapse-button rounded-xl border border-[var(--panel-border)] px-3 py-1 text-[11px] font-semibold text-[var(--text-subtle)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
-                    aria-pressed={open}
-                    title={open ? 'Collapse bottom drawer' : 'Expand bottom drawer'}
-                >
-                    {open ? 'v' : '^'}
-                </button>
             </div>
-            {open ? <div className="min-h-0 overflow-hidden px-4 pb-4">{content}</div> : null}
+            <div className="min-h-0 overflow-hidden px-4 pb-4">{content}</div>
         </section>
     );
 }

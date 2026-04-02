@@ -1,5 +1,7 @@
 import { SHELL_LAYOUT } from './shellTokens';
 
+import { PanelLeft, PanelBottom, PanelRight, Search } from 'lucide-react';
+
 interface ProjectMeta {
     name: string;
     accentColor: string;
@@ -9,6 +11,8 @@ interface ProjectMeta {
 interface EditorTopbarProps {
     project?: ProjectMeta;
     isDark: boolean;
+    leftPanelCollapsed: boolean;
+    bottomDrawerOpen: boolean;
     inspectorCollapsed: boolean;
     statusChips?: Array<{
         id: string;
@@ -17,6 +21,8 @@ interface EditorTopbarProps {
         onSelect?: () => void;
     }>;
     onToggleTheme: () => void;
+    onToggleLeftPanel: () => void;
+    onToggleBottomDrawer: () => void;
     onToggleInspector: () => void;
     onOpenCommandPalette: () => void;
 }
@@ -36,9 +42,13 @@ function getChipToneClass(tone: 'info' | 'success' | 'warning') {
 export function EditorTopbar({
     project,
     isDark,
+    leftPanelCollapsed,
+    bottomDrawerOpen,
     inspectorCollapsed,
     statusChips = [],
     onToggleTheme,
+    onToggleLeftPanel,
+    onToggleBottomDrawer,
     onToggleInspector,
     onOpenCommandPalette,
 }: EditorTopbarProps) {
@@ -49,19 +59,15 @@ export function EditorTopbar({
         >
             <div className="flex min-w-0 items-center gap-3">
                 {project ? (
-                    <div className="flex min-w-0 items-center gap-3 rounded-[18px] border border-[var(--panel-border)] bg-[var(--panel-muted)] px-3 py-2">
-                        <span className="inline-block h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: project.accentColor }} />
-                        <div className="min-w-0">
-                            <div className="truncate text-[13px] font-semibold text-[var(--text)]">{project.name}</div>
-                            <div className="truncate text-[10px] uppercase tracking-[0.18em] text-[var(--text-subtle)]">
-                                Desktop authoring workspace
-                            </div>
+                    <div className="flex min-w-0 items-center gap-3 px-1 py-1">
+                        <span className="inline-block h-3 w-3 shrink-0 rounded-full shadow-sm" style={{ backgroundColor: project.accentColor }} />
+                        <div className="truncate text-[13px] font-bold tracking-wide text-[var(--text)]">
+                            {project.name}
                         </div>
                     </div>
                 ) : (
-                    <div className="rounded-[18px] border border-[var(--panel-border)] bg-[var(--panel-muted)] px-3 py-2">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-subtle)]">Workspace</div>
-                        <div className="text-[13px] font-semibold text-[var(--text)]">DIN Editor</div>
+                    <div className="flex min-w-0 items-center px-1 py-1">
+                        <div className="text-[13px] font-bold tracking-wide text-[var(--text)]">DIN Editor</div>
                     </div>
                 )}
                 {statusChips.length > 0 ? (
@@ -82,31 +88,40 @@ export function EditorTopbar({
             </div>
 
             <div className="ui-topbar-actions flex flex-wrap items-center justify-end gap-2">
-                {project?.onRevealProject ? (
+                <div className="flex items-center gap-1 border border-transparent mr-2">
                     <button
                         type="button"
-                        onClick={() => void project.onRevealProject?.()}
-                        className="rounded-xl border border-[var(--panel-border)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                        onClick={onToggleLeftPanel}
+                        className={`border border-[var(--panel-border)] p-1.5 transition ${!leftPanelCollapsed ? 'bg-[var(--panel-muted)] text-[var(--accent)]' : 'text-[var(--text-subtle)] hover:text-[var(--text)] hover:border-[var(--accent)]'}`}
+                        title="Toggle left panel"
                     >
-                        Reveal
+                        <PanelLeft size={16} strokeWidth={2.5} />
                     </button>
-                ) : null}
-                <button
-                    type="button"
-                    onClick={onToggleInspector}
-                    className="rounded-xl border border-[var(--panel-border)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                    aria-pressed={!inspectorCollapsed}
-                >
-                    Inspector
-                </button>
-                <button
-                    type="button"
-                    onClick={onOpenCommandPalette}
-                    className="rounded-xl border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text)] transition hover:bg-[var(--panel-bg)]"
-                    title="Open command palette"
-                >
-                    Command
-                </button>
+                    <button
+                        type="button"
+                        onClick={onToggleBottomDrawer}
+                        className={`border border-[var(--panel-border)] p-1.5 transition ${bottomDrawerOpen ? 'bg-[var(--panel-muted)] text-[var(--accent)]' : 'text-[var(--text-subtle)] hover:text-[var(--text)] hover:border-[var(--accent)]'}`}
+                        title="Toggle bottom drawer"
+                    >
+                        <PanelBottom size={16} strokeWidth={2.5} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onToggleInspector}
+                        className={`border border-[var(--panel-border)] p-1.5 transition ${!inspectorCollapsed ? 'bg-[var(--panel-muted)] text-[var(--accent)]' : 'text-[var(--text-subtle)] hover:text-[var(--text)] hover:border-[var(--accent)]'}`}
+                        title="Toggle right panel"
+                    >
+                        <PanelRight size={16} strokeWidth={2.5} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onOpenCommandPalette}
+                        className="ml-2 border border-transparent p-1.5 text-[var(--text-subtle)] transition hover:text-[var(--text)] hover:bg-[var(--panel-muted)]"
+                        title="Open command palette"
+                    >
+                        <Search size={16} strokeWidth={2.5} />
+                    </button>
+                </div>
                 <button
                     type="button"
                     onClick={onToggleTheme}
