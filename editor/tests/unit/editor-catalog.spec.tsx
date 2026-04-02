@@ -26,6 +26,12 @@ describe('editor catalog', () => {
         const oscillatorButton = screen.getByRole('button', { name: 'Add Oscillator' });
         expect(oscillatorButton).toBeInTheDocument();
         expect(screen.getByText('Sources')).toBeInTheDocument();
+        expect(screen.getByText('MIDI')).toBeInTheDocument();
+        expect(screen.getByText('Routing')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Math' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Add Midi In' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Add Output' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Add Math' })).toBeInTheDocument();
 
         const dataTransfer = {
             effectAllowed: 'move',
