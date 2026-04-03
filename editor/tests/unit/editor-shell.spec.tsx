@@ -50,7 +50,7 @@ describe('editor shell', () => {
         fireEvent.click(screen.getByTitle('Library'));
         expect(screen.getByLabelText('Search library files')).toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole('button', { name: 'Command' }));
+        fireEvent.click(screen.getByTitle('Open command palette'));
 
         expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
         expect(screen.getByText('Copy Patch JSON')).toBeInTheDocument();

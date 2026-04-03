@@ -269,13 +269,13 @@ describe('Editor connection assist', () => {
         expect(screen.queryByLabelText('Search library files')).not.toBeInTheDocument();
 
         act(() => {
-            fireEvent.click(screen.getByTitle('Collapse bottom drawer'));
+            fireEvent.click(screen.getByTitle('Toggle bottom drawer'));
         });
 
         expect(screen.queryByText('Engine Latency')).not.toBeInTheDocument();
 
         act(() => {
-            fireEvent.click(screen.getByTitle('Expand bottom drawer'));
+            fireEvent.click(screen.getByTitle('Toggle bottom drawer'));
         });
 
         await waitFor(() => {
