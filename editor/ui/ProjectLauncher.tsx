@@ -4,6 +4,7 @@ import type { ProjectManifest } from '../project';
 import type { PatchDocument } from '../../src/patch';
 import type { EditorTemplateDefinition } from './editor/templateLibrary';
 import type { DensityMode, InterruptedWorkSummary, LauncherSection, StatusSeverity } from './phase3a.types';
+import { LAUNCHER_COPY } from './copy';
 
 export interface LauncherResumeItem extends InterruptedWorkSummary {
     projectName: string;
@@ -51,18 +52,6 @@ function formatProjectDate(value: number): string {
         }).format(value);
     } catch {
         return new Date(value).toLocaleString();
-    }
-}
-
-function formatStorageKind(storageKind: ProjectManifest['storageKind']): string {
-    switch (storageKind) {
-        case 'electron-fs':
-            return 'Desktop folder';
-        case 'browser-fs-handle':
-            return 'Browser folder';
-        case 'browser-indexeddb':
-        default:
-            return 'Browser IndexedDB';
     }
 }
 
@@ -184,16 +173,20 @@ export function ProjectLauncher({
         () => resumableWork.find((entry) => entry.projectId === selectedResumeProjectId) ?? resumableWork[0] ?? null,
         [resumableWork, selectedResumeProjectId],
     );
+    const sectionTabs = useMemo(
+        () => Object.entries(LAUNCHER_COPY.entrySurface.tabs) as [LauncherSection, string][],
+        [],
+    );
 
     const createProject = async () => {
-        const nextName = projectName.trim() || 'Untitled Project';
+        const nextName = projectName.trim() || LAUNCHER_COPY.defaults.untitledProjectName;
         await onCreateProject(nextName);
         setProjectName('');
     };
 
     const createFromTemplate = async () => {
         if (!selectedTemplate) return;
-        const nextName = importProjectName.trim() || `${selectedTemplate.name} Project`;
+        const nextName = importProjectName.trim() || `${selectedTemplate.name} ${LAUNCHER_COPY.defaults.projectSuffix}`;
         await onCreateProjectFromTemplate(selectedTemplate.id, nextName);
         setImportProjectName('');
     };
@@ -212,7 +205,7 @@ export function ProjectLauncher({
             setImportError(null);
         } catch (nextError) {
             setImportDraft(null);
-            setImportError(nextError instanceof Error ? nextError.message : 'Failed to validate the patch file.');
+            setImportError(nextError instanceof Error ? nextError.message : LAUNCHER_COPY.errors.validatePatchFile);
         } finally {
             if (importInputRef.current) {
                 importInputRef.current.value = '';
@@ -237,7 +230,7 @@ export function ProjectLauncher({
             return (
                 <div className="rounded-[24px] border border-white/10 bg-[rgba(255,255,255,0.04)] p-5">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--text-subtle)]">
-                        Template Summary
+                        {LAUNCHER_COPY.summary.template}
                     </p>
                     <div className="mt-4 flex items-center gap-3">
                         <span className="inline-flex h-3 w-3 rounded-full" style={{ backgroundColor: selectedTemplate.accentColor }} />
@@ -249,12 +242,12 @@ export function ProjectLauncher({
                         </div>
                     </div>
                     <label className="mt-5 flex flex-col gap-2 text-[12px] font-medium text-[rgba(236,242,255,0.82)]">
-                        Project name
+                        {LAUNCHER_COPY.fields.projectName}
                         <input
                             type="text"
                             value={importProjectName}
                             onChange={(event) => setImportProjectName(event.target.value)}
-                            placeholder={`${selectedTemplate.name} Project`}
+                            placeholder={`${selectedTemplate.name} ${LAUNCHER_COPY.defaults.projectSuffix}`}
                             className="h-12 rounded-2xl border border-white/10 bg-[rgba(8,13,25,0.88)] px-4 text-[14px] text-white outline-none transition placeholder:text-[rgba(236,242,255,0.28)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[rgba(104,165,255,0.2)]"
                         />
                     </label>
@@ -264,7 +257,7 @@ export function ProjectLauncher({
                         disabled={busy}
                         className="mt-4 inline-flex h-12 w-full items-center justify-center rounded-2xl border border-transparent bg-[linear-gradient(135deg,#68a5ff_0%,#8b7dff_100%)] px-4 text-[13px] font-semibold uppercase tracking-[0.24em] text-white transition hover:opacity-95 disabled:cursor-wait disabled:opacity-70"
                     >
-                        Create From Template
+                        {LAUNCHER_COPY.templates.createFromTemplate}
                     </button>
                 </div>
             );
@@ -274,7 +267,7 @@ export function ProjectLauncher({
             return (
                 <div className="rounded-[24px] border border-white/10 bg-[rgba(255,255,255,0.04)] p-5" data-testid="launcher-summary-panel">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--text-subtle)]">
-                        Import Summary
+                        {LAUNCHER_COPY.summary.import}
                     </p>
                     {importDraft ? (
                         <>
@@ -284,22 +277,22 @@ export function ProjectLauncher({
                             </div>
                             <div className="mt-4 grid grid-cols-2 gap-3">
                                 <div className="rounded-2xl border border-white/10 bg-[rgba(8,13,25,0.7)] px-3 py-3">
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)]">Nodes</p>
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)]">{LAUNCHER_COPY.summary.nodes}</p>
                                     <p className="mt-2 text-[22px] font-semibold text-white">{importDraft.summary.nodeCount}</p>
                                 </div>
                                 <div className="rounded-2xl border border-white/10 bg-[rgba(8,13,25,0.7)] px-3 py-3">
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)]">Connections</p>
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)]">{LAUNCHER_COPY.summary.connections}</p>
                                     <p className="mt-2 text-[22px] font-semibold text-white">{importDraft.summary.connectionCount}</p>
                                 </div>
                             </div>
                             {importMode === 'new' ? (
                                 <label className="mt-5 flex flex-col gap-2 text-[12px] font-medium text-[rgba(236,242,255,0.82)]">
-                                    New project name
+                                    {LAUNCHER_COPY.import.newProjectName}
                                     <input
                                         type="text"
                                         value={importProjectName}
                                         onChange={(event) => setImportProjectName(event.target.value)}
-                                        placeholder={importDraft.summary.name || 'Imported Patch Project'}
+                                        placeholder={importDraft.summary.name || LAUNCHER_COPY.defaults.importedPatchProjectName}
                                         className="h-12 rounded-2xl border border-white/10 bg-[rgba(8,13,25,0.88)] px-4 text-[14px] text-white outline-none transition placeholder:text-[rgba(236,242,255,0.28)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[rgba(104,165,255,0.2)]"
                                     />
                                 </label>
@@ -310,12 +303,12 @@ export function ProjectLauncher({
                                 disabled={busy || (importMode === 'existing' && !importTargetProjectId)}
                                 className="mt-5 inline-flex h-12 w-full items-center justify-center rounded-2xl border border-transparent bg-[linear-gradient(135deg,#ed6a5a_0%,#f6a623_100%)] px-4 text-[13px] font-semibold uppercase tracking-[0.24em] text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-70"
                             >
-                                Import Patch
+                                {LAUNCHER_COPY.import.importPatch}
                             </button>
                         </>
                     ) : (
                         <div className="mt-4 rounded-2xl border border-dashed border-white/10 bg-[rgba(8,13,25,0.55)] px-4 py-6 text-[13px] leading-6 text-[rgba(236,242,255,0.72)]">
-                            Select a patch file first. The launcher validates the patch before the import action stays available.
+                            {LAUNCHER_COPY.import.emptySummary}
                         </div>
                     )}
                 </div>
@@ -326,7 +319,7 @@ export function ProjectLauncher({
             return (
                 <div className="rounded-[24px] border border-white/10 bg-[rgba(255,255,255,0.04)] p-5" data-testid="launcher-summary-panel">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--text-subtle)]">
-                        Recovery Summary
+                        {LAUNCHER_COPY.summary.recovery}
                     </p>
                     {selectedResume ? (
                         <>
@@ -353,9 +346,9 @@ export function ProjectLauncher({
                         </>
                     ) : hasLegacyWorkspace ? (
                         <>
-                            <div className="mt-4 text-[18px] font-semibold text-white">Legacy workspace detected</div>
+                            <div className="mt-4 text-[18px] font-semibold text-white">{LAUNCHER_COPY.summary.legacyWorkspaceDetected}</div>
                             <div className="mt-2 text-[13px] leading-6 text-[rgba(236,242,255,0.78)]">
-                                Recover older global graphs and cached assets into one dedicated DIN project.
+                                {LAUNCHER_COPY.summary.legacyWorkspaceDetectedDescription}
                             </div>
                             <button
                                 type="button"
@@ -363,12 +356,12 @@ export function ProjectLauncher({
                                 disabled={busy}
                                 className="mt-5 inline-flex h-12 w-full items-center justify-center rounded-2xl border border-[rgba(104,165,255,0.35)] bg-[rgba(8,13,25,0.75)] px-4 text-[13px] font-semibold uppercase tracking-[0.22em] text-[rgba(213,230,255,0.92)] transition hover:border-[rgba(104,165,255,0.7)] hover:text-white disabled:cursor-wait disabled:opacity-70"
                             >
-                                Recover Legacy Workspace
+                                {LAUNCHER_COPY.recover.recoverLegacyWorkspace}
                             </button>
                         </>
                     ) : (
                         <div className="mt-4 rounded-2xl border border-dashed border-white/10 bg-[rgba(8,13,25,0.55)] px-4 py-6 text-[13px] leading-6 text-[rgba(236,242,255,0.72)]">
-                            No unfinished work or legacy workspace needs recovery right now.
+                            {LAUNCHER_COPY.summary.noRecoveryNeeded}
                         </div>
                     )}
                 </div>
@@ -378,7 +371,7 @@ export function ProjectLauncher({
         return (
             <div className="rounded-[24px] border border-white/10 bg-[rgba(255,255,255,0.04)] p-5" data-testid="launcher-summary-panel">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--text-subtle)]">
-                    Next Actions
+                    {LAUNCHER_COPY.summary.nextActions}
                 </p>
                 {selectedProject ? (
                     <>
@@ -387,26 +380,26 @@ export function ProjectLauncher({
                             <div>
                                 <div className="text-[18px] font-semibold text-white">{selectedProject.name}</div>
                                 <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-[var(--text-subtle)]">
-                                    {formatStorageKind(selectedProject.storageKind)}
+                                    {LAUNCHER_COPY.helpers.storageKind(selectedProject.storageKind)}
                                 </div>
                             </div>
                         </div>
                         <div className="mt-4 grid grid-cols-2 gap-3">
                             <div className="rounded-2xl border border-white/10 bg-[rgba(8,13,25,0.7)] px-3 py-3">
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)]">Graphs</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)]">{LAUNCHER_COPY.summary.graphs}</p>
                                 <p className="mt-2 text-[22px] font-semibold text-white">{selectedProject.graphs.length}</p>
                             </div>
                             <div className="rounded-2xl border border-white/10 bg-[rgba(8,13,25,0.7)] px-3 py-3">
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)]">Assets</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)]">{LAUNCHER_COPY.summary.assets}</p>
                                 <p className="mt-2 text-[22px] font-semibold text-white">{selectedProject.assets.length}</p>
                             </div>
                         </div>
                         <div className="mt-4 text-[12px] text-[rgba(236,242,255,0.72)]">
-                            Last opened {formatProjectDate(selectedProject.lastOpenedAt)}
+                            {LAUNCHER_COPY.summary.lastOpened(formatProjectDate(selectedProject.lastOpenedAt))}
                         </div>
                         {resumableByProjectId.get(selectedProject.id) ? (
                             <div className={`mt-4 rounded-2xl border px-4 py-4 ${formatSeverityTone(resumableByProjectId.get(selectedProject.id)?.severity ?? 'info')}`}>
-                                <div className="text-[11px] font-semibold uppercase tracking-[0.18em]">Interrupted work</div>
+                                <div className="text-[11px] font-semibold uppercase tracking-[0.18em]">{LAUNCHER_COPY.summary.interruptedWork}</div>
                                 <div className="mt-2 text-[13px] leading-6">
                                     {resumableByProjectId.get(selectedProject.id)?.description}
                                 </div>
@@ -423,15 +416,15 @@ export function ProjectLauncher({
                     </>
                 ) : (
                     <div className="mt-4 rounded-2xl border border-dashed border-white/10 bg-[rgba(8,13,25,0.55)] px-4 py-6 text-[13px] leading-6 text-[rgba(236,242,255,0.72)]">
-                        Create a first DIN project or recover a previous workspace to start tracking isolated graphs and assets.
+                        {LAUNCHER_COPY.summary.emptySelectedProject}
                     </div>
                 )}
                 <div className="mt-6 border-t border-white/10 pt-5">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--text-subtle)]">
-                        New Project
+                        {LAUNCHER_COPY.summary.newProject}
                     </div>
                     <label className="mt-4 flex flex-col gap-2 text-[12px] font-medium text-[rgba(236,242,255,0.82)]">
-                        Project name
+                        {LAUNCHER_COPY.fields.projectName}
                         <input
                             type="text"
                             value={projectName}
@@ -442,8 +435,8 @@ export function ProjectLauncher({
                                     void createProject();
                                 }
                             }}
-                            placeholder="Atmospheric Breakbeat Lab"
-                            aria-label="Project name"
+                            placeholder={LAUNCHER_COPY.defaults.newProjectPlaceholder}
+                            aria-label={LAUNCHER_COPY.fields.projectName}
                             className="h-12 rounded-2xl border border-white/10 bg-[rgba(8,13,25,0.88)] px-4 text-[14px] text-white outline-none transition placeholder:text-[rgba(236,242,255,0.28)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[rgba(104,165,255,0.2)]"
                         />
                     </label>
@@ -453,7 +446,7 @@ export function ProjectLauncher({
                         disabled={busy}
                         className="mt-4 inline-flex h-12 w-full items-center justify-center rounded-2xl border border-transparent bg-[linear-gradient(135deg,#ed6a5a_0%,#f6a623_100%)] px-4 text-[13px] font-semibold uppercase tracking-[0.24em] text-white transition hover:opacity-95 disabled:cursor-wait disabled:opacity-70"
                     >
-                        Create Project
+                        {LAUNCHER_COPY.actions.createProject}
                     </button>
                 </div>
             </div>
@@ -472,29 +465,28 @@ export function ProjectLauncher({
                                 </span>
                                 <div>
                                     <p className="text-[11px] font-semibold uppercase tracking-[0.36em] text-[var(--text-subtle)]">
-                                        DIN Phase 3A
+                                        {LAUNCHER_COPY.hero.badge}
                                     </p>
                                     <h1 className="mt-1 text-3xl font-semibold tracking-[-0.03em] text-white">
-                                        Open the right project, starter, import, or recovery path without losing context.
+                                        {LAUNCHER_COPY.hero.title}
                                     </h1>
                                 </div>
                             </div>
                             <p className="max-w-2xl text-[15px] leading-7 text-[rgba(236,242,255,0.82)]">
-                                The launcher is now the owner of entry flows. Reopen recent work, start from a graph template,
-                                import an existing patch into a dedicated project, or resume unfinished review and repair tasks.
+                                {LAUNCHER_COPY.hero.description}
                             </p>
                             <div className="flex flex-wrap gap-3 text-[11px] uppercase tracking-[0.24em] text-[var(--text-subtle)]">
                                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                                    {supportsDedicatedWindows ? 'Dedicated project windows' : 'Single-window workspace'}
+                                    {supportsDedicatedWindows ? LAUNCHER_COPY.hero.dedicatedProjectWindows : LAUNCHER_COPY.hero.singleWindowWorkspace}
                                 </span>
                                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                                    {supportsFileSystemAccess ? 'Local folders enabled' : 'IndexedDB project storage'}
+                                    {supportsFileSystemAccess ? LAUNCHER_COPY.hero.localFoldersEnabled : LAUNCHER_COPY.hero.indexedDbProjectStorage}
                                 </span>
                                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                                    {projects.length} tracked projects
+                                    {LAUNCHER_COPY.hero.trackedProjects(projects.length)}
                                 </span>
                                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                                    {resumableWork.length} resumable tasks
+                                    {LAUNCHER_COPY.hero.resumableTasks(resumableWork.length)}
                                 </span>
                             </div>
                         </div>
@@ -506,22 +498,17 @@ export function ProjectLauncher({
                     <div className="flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--text-subtle)]">
-                                Entry Surface
+                                {LAUNCHER_COPY.entrySurface.badge}
                             </p>
                             <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">
-                                Phase 3A launcher sections
+                                {LAUNCHER_COPY.entrySurface.title}
                             </h2>
                         </div>
                         <div
                             className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-[rgba(8,13,25,0.88)] p-1"
                             data-testid="launcher-section-tabs"
                         >
-                            {([
-                                ['recent', 'Recent'],
-                                ['templates', 'Templates'],
-                                ['import', 'Import'],
-                                ['recover', 'Recover'],
-                            ] as const).map(([id, label]) => (
+                            {sectionTabs.map(([id, label]) => (
                                 <button
                                     key={id}
                                     type="button"
@@ -550,10 +537,10 @@ export function ProjectLauncher({
                             <div className="flex flex-wrap items-end justify-between gap-4">
                                 <div>
                                     <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--text-subtle)]">
-                                        Recent work
+                                        {LAUNCHER_COPY.recent.badge}
                                     </p>
                                     <h3 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-white">
-                                        Search, scan, and reopen the right project fast
+                                        {LAUNCHER_COPY.recent.title}
                                     </h3>
                                 </div>
                                 <div className="w-full max-w-sm">
@@ -561,8 +548,8 @@ export function ProjectLauncher({
                                         type="text"
                                         value={search}
                                         onChange={(event) => setSearch(event.target.value)}
-                                        placeholder="Search projects"
-                                        aria-label="Search projects"
+                                        placeholder={LAUNCHER_COPY.recent.searchPlaceholder}
+                                        aria-label={LAUNCHER_COPY.recent.searchLabel}
                                         className="h-11 w-full rounded-2xl border border-white/10 bg-[rgba(8,13,25,0.88)] px-4 text-[14px] text-white outline-none transition placeholder:text-[rgba(236,242,255,0.28)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[rgba(104,165,255,0.2)]"
                                     />
                                 </div>
@@ -571,10 +558,10 @@ export function ProjectLauncher({
                             {filteredProjects.length === 0 ? (
                                 <div className="rounded-[24px] border border-dashed border-white/10 bg-[rgba(255,255,255,0.03)] px-6 py-12 text-center">
                                     <p className="text-[15px] font-medium text-white">
-                                        {projects.length === 0 ? 'No project yet.' : 'No project matches this search.'}
+                                        {projects.length === 0 ? LAUNCHER_COPY.recent.emptyNoProjects : LAUNCHER_COPY.recent.emptyNoMatches}
                                     </p>
                                     <p className="mt-2 text-[13px] text-[rgba(236,242,255,0.64)]">
-                                        Create a project, start from a template, or import an existing patch to begin.
+                                        {LAUNCHER_COPY.recent.emptyDescription}
                                     </p>
                                 </div>
                             ) : (
@@ -611,10 +598,14 @@ export function ProjectLauncher({
                                                             ) : null}
                                                         </div>
                                                         <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-subtle)]">
-                                                            {formatStorageKind(project.storageKind)}
+                                                            {LAUNCHER_COPY.helpers.storageKind(project.storageKind)}
                                                         </p>
                                                         <p className="mt-2 text-[12px] text-[rgba(236,242,255,0.68)]">
-                                                            {project.graphs.length} graphs, {project.assets.length} assets, opened {formatProjectDate(project.lastOpenedAt)}
+                                                            {LAUNCHER_COPY.recent.projectRowSummary(
+                                                                project.graphs.length,
+                                                                project.assets.length,
+                                                                formatProjectDate(project.lastOpenedAt),
+                                                            )}
                                                         </p>
                                                     </div>
                                                 </button>
@@ -635,7 +626,7 @@ export function ProjectLauncher({
                                                         disabled={busy}
                                                         className="rounded-xl border border-white/10 bg-[rgba(255,255,255,0.05)] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-white transition hover:border-white/20 disabled:opacity-70"
                                                     >
-                                                        {supportsDedicatedWindows ? 'Open Window' : 'Open'}
+                                                        {supportsDedicatedWindows ? LAUNCHER_COPY.recent.openWindow : LAUNCHER_COPY.recent.open}
                                                     </button>
                                                 </div>
                                             </div>
@@ -678,10 +669,10 @@ export function ProjectLauncher({
                                     <div className="flex items-center justify-between gap-3">
                                         <div>
                                             <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--text-subtle)]">
-                                                Patch file
+                                                {LAUNCHER_COPY.import.patchFile}
                                             </div>
                                             <div className="mt-2 text-[16px] font-semibold text-white">
-                                                Validate before importing
+                                                {LAUNCHER_COPY.import.validateBeforeImporting}
                                             </div>
                                         </div>
                                         <button
@@ -689,7 +680,7 @@ export function ProjectLauncher({
                                             onClick={() => importInputRef.current?.click()}
                                             className="rounded-xl border border-white/10 bg-[rgba(255,255,255,0.05)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-white transition hover:border-white/20"
                                         >
-                                            Select Patch
+                                            {LAUNCHER_COPY.import.selectPatch}
                                         </button>
                                     </div>
                                     <input
@@ -697,11 +688,11 @@ export function ProjectLauncher({
                                         type="file"
                                         accept=".json,application/json"
                                         onChange={handleImportFileChange}
-                                        aria-label="Import patch file"
+                                        aria-label={LAUNCHER_COPY.import.fileInputLabel}
                                         className="sr-only"
                                     />
                                     <p className="mt-3 text-[13px] leading-6 text-[rgba(236,242,255,0.72)]">
-                                        Import keeps the launcher in charge of project entry. Validate a patch, then either add it to an existing project or create a new dedicated project for it.
+                                        {LAUNCHER_COPY.import.description}
                                     </p>
                                     {importError ? (
                                         <div className="mt-4 rounded-2xl border border-[rgba(255,93,143,0.28)] bg-[rgba(255,93,143,0.1)] px-4 py-3 text-[13px] text-[rgba(255,222,232,0.92)]">
@@ -712,7 +703,7 @@ export function ProjectLauncher({
 
                                 <div className="rounded-[24px] border border-white/10 bg-[rgba(255,255,255,0.03)] p-5">
                                     <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--text-subtle)]">
-                                        Import destination
+                                        {LAUNCHER_COPY.import.destination}
                                     </div>
                                     <div className="mt-4 flex flex-wrap gap-2">
                                         <button
@@ -725,7 +716,7 @@ export function ProjectLauncher({
                                                     : 'border border-white/10 text-[var(--text-subtle)] hover:text-[var(--text)]'
                                             } disabled:cursor-not-allowed disabled:opacity-50`}
                                         >
-                                            Existing project
+                                            {LAUNCHER_COPY.import.existingProject}
                                         </button>
                                         <button
                                             type="button"
@@ -736,12 +727,12 @@ export function ProjectLauncher({
                                                     : 'border border-white/10 text-[var(--text-subtle)] hover:text-[var(--text)]'
                                             }`}
                                         >
-                                            New project
+                                            {LAUNCHER_COPY.import.newProject}
                                         </button>
                                     </div>
                                     {importMode === 'existing' ? (
                                         <label className="mt-4 flex flex-col gap-2 text-[12px] font-medium text-[rgba(236,242,255,0.82)]">
-                                            Target project
+                                            {LAUNCHER_COPY.import.targetProject}
                                             <select
                                                 value={importTargetProjectId}
                                                 onChange={(event) => setImportTargetProjectId(event.target.value)}
@@ -756,12 +747,12 @@ export function ProjectLauncher({
                                         </label>
                                     ) : (
                                         <label className="mt-4 flex flex-col gap-2 text-[12px] font-medium text-[rgba(236,242,255,0.82)]">
-                                            New project name
+                                            {LAUNCHER_COPY.import.newProjectName}
                                             <input
                                                 type="text"
                                                 value={importProjectName}
                                                 onChange={(event) => setImportProjectName(event.target.value)}
-                                                placeholder="Imported Patch Project"
+                                                placeholder={LAUNCHER_COPY.defaults.importedPatchProjectName}
                                                 className="h-12 rounded-2xl border border-white/10 bg-[rgba(8,13,25,0.88)] px-4 text-[14px] text-white outline-none transition placeholder:text-[rgba(236,242,255,0.28)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[rgba(104,165,255,0.2)]"
                                             />
                                         </label>
@@ -769,7 +760,7 @@ export function ProjectLauncher({
                                 </div>
                             </div>
                             <div className="rounded-[24px] border border-dashed border-white/10 bg-[rgba(255,255,255,0.03)] p-5 text-[13px] leading-6 text-[rgba(236,242,255,0.72)]">
-                                The launcher validates the patch, preserves its graph name, and lands you inside the project with that imported graph active.
+                                {LAUNCHER_COPY.import.importOutcome}
                             </div>
                         </div>
                     ) : null}
@@ -779,13 +770,13 @@ export function ProjectLauncher({
                             <div className="grid gap-4 lg:grid-cols-2">
                                 <div className="rounded-[24px] border border-white/10 bg-[rgba(255,255,255,0.03)] p-5">
                                     <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--text-subtle)]">
-                                        Recover
+                                        {LAUNCHER_COPY.recover.recover}
                                     </div>
                                     <div className="mt-2 text-[16px] font-semibold text-white">
-                                        Legacy workspace handoff
+                                        {LAUNCHER_COPY.recover.legacyWorkspaceHandoff}
                                     </div>
                                     <p className="mt-3 text-[13px] leading-6 text-[rgba(236,242,255,0.72)]">
-                                        Recover previous global graphs and cached assets into a dedicated project without reopening the old editor state first.
+                                        {LAUNCHER_COPY.recover.legacyWorkspaceDescription}
                                     </p>
                                     <button
                                         type="button"
@@ -793,16 +784,16 @@ export function ProjectLauncher({
                                         disabled={!hasLegacyWorkspace || busy}
                                         className="mt-4 inline-flex h-12 items-center justify-center rounded-2xl border border-[rgba(104,165,255,0.35)] bg-[rgba(8,13,25,0.75)] px-4 text-[13px] font-semibold uppercase tracking-[0.22em] text-[rgba(213,230,255,0.92)] transition hover:border-[rgba(104,165,255,0.7)] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                                     >
-                                        Recover Legacy Workspace
+                                        {LAUNCHER_COPY.recover.recoverLegacyWorkspace}
                                     </button>
                                 </div>
                                 <div className="rounded-[24px] border border-white/10 bg-[rgba(255,255,255,0.03)] p-5">
                                     <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--text-subtle)]">
-                                        Interrupted work
+                                        {LAUNCHER_COPY.recover.interruptedWork}
                                     </div>
                                     {resumableWork.length === 0 ? (
                                         <div className="mt-3 text-[13px] leading-6 text-[rgba(236,242,255,0.72)]">
-                                            No unfinished review, generation, or repair tasks are waiting.
+                                            {LAUNCHER_COPY.recover.noInterruptedWork}
                                         </div>
                                     ) : (
                                         <div className="mt-4 grid gap-3">

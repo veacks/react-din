@@ -10,6 +10,7 @@ import {
 import { createTemplateGraphDocument, EDITOR_TEMPLATES } from './editor/templateLibrary';
 import { listProjectInterruptedWork, writeProjectResumeIntent } from './projectUiState';
 import { Editor } from './Editor';
+import { APP_COPY } from './copy';
 import ProjectLauncher, { type LauncherImportRequest, type LauncherResumeItem } from './ProjectLauncher';
 
 type AppScreen =
@@ -63,7 +64,7 @@ function App() {
                 });
             });
         } catch (nextError) {
-            setError(nextError instanceof Error ? nextError.message : 'Failed to open the project.');
+            setError(nextError instanceof Error ? nextError.message : APP_COPY.errors.openProject);
         } finally {
             setBusy(false);
         }
@@ -91,7 +92,7 @@ function App() {
                 setScreen({ kind: 'launcher' });
             } catch (nextError) {
                 if (cancelled) return;
-                setError(nextError instanceof Error ? nextError.message : 'Failed to bootstrap the project launcher.');
+                setError(nextError instanceof Error ? nextError.message : APP_COPY.errors.bootstrapLauncher);
                 setScreen({ kind: 'launcher' });
             } finally {
                 if (!cancelled) {
@@ -116,7 +117,7 @@ function App() {
                 await repository.openProjectWindow(projectId);
                 await refreshLauncherState();
             } catch (nextError) {
-                setError(nextError instanceof Error ? nextError.message : 'Failed to open the project window.');
+                setError(nextError instanceof Error ? nextError.message : APP_COPY.errors.openProjectWindow);
             } finally {
                 setBusy(false);
             }
@@ -139,7 +140,7 @@ function App() {
 
             await openProjectInCurrentWindow(project.id);
         } catch (nextError) {
-            setError(nextError instanceof Error ? nextError.message : 'Failed to create the project.');
+            setError(nextError instanceof Error ? nextError.message : APP_COPY.errors.createProject);
         } finally {
             setBusy(false);
         }
@@ -195,7 +196,7 @@ function App() {
             await saveGraphIntoProject(project.id, templateGraph, true);
             await openPreparedProject(project.id);
         } catch (nextError) {
-            setError(nextError instanceof Error ? nextError.message : 'Failed to create the project from template.');
+            setError(nextError instanceof Error ? nextError.message : APP_COPY.errors.createProjectFromTemplate);
         } finally {
             setBusy(false);
         }
@@ -222,13 +223,13 @@ function App() {
             });
             const projectId = targetProjectId ?? project?.id;
             if (!projectId) {
-                throw new Error('No project target available for the patch import.');
+                throw new Error(APP_COPY.errors.missingPatchTarget);
             }
 
             await saveGraphIntoProject(projectId, graph, !targetProjectId);
             await openPreparedProject(projectId);
         } catch (nextError) {
-            setError(nextError instanceof Error ? nextError.message : 'Failed to import the patch.');
+            setError(nextError instanceof Error ? nextError.message : APP_COPY.errors.importPatch);
         } finally {
             setBusy(false);
         }
@@ -249,7 +250,7 @@ function App() {
 
             await openProjectInCurrentWindow(recoveredProject.id);
         } catch (nextError) {
-            setError(nextError instanceof Error ? nextError.message : 'Failed to recover the legacy workspace.');
+            setError(nextError instanceof Error ? nextError.message : APP_COPY.errors.recoverLegacyWorkspace);
         } finally {
             setBusy(false);
         }
@@ -271,7 +272,7 @@ function App() {
         return (
             <main className="flex min-h-screen items-center justify-center bg-[#080912] text-[var(--text)]">
                 <div className="rounded-2xl border border-white/10 bg-[rgba(255,255,255,0.04)] px-6 py-4 text-[13px] uppercase tracking-[0.24em] text-[var(--text-subtle)]">
-                    Loading projects
+                    {APP_COPY.loadingProjects}
                 </div>
             </main>
         );
@@ -317,7 +318,7 @@ function App() {
 function stripImportedProjectName(fileName: string) {
     const index = fileName.lastIndexOf('.');
     const base = index > 0 ? fileName.slice(0, index) : fileName;
-    return `${base || 'Imported Patch'} Project`;
+    return `${base || APP_COPY.importedPatchBaseName} ${APP_COPY.importedPatchProjectSuffix}`;
 }
 
 export default App;

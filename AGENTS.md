@@ -17,6 +17,13 @@
   - `## Example`
   - `## Test Coverage`
 
+## UI Copy Governance
+
+- Keep contributor-facing and user-facing UI text in a dedicated copy file instead of inline string literals inside components.
+- Scope: launcher, editor shell, panels, drawers, dialogs, banners, empty states, CTA labels, and recover/import flows.
+- Prefer feature-local copy modules such as `editor/ui/copy.ts` when a surface shares text across multiple components.
+- A UI change that adds or edits visible copy is incomplete until the relevant copy file changes in the same branch.
+
 ## Coverage Governance
 
 - `project/COVERAGE_MANIFEST.json` is the source of truth for in-scope public components and editor nodes.
