@@ -11,7 +11,7 @@ import {
     MonoSynth,
     DrumSynth,
     noteToFreq,
-} from '@din/react';
+} from '@open-din/react';
 
 /**
  * Sequencer Demo - Acid House Banger

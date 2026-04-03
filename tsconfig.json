@@ -26,10 +26,10 @@
         "forceConsistentCasingInFileNames": true,
         "baseUrl": ".",
         "paths": {
-            "@din/react": [
+            "@open-din/react": [
                 "./src/index.ts"
             ],
-            "@din/react/*": [
+            "@open-din/react/*": [
                 "./src/*"
             ]
         }

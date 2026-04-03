@@ -1,6 +1,6 @@
 # Product Summary
 
-`@din/react` helps React developers build and inspect declarative Web Audio graphs through a reusable library and the DIN Editor.
+`@open-din/react` helps React developers build and inspect declarative Web Audio graphs through a reusable library and the DIN Editor.
 
 ## Priority Features
 

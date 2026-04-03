@@ -8,7 +8,7 @@ import {
     Delay,
     StereoPanner,
     Compressor,
-} from '@din/react';
+} from '@open-din/react';
 
 /**
  * Nodes Demo - Audio Processing Nodes

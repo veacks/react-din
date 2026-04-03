@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { graphDocumentToPatch } from '@din/react/patch';
+import { graphDocumentToPatch } from '@open-din/react/patch';
 import { audioEngine } from '../ui/editor/AudioEngine';
 import { editorMidiRuntime } from '../ui/editor/midiRuntime';
 import { generateCode } from '../ui/editor/CodeGenerator';

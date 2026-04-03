@@ -1,5 +1,5 @@
 import type { Connection, Edge, Node } from '@xyflow/react';
-import { patchToGraphDocument } from '@din/react/patch';
+import { patchToGraphDocument } from '@open-din/react/patch';
 import {
     canConnect,
     getSingletonNodeTypes,

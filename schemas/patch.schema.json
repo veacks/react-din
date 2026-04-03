@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:@din/react:patch-document:v1",
-  "title": "@din/react PatchDocument v1",
-  "description": "Public exchange format for @din/react DIN Editor patches.",
+  "$id": "urn:@open-din/react:patch-document:v1",
+  "title": "@open-din/react PatchDocument v1",
+  "description": "Public exchange format for @open-din/react DIN Editor patches.",
   "$comment": "PatchDocument public shape is unchanged by the editor multi-project workspace work.",
   "type": "object",
   "additionalProperties": false,

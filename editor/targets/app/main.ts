@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { graphDocumentToPatch, patchToGraphDocument } from '@din/react/patch';
+import { graphDocumentToPatch, patchToGraphDocument } from '@open-din/react/patch';
 
 type ProjectStorageKind = 'electron-fs';
 type ProjectAssetKind = 'sample' | 'impulse' | 'audio';

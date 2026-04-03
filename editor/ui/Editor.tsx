@@ -18,7 +18,7 @@ import './editor/editor.css';
 import Inspector from './editor/Inspector';
 import { CodeGenerator } from './editor/CodeGenerator';
 import ConnectionAssistMenu from './editor/ConnectionAssistMenu';
-import { MidiProvider } from '@din/react/midi';
+import { MidiProvider } from '@open-din/react/midi';
 
 import { useAudioGraphStore } from './editor/store';
 import type { AudioNodeData } from './editor/types';
@@ -764,7 +764,7 @@ const EditorContent: FC<EditorProps> = ({ project }) => {
     const onDrop = useCallback(
         (event: React.DragEvent) => {
             event.preventDefault();
-            const type = event.dataTransfer.getData('application/reactflow');
+            const type = event.dataTransfer.getData('application-din/reactflow');
             if (typeof type === 'undefined' || !type) return;
 
             const position = reactFlowInstance?.screenToFlowPosition({

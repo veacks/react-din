@@ -1,3 +1,3 @@
-import { createMidiRuntime } from '@din/react/midi';
+import { createMidiRuntime } from '@open-din/react/midi';
 
 export const editorMidiRuntime = createMidiRuntime();

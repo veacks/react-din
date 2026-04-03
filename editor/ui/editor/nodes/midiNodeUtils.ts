@@ -1,4 +1,4 @@
-import type { MidiPortDescriptor } from '@din/react/midi';
+import type { MidiPortDescriptor } from '@open-din/react/midi';
 
 export interface MidiPortOption {
     value: string;

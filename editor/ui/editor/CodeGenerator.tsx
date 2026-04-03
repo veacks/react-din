@@ -101,8 +101,8 @@ import {
     useLFO,
     useMidiNote,
     useMidiCC,
-} from '@din/react';
-import type { LFOOutput, VoiceRenderProps } from '@din/react';
+} from '@open-din/react';
+import type { LFOOutput, VoiceRenderProps } from '@open-din/react';
 import {
     getInputParamHandleId,
     getTransportConnections,
@@ -993,7 +993,7 @@ export function generateCode(
         code = `import { type ReactNode } from 'react';\n`;
     }
     code += importList.length > 0
-        ? `import { ${importList.join(', ')} } from '@din/react';\n\n`
+        ? `import { ${importList.join(', ')} } from '@open-din/react';\n\n`
         : '\n';
 
     if (usedParamInfo.length > 0) {

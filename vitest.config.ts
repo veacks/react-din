@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 export default defineConfig({
     resolve: {
         alias: {
-            '@din/react': resolve(__dirname, 'src/index.ts'),
+            '@open-din/react': resolve(__dirname, 'src/index.ts'),
         },
     },
     test: {

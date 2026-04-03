@@ -4,7 +4,7 @@ import {
     migratePatchDocument,
     patchToGraphDocument,
     type PatchDocument,
-} from '@din/react/patch';
+} from '@open-din/react/patch';
 import type { OfflinePatchSummary, OfflinePatchValidation } from './types';
 
 export function summarizePatch(patch: PatchDocument): OfflinePatchSummary {

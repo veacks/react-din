@@ -1,14 +1,14 @@
-# @din/react
+# @open-din/react
 
 A React-first declarative WebAudio library for building audio graphs, focused for interactive sound design.
 
-The DIN editor product is being split into a separate `din-studio` repository so this repository can stay focused on the `@din/react` library surface.
+The DIN editor product is being split into a separate `din-studio` repository so this repository can stay focused on the `@open-din/react` library surface.
 
 Build complex audio graphs using React's declarative paradigm. Audio nodes are represented as React components that automatically connect based on their parent-child relationships.
 
 > [!WARNING]  
 > This is a work in progress. The API is not stable and may change in the future.
-> It has been published under the npm package name `@din/react`.
+> It has been published under the npm package name `@open-din/react`.
 
 ## Features
 
@@ -26,17 +26,17 @@ Build complex audio graphs using React's declarative paradigm. Audio nodes are r
 ## Installation
 
 ```bash
-npm install @din/react
+npm install @open-din/react
 # or
-yarn add @din/react
+yarn add @open-din/react
 # or
-pnpm add @din/react
+pnpm add @open-din/react
 ```
 
 ## Quick Start
 
 ```tsx
-import { AudioProvider, Gain, Filter, Osc } from '@din/react';
+import { AudioProvider, Gain, Filter, Osc } from '@open-din/react';
 
 function App() {
   return (
@@ -72,7 +72,7 @@ Components automatically connect to their parent's output. The tree structure de
 Create step sequences with pattern-based triggering:
 
 ```tsx
-import { Sequencer, Track, useTrigger, Sampler } from '@din/react';
+import { Sequencer, Track, useTrigger, Sampler } from '@open-din/react';
 
 function DrumMachine() {
   return (
@@ -93,7 +93,7 @@ function DrumMachine() {
 Use musical timing with the transport system:
 
 ```tsx
-import { TransportProvider, useTransport, useBeat } from '@din/react';
+import { TransportProvider, useTransport, useBeat } from '@open-din/react';
 
 function PlayButton() {
   const { isPlaying, play, stop, bpm } = useTransport();
@@ -123,7 +123,7 @@ import {
   MidiCCOutput,
   MidiTransportSync,
   TransportProvider,
-} from '@din/react';
+} from '@open-din/react';
 
 function MidiPatch() {
   return (
@@ -148,7 +148,7 @@ function MidiPatch() {
 Analyze audio with FFT and metering:
 
 ```tsx
-import { useFFT, useMeter, Analyzer } from '@din/react';
+import { useFFT, useMeter, Analyzer } from '@open-din/react';
 
 function Visualizer() {
   const { bass, mid, high, spectrum } = useFFT({ fftSize: 512 });
@@ -167,7 +167,7 @@ function Visualizer() {
 Apply effects to audio:
 
 ```tsx
-import { Reverb, Chorus, Distortion } from '@din/react/effects';
+import { Reverb, Chorus, Distortion } from '@open-din/react/effects';
 
 function EffectsChain() {
   return (
@@ -187,7 +187,7 @@ function EffectsChain() {
 Use note strings (English or French) instead of raw MIDI numbers:
 
 ```tsx
-import { noteToMidi, midiToNote, noteToFreq, parseNote } from '@din/react';
+import { noteToMidi, midiToNote, noteToFreq, parseNote } from '@open-din/react';
 
 // English note names
 noteToMidi('C4');      // 60
@@ -212,7 +212,7 @@ parseNote('Eb4');      // { note: 'D#', octave: 4, midi: 63, frequency: 311.13 }
 Built-in synthesizer components inspired by Tone.js:
 
 ```tsx
-import { Synth, MonoSynth, FMSynth, AMSynth, NoiseSynth, Envelope } from '@din/react';
+import { Synth, MonoSynth, FMSynth, AMSynth, NoiseSynth, Envelope } from '@open-din/react';
 
 // Basic synth with ADSR envelope
 <Track id="lead" pattern={pattern}>
@@ -278,7 +278,7 @@ import { Synth, MonoSynth, FMSynth, AMSynth, NoiseSynth, Envelope } from '@din/r
 Use the Panner component for 3D positional audio:
 
 ```tsx
-import { AudioProvider, Panner, Sampler } from '@din/react';
+import { AudioProvider, Panner, Sampler } from '@open-din/react';
 
 function SpatialAudio() {
   const [position, setPosition] = useState({ x: 0, y: 0, z: -5 });
@@ -388,7 +388,7 @@ function SpatialAudio() {
 
 ## Examples
 
-The published `@din/react` package now includes the [`example`](./example) workspace so the demo source stays bundled with the library release.
+The [`example`](./example) workspace stays in the repository for local development and release verification, but it is not bundled into the published npm tarball.
 
 ## DIN Editor MCP
 

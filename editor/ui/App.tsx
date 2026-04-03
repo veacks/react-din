@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useState } from 'react';
-import { patchToGraphDocument, type PatchDocument } from '@din/react/patch';
+import { patchToGraphDocument, type PatchDocument } from '@open-din/react/patch';
 import { AgentBridgeClient } from '../bridge/AgentBridgeClient';
 import {
     getProjectRepository,

@@ -7,7 +7,7 @@ import {
     useLFO,
     LFO,
     type LFOWaveform,
-} from '@din/react';
+} from '@open-din/react';
 
 /**
  * LFO Demo - Demonstrates using LFO for modulation

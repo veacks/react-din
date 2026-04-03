@@ -14,7 +14,7 @@ import type {
 import { useAudioGraphStore } from './store';
 import { isDataNodeType, isInputLikeNodeType, resolveInputParamByHandle } from './nodeHelpers';
 import { audioEngine } from './AudioEngine';
-import { clamp, compare, math, mix, switchValue } from '@din/react/data';
+import { clamp, compare, math, mix, switchValue } from '@open-din/react/data';
 
 export interface TargetHandleConnectionInfo {
     connected: boolean;

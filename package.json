@@ -1,5 +1,5 @@
 {
-  "name": "@din/react",
+  "name": "@open-din/react",
   "version": "0.1.0",
   "description": "A React-first declarative WebAudio library for building audio graphs",
   "author": "Valentin Dubois - veacks.net",
@@ -122,14 +122,54 @@
         "default": "./dist/patch/index.cjs"
       }
     },
-    "./patch/schema.json": "./schemas/patch.schema.json"
+    "./routing": {
+      "import": {
+        "types": "./dist/routing/index.d.ts",
+        "default": "./dist/routing/index.js"
+      },
+      "require": {
+        "types": "./dist/routing/index.d.cts",
+        "default": "./dist/routing/index.cjs"
+      }
+    },
+    "./notes": {
+      "import": {
+        "types": "./dist/notes/index.d.ts",
+        "default": "./dist/notes/index.js"
+      },
+      "require": {
+        "types": "./dist/notes/index.d.cts",
+        "default": "./dist/notes/index.cjs"
+      }
+    },
+    "./synths": {
+      "import": {
+        "types": "./dist/synths/index.d.ts",
+        "default": "./dist/synths/index.js"
+      },
+      "require": {
+        "types": "./dist/synths/index.d.cts",
+        "default": "./dist/synths/index.cjs"
+      }
+    },
+    "./utils": {
+      "import": {
+        "types": "./dist/utils/index.d.ts",
+        "default": "./dist/utils/index.js"
+      },
+      "require": {
+        "types": "./dist/utils/index.d.cts",
+        "default": "./dist/utils/index.cjs"
+      }
+    },
+    "./patch/schema.json": "./schemas/patch.schema.json",
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
     "schemas",
     "README.md",
-    "LICENSE",
-    "example"
+    "LICENSE"
   ],
   "sideEffects": false,
   "scripts": {
@@ -147,6 +187,7 @@
     "validate:coverage": "node ./scripts/validate-coverage.mjs",
     "validate:changes": "node ./scripts/validate-changes.mjs",
     "ci:check": "npm run validate:docs && npm run validate:patch-schema && npm run validate:coverage && npm run test:library && npm run test:editor",
+    "prepack": "npm run build",
     "prepublishOnly": "npm run build",
     "example:dev": "npm --prefix example run dev",
     "editor:dev": "npm run editor:dev:web",

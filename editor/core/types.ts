@@ -1,6 +1,6 @@
 import type { Edge, Node, XYPosition } from '@xyflow/react';
-import type { MidiRuntimeSnapshot } from '@din/react/midi';
-import type { PatchDocument } from '@din/react/patch';
+import type { MidiRuntimeSnapshot } from '@open-din/react/midi';
+import type { PatchDocument } from '@open-din/react/patch';
 import type { ProjectStorageKind, ProjectWindowKind } from '../project';
 import type { AudioNodeData, GraphDocument } from '../ui/editor/store';
 import type { EditorNodeType } from '../ui/editor/nodeCatalog';

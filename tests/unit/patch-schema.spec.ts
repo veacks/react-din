@@ -1,5 +1,5 @@
 import patchSchema from '../../schemas/patch.schema.json';
-import { PATCH_DOCUMENT_VERSION, graphDocumentToPatch } from '@din/react';
+import { PATCH_DOCUMENT_VERSION, graphDocumentToPatch } from '@open-din/react';
 
 describe('patch schema contract', () => {
     it('keeps the published schema aligned with the current patch version and public interface shape', () => {

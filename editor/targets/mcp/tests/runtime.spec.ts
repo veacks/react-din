@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type WebSocket from 'ws';
-import { graphDocumentToPatch } from '@din/react/patch';
+import { graphDocumentToPatch } from '@open-din/react/patch';
 import { createLogger } from '../src/logger';
 import { DinEditorMcpRuntime, offlinePatchUri } from '../src/runtime';
 import { SessionRegistry } from '../src/sessionRegistry';
