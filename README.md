@@ -400,7 +400,7 @@ npm run validate:changes
 npm run test:library
 ```
 
-Every public component in scope is mapped to a dedicated documentation page and at least one required automated test file in [`project/COVERAGE_MANIFEST.json`](./project/COVERAGE_MANIFEST.json). Any source change must update the mapped docs and tests in the same change set. The public patch JSON contract is versioned and tracked separately in [`schemas/patch.schema.json`](./schemas/patch.schema.json). MCP tooling and DIN Studio workflows now live in the separate `din-studio` repository.
+Every public component in scope is mapped to a dedicated documentation page and at least one required automated test file in [`project/COVERAGE_MANIFEST.json`](./project/COVERAGE_MANIFEST.json). Any source change must update the mapped docs and tests in the same change set. The public patch JSON contract is versioned and tracked separately in [`schemas/patch.schema.json`](./schemas/patch.schema.json).
 
 ## Spatial Audio with @react-three/drei
 

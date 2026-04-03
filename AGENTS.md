@@ -19,10 +19,8 @@
 
 ## UI Copy Governance
 
-- Keep contributor-facing and user-facing UI text in a dedicated copy file instead of inline string literals inside components.
-- Scope: launcher, editor shell, panels, drawers, dialogs, banners, empty states, CTA labels, and recover/import flows.
-- Prefer feature-local copy modules such as `editor/ui/copy.ts` when a surface shares text across multiple components.
-- A UI change that adds or edits visible copy is incomplete until the relevant copy file changes in the same branch.
+- Keep contributor-facing and user-facing UI text in dedicated copy modules instead of scattering repeated string literals across components.
+- A UI change that adds or edits visible copy is incomplete until the relevant copy source changes in the same branch.
 
 ## Coverage Governance
 
@@ -33,7 +31,7 @@
 ## DIN Studio Boundary
 
 - DIN Studio-owned features, editor scenarios, and editor tests live in the sibling `din-studio` repository, not in `react-din`.
-- Changes to editor-node behavior, DIN Studio launcher flows, MCP flows, and workspace UX must update the DIN Studio project docs and tests in that repository.
+- Changes to DIN Studio-owned behavior and product workflows must update the DIN Studio project docs and tests in that repository.
 
 ## Patch Schema Governance
 

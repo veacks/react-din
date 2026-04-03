@@ -24,7 +24,7 @@ Keep the public `@open-din/react` component surface documented, testable, and sa
 
 ### F01-S04 MIDI surfaces stay aligned
 
-**Given** a contributor changes the public MIDI runtime, provider, hooks, or MIDI bridge components
+**Given** a contributor changes the public MIDI runtime, provider, hooks, or MIDI helper components
 **When** the change lands
 **Then** docs, automated tests, and manifest mappings reflect the shipped MIDI behavior
 

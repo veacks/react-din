@@ -50,7 +50,7 @@ for (const file of markdownFiles) {
         errors.push(`${relative}: documentation must stay in English`);
     }
 
-    if (relative.startsWith('docs/components/') || relative.startsWith('docs/editor-nodes/')) {
+    if (relative.startsWith('docs/components/')) {
         for (const heading of sectionHeadings) {
             if (!contents.includes(heading)) {
                 errors.push(`${relative}: missing required heading "${heading}"`);

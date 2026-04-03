@@ -2,8 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:@open-din/react:patch-document:v1",
   "title": "@open-din/react PatchDocument v1",
-  "description": "Public exchange format for @open-din/react DIN Editor patches.",
-  "$comment": "PatchDocument public shape is unchanged by the editor multi-project workspace work.",
+  "description": "Public exchange format for @open-din/react patch documents.",
+  "$comment": "PatchDocument is the stable serialized graph contract published by @open-din/react.",
   "type": "object",
   "additionalProperties": false,
   "required": [

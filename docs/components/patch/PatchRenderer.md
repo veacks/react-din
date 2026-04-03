@@ -21,10 +21,10 @@ Render a versioned `PatchDocument` as a live `@open-din/react` graph, or derive 
 ## Integration Notes
 - Use `importPatch(patch, options?)` when you want a reusable typed component instead of passing `patch` on every render.
 - The public patch JSON contract is described by [`schemas/patch.schema.json`](../../../schemas/patch.schema.json) and published with the package at `@open-din/react/patch/schema.json`.
-- Patch public props come only from editor `Input` and `EventTrigger` nodes.
+- Patch public props come from the patch interface entries stored in `interface.inputs[]` and `interface.events[]`.
 - Patch MIDI bindings stay explicit in host code so the app keeps ownership of permissions, selected ports, and `MidiProvider`.
 - When a patch contains a transport node or a bound MIDI sync output, `includeProvider` wraps the content in `TransportProvider`; `midi-master` sync forces transport `mode="manual"`.
-- Export/import round-trips preserve editor positions, public interface metadata, and unresolved external `assetPath` references for sampler and convolver nodes.
+- Export/import round-trips preserve graph positions, public interface metadata, and unresolved external `assetPath` references for sampler and convolver nodes.
 
 ## Failure Modes
 - Unsupported patch versions, unknown node types, or invalid handles throw during `importPatch(...)` and `PatchRenderer` normalization.
@@ -68,5 +68,5 @@ function App() {
 ```
 
 ## Test Coverage
-- Automated: `tests/library/patch.spec.tsx`, `editor/tests/unit/store-and-codegen.spec.ts`
-- Scenarios: `F01-S05`, `F03-S08`, `F04-S03`
+- Automated: `tests/library/patch.spec.tsx`
+- Scenarios: `F01-S05`, `F04-S03`

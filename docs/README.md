@@ -11,18 +11,6 @@
 - Patch: [PatchRenderer](./components/patch/PatchRenderer.md)
 - MIDI: [MidiProvider](./components/midi/MidiProvider.md), [MidiNoteInput](./components/midi/MidiNoteInput.md), [MidiCCInput](./components/midi/MidiCCInput.md), [MidiNoteOutput](./components/midi/MidiNoteOutput.md), [MidiCCOutput](./components/midi/MidiCCOutput.md), [MidiTransportSync](./components/midi/MidiTransportSync.md)
 
-## DIN Editor Nodes
-
-- [OscNode](./editor-nodes/OscNode.md), [GainNode](./editor-nodes/GainNode.md), [FilterNode](./editor-nodes/FilterNode.md), [OutputNode](./editor-nodes/OutputNode.md), [NoiseNode](./editor-nodes/NoiseNode.md), [DelayNode](./editor-nodes/DelayNode.md), [ReverbNode](./editor-nodes/ReverbNode.md), [CompressorNode](./editor-nodes/CompressorNode.md), [DistortionNode](./editor-nodes/DistortionNode.md), [ChorusNode](./editor-nodes/ChorusNode.md), [NoiseBurstNode](./editor-nodes/NoiseBurstNode.md), [WaveShaperNode](./editor-nodes/WaveShaperNode.md), [ConvolverNode](./editor-nodes/ConvolverNode.md), [AnalyzerNode](./editor-nodes/AnalyzerNode.md), [StereoPannerNode](./editor-nodes/StereoPannerNode.md), [Panner3DNode](./editor-nodes/Panner3DNode.md), [MixerNode](./editor-nodes/MixerNode.md), [InputNode](./editor-nodes/InputNode.md), [ConstantSourceNode](./editor-nodes/ConstantSourceNode.md), [MediaStreamNode](./editor-nodes/MediaStreamNode.md), [EventTriggerNode](./editor-nodes/EventTriggerNode.md), [NoteNode](./editor-nodes/NoteNode.md), [TransportNode](./editor-nodes/TransportNode.md), [StepSequencerNode](./editor-nodes/StepSequencerNode.md), [PianoRollNode](./editor-nodes/PianoRollNode.md), [LFONode](./editor-nodes/LFONode.md), [ADSRNode](./editor-nodes/ADSRNode.md), [VoiceNode](./editor-nodes/VoiceNode.md), [SamplerNode](./editor-nodes/SamplerNode.md), [MathNode](./editor-nodes/MathNode.md), [CompareNode](./editor-nodes/CompareNode.md), [MixNode](./editor-nodes/MixNode.md), [ClampNode](./editor-nodes/ClampNode.md), [SwitchNode](./editor-nodes/SwitchNode.md)
-- MIDI nodes: [MidiNoteNode](./editor-nodes/MidiNoteNode.md), [MidiCCNode](./editor-nodes/MidiCCNode.md), [MidiNoteOutputNode](./editor-nodes/MidiNoteOutputNode.md), [MidiCCOutputNode](./editor-nodes/MidiCCOutputNode.md), [MidiSyncNode](./editor-nodes/MidiSyncNode.md)
-
-## DIN Editor UX
-
-- [DIN Editor Docs](./editor/README.md)
-- [LauncherEntryFlows](./editor/LauncherEntryFlows.md)
-- [SourceControlPanel](./editor/SourceControlPanel.md)
-- [AudioLibraryPanel](./editor/AudioLibraryPanel.md)
-
 ## Governance
 
 - Coverage manifest: [`project/COVERAGE_MANIFEST.json`](../project/COVERAGE_MANIFEST.json)
