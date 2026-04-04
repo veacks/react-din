@@ -187,7 +187,8 @@
     "ci:check": "npm run validate:docs && npm run validate:patch-schema && npm run validate:coverage && npm run test:library",
     "prepack": "npm run build",
     "prepublishOnly": "npm run build",
-    "example:dev": "npm --prefix example run dev"
+    "example:dev": "npm --prefix example run dev",
+    "prepare": "husky"
   },
   "peerDependencies": {
     "react": ">=18.0.0",
@@ -203,6 +204,7 @@
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "eslint": "^8.56.0",
+    "husky": "^9.1.7",
     "jsdom": "^29.0.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
