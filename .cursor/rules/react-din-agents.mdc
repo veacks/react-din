@@ -1,0 +1,7 @@
+---
+description: @open-din/react canonical agent contract
+globs: *
+alwaysApply: true
+---
+
+Follow @AGENTS.md. Product context: `project/SUMMARY.md`, `project/USERFLOW.md`, `project/TEST_MATRIX.md`. Playbooks: @project/skills.

@@ -1,0 +1,7 @@
+---
+description: Coverage manifest and validation scripts
+globs: project/COVERAGE_MANIFEST.json,scripts/validate-*.mjs
+alwaysApply: false
+---
+
+Follow @AGENTS.md. Use @project/skills/coverage-manifest-update/SKILL.md and @project/skills/release-surface-check/SKILL.md.

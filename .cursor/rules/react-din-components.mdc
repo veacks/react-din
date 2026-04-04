@@ -1,0 +1,7 @@
+---
+description: Public components and library src
+globs: src/**,docs/components/**
+alwaysApply: false
+---
+
+Follow @AGENTS.md. For exported components use @project/skills/public-component-change/SKILL.md and @project/skills/docs-component-author/SKILL.md.

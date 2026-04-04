@@ -1,0 +1,7 @@
+---
+description: Patch document JSON schema
+globs: schemas/**,src/patch/**
+alwaysApply: false
+---
+
+Follow @AGENTS.md. Use @project/skills/patch-schema-change/SKILL.md; keep `schemas/patch.schema.json` as the single public shape source.
