@@ -92,7 +92,8 @@
         "midiCC",
         "midiNoteOutput",
         "midiCCOutput",
-        "midiSync"
+        "midiSync",
+        "midiPlayer"
       ]
     },
     "position": {

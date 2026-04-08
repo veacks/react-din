@@ -112,6 +112,7 @@ const PATCH_NODE_TYPES = new Set([
     'midiNoteOutput',
     'midiCCOutput',
     'midiSync',
+    'midiPlayer',
 ]);
 
 const MODULATION_TARGET_HANDLES = new Set([
@@ -225,6 +226,14 @@ function resolveConvolverAssetPath(data: Record<string, unknown>): string {
     return ensurePathPrefix('', '/impulses', fileName || 'impulse.wav');
 }
 
+function resolveMidiPlayerAssetPath(data: Record<string, unknown>): string {
+    const assetPath = asString(data.assetPath);
+    if (assetPath) return assetPath;
+
+    const fileName = fileNameFromPath(asString(data.midiFileName));
+    return ensurePathPrefix('', '/midi', fileName || 'clip.mid');
+}
+
 function sanitizeNodeData(data: Record<string, unknown>): Record<string, unknown> {
     const next = deepClone(data);
 
@@ -239,6 +248,12 @@ function sanitizeNodeData(data: Record<string, unknown>): Record<string, unknown
         next.assetPath = resolveConvolverAssetPath(next);
         next.impulseSrc = '';
         delete next.impulseId;
+    }
+
+    if (next.type === 'midiPlayer') {
+        next.assetPath = resolveMidiPlayerAssetPath(next);
+        delete next.midiFileId;
+        delete next.loaded;
     }
 
     if (next.type === 'output' || next.type === 'transport') {
@@ -266,6 +281,14 @@ function hydrateNodeDataForGraph(data: Record<string, unknown>): Record<string, 
         next.impulseSrc = '';
         next.impulseId = '';
         next.impulseFileName = asString(next.impulseFileName) || fileNameFromPath(assetPath) || 'impulse.wav';
+    }
+
+    if (next.type === 'midiPlayer') {
+        const assetPath = resolveMidiPlayerAssetPath(next);
+        next.assetPath = assetPath;
+        next.midiFileId = '';
+        next.midiFileName = asString(next.midiFileName) || fileNameFromPath(assetPath) || 'clip.mid';
+        next.loaded = false;
     }
 
     if (next.type === 'output' || next.type === 'transport') {
@@ -307,7 +330,9 @@ function getSourceHandleIds(node: PatchNode): Set<string> {
 
     if (type === 'note') handleIds.add('freq');
     if (type === 'transport') handleIds.add('out');
-    if (type === 'stepSequencer' || type === 'pianoRoll' || type === 'eventTrigger') handleIds.add('trigger');
+    if (type === 'stepSequencer' || type === 'pianoRoll' || type === 'eventTrigger' || type === 'midiPlayer') {
+        handleIds.add('trigger');
+    }
     if (type === 'lfo') handleIds.add('out');
     if (type === 'voice') ['note', 'gate', 'velocity'].forEach((id) => handleIds.add(id));
     if (type === 'adsr') handleIds.add('envelope');
@@ -344,7 +369,7 @@ function getTargetHandleIds(node: PatchNode): Set<string> {
 
     if (type === 'compressor') handleIds.add('sidechainIn');
     if (type === 'eventTrigger') handleIds.add('token');
-    if (type === 'stepSequencer' || type === 'pianoRoll') handleIds.add('transport');
+    if (type === 'stepSequencer' || type === 'pianoRoll' || type === 'midiPlayer') handleIds.add('transport');
     if (type === 'lfo') ['rate', 'depth'].forEach((id) => handleIds.add(id));
     if (type === 'voice') ['trigger', 'portamento'].forEach((id) => handleIds.add(id));
     if (type === 'adsr') ['gate', 'attack', 'decay', 'sustain', 'release'].forEach((id) => handleIds.add(id));
@@ -598,7 +623,9 @@ export function getTransportConnections(
         if (
             sourceNode?.data.type === 'transport'
             && targetNode
-            && (targetNode.data.type === 'stepSequencer' || targetNode.data.type === 'pianoRoll')
+            && (targetNode.data.type === 'stepSequencer'
+                || targetNode.data.type === 'pianoRoll'
+                || targetNode.data.type === 'midiPlayer')
             && connection.sourceHandle === 'out'
             && connection.targetHandle === 'transport'
         ) {

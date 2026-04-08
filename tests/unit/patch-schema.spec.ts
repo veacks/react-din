@@ -12,7 +12,19 @@ describe('patch schema contract', () => {
             expect.arrayContaining(['inputs', 'events', 'midiInputs', 'midiOutputs'])
         );
         expect(patchSchema.$defs.nodeType.enum).toEqual(
-            expect.arrayContaining(['input', 'eventTrigger', 'midiNote', 'midiCC', 'midiNoteOutput', 'midiCCOutput', 'midiSync', 'sampler', 'convolver', 'output'])
+            expect.arrayContaining([
+                'input',
+                'eventTrigger',
+                'midiNote',
+                'midiCC',
+                'midiNoteOutput',
+                'midiCCOutput',
+                'midiSync',
+                'midiPlayer',
+                'sampler',
+                'convolver',
+                'output',
+            ])
         );
     });
 
