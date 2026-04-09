@@ -64,3 +64,41 @@ Portable workflows for repeating tasks: `project/skills/*/SKILL.md`.
 
 - Public exports should carry JSDoc; `eslint-plugin-jsdoc` flags gaps as warnings.
 - Hand-written docs describe behavior and integration; generated docs describe machine-checked API shape—avoid duplicating prose between them.
+- Before merge, `npm run docs:generate` must succeed when package exports or public API surface change.
+
+## Documentation Access Order (CRITICAL)
+
+Always follow this sequence when gathering context. Do not skip steps.
+
+1. This `AGENTS.md` — ownership, rules, quality gates
+2. `docs/README.md` — hand-written index; use workspace `docs/README.md` when routing the whole stack
+3. Workspace summary `../docs/summaries/react-din-api.md` (when using the `open-din` container) — compressed API overview
+4. `docs/generated/` from `npm run docs:generate` — reference only, at most two files at a time
+5. Source under `src/` — last resort
+
+## Context Budget Rules
+
+- Load at most two documentation files per step; close or stop using them before opening more
+- Load at most one repository’s context unless the task is explicitly cross-repo
+- Prefer summaries over generated docs; prefer generated docs over source
+- Never bulk-load `docs/generated/` — open only the specific module pages needed
+- Minimize total loaded context at all times
+
+## Code Reading Policy
+
+- Do **not** read source files when documentation answers the question
+- Exhaust summaries and targeted generated docs before opening `src/`
+- When source reading is required, scope to the exact module — do not scan entire directories
+
+## Documentation Ownership
+
+- This repository owns `docs/`, this `AGENTS.md`, and local `docs/generated/` output
+- Workspace summaries (`open-din/docs/summaries/`) must stay consistent when public exports or module boundaries change
+- A public API change is incomplete until component docs, coverage, schema, and the matching summary are updated when the surface changes
+
+## Documentation Freshness
+
+- Regenerate docs after any public export or API change (`npm run docs:generate`)
+- Treat `docs/generated/` as ephemeral — do not treat stale output as authoritative
+- After regeneration, decide whether `../docs/summaries/react-din-api.md` needs an update
+- Do not cite outdated documentation as authoritative
