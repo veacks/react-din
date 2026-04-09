@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "repo": "react-din",
+  "role": "api",
+  "route_when": [
+    "public components",
+    "hooks",
+    "package exports",
+    "docs/components",
+    "patch schema",
+    "coverage manifest"
+  ],
+  "load_order": [
+    "project/ROUTE_CARD.json",
+    "project/SCHEMA_SECTION_SLICES.json or project/PUBLIC_EXPORT_SLICES.json",
+    "project/skills/<matching-skill>/SKILL.md",
+    "exact source file",
+    "exact test file"
+  ],
+  "do_not_route": {
+    "din-core": [
+      "runtime semantics",
+      "registry",
+      "migration",
+      "FFI",
+      "WASM"
+    ],
+    "din-studio": [
+      "editor workflows",
+      "launcher UX",
+      "MCP behavior"
+    ],
+    "din-agents": [
+      "workspace routing",
+      "automation"
+    ]
+  },
+  "entry_points": [
+    "schemas/patch.schema.json",
+    "src/index.ts",
+    "src/patch/types.ts",
+    "project/SCHEMA_SECTION_SLICES.json",
+    "project/PUBLIC_EXPORT_SLICES.json",
+    "project/COVERAGE_MANIFEST.json"
+  ],
+  "task_slices": {
+    "patch_schema": "project/SCHEMA_SECTION_SLICES.json",
+    "public_export": "project/PUBLIC_EXPORT_SLICES.json",
+    "coverage": "project/COVERAGE_MANIFEST.json"
+  },
+  "hard_boundaries": [
+    "react-din owns the published patch schema.",
+    "Do not implement editor workflows here.",
+    "Do not implement Rust runtime logic here."
+  ],
+  "shared_contract_escalation": [
+    "serialization",
+    "persisted node ids",
+    "round-trip parity"
+  ],
+  "validation_commands": [
+    "npm run lint",
+    "npm run typecheck",
+    "npm run ci:check"
+  ]
+}

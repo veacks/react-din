@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "defaults": {
+    "barrel": "src/index.ts",
+    "coverage_manifest": "project/COVERAGE_MANIFEST.json"
+  },
+  "groups": [
+    {
+      "id": "core",
+      "source_index": "src/core/index.ts",
+      "coverage_prefixes": [
+        "component:AudioProvider"
+      ],
+      "docs_root": "docs/components/core"
+    },
+    {
+      "id": "nodes",
+      "source_index": "src/nodes/index.ts",
+      "coverage_prefixes": [
+        "component:Gain",
+        "component:Filter",
+        "component:Osc",
+        "component:Delay",
+        "component:Compressor",
+        "component:Convolver",
+        "component:Panner",
+        "component:StereoPanner",
+        "component:WaveShaper",
+        "component:PresetWaveShaper",
+        "component:ADSR"
+      ],
+      "docs_root": "docs/components/nodes"
+    },
+    {
+      "id": "transport-and-sequencer",
+      "source_index": "src/transport/index.ts",
+      "secondary_indices": [
+        "src/sequencer/index.ts"
+      ],
+      "coverage_prefixes": [
+        "component:TransportProvider",
+        "component:Sequencer",
+        "component:Track",
+        "component:EventTrigger"
+      ]
+    },
+    {
+      "id": "sources-effects-routing",
+      "source_index": "src/sources/index.ts",
+      "secondary_indices": [
+        "src/effects/index.ts",
+        "src/routing/index.ts"
+      ],
+      "coverage_prefixes": [
+        "component:Sampler",
+        "component:TriggeredSampler",
+        "component:Noise",
+        "component:NoiseBurst",
+        "component:MediaStream",
+        "component:ConstantSource",
+        "component:LFO",
+        "component:Reverb",
+        "component:Chorus",
+        "component:Distortion",
+        "component:Phaser",
+        "component:Flanger",
+        "component:Tremolo",
+        "component:EQ3",
+        "component:AuxSend",
+        "component:AuxReturn",
+        "component:MatrixMixer"
+      ]
+    },
+    {
+      "id": "patch-and-midi",
+      "source_index": "src/patch/index.ts",
+      "secondary_indices": [
+        "src/midi/index.ts"
+      ],
+      "coverage_prefixes": [
+        "component:Patch",
+        "component:PatchOutput",
+        "component:PatchRenderer",
+        "component:MidiProvider",
+        "component:MidiNoteInput",
+        "component:MidiCCInput",
+        "component:MidiNoteOutput",
+        "component:MidiCCOutput",
+        "component:MidiTransportSync"
+      ]
+    }
+  ],
+  "notes": [
+    "Start with the group source_index instead of loading the full coverage manifest.",
+    "Open the coverage manifest row only after the target export group is known."
+  ]
+}

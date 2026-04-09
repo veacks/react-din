@@ -3,10 +3,10 @@
 ## LOAD ORDER
 
 1. `AGENTS.md`
-2. `project/SUMMARY.md`
-3. `../docs/summaries/react-din-api.md`
-4. `project/REPO_MANIFEST.json`
-5. One matching file in `project/skills/`
+2. `project/ROUTE_CARD.json`
+3. `project/SCHEMA_SECTION_SLICES.json` or `project/PUBLIC_EXPORT_SLICES.json`
+4. One matching file in `project/skills/`
+5. The exact source file and exact test file
 
 ## ROUTE HERE WHEN
 
@@ -21,8 +21,9 @@
 
 ## ENTRY POINTS
 
-- `src/index.ts`
-- `schemas/patch.schema.json`
+- `project/ROUTE_CARD.json`
+- `project/SCHEMA_SECTION_SLICES.json`
+- `project/PUBLIC_EXPORT_SLICES.json`
 - `project/COVERAGE_MANIFEST.json`
 
 ## SKILL MAP
@@ -36,6 +37,7 @@
 
 - Keep docs, tests, exports, and coverage rows aligned.
 - `react-din` owns the public patch schema.
+- Use slice manifests before opening `src/index.ts` or broad patch helpers.
 - Do not change shared schema or persisted IDs without coordinating `din-core`.
 
 ## VALIDATION

@@ -47,11 +47,14 @@
       "npm run typecheck",
       "npm run ci:check"
     ],
+    "route_card_path": "project/ROUTE_CARD.json",
     "summary_path": "project/SUMMARY.md",
     "api_summary_path": "../docs/summaries/react-din-api.md",
     "repo_manifest_path": "project/REPO_MANIFEST.json",
     "skills_path": "project/skills",
     "linked_manifests": [
+      "project/SCHEMA_SECTION_SLICES.json",
+      "project/PUBLIC_EXPORT_SLICES.json",
       "project/COVERAGE_MANIFEST.json"
     ]
   }

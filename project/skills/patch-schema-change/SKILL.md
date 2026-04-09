@@ -11,8 +11,8 @@
 
 ## STEPS
 
-1. Read `project/SUMMARY.md`, `../docs/summaries/react-din-api.md`, and `project/REPO_MANIFEST.json`.
-2. Update `schemas/patch.schema.json` and any exported patch helpers.
+1. Read `project/ROUTE_CARD.json` and the matching section in `project/SCHEMA_SECTION_SLICES.json`.
+2. Update `schemas/patch.schema.json` and any exact TS contract files named by that section.
 3. Coordinate `din-core` if serialization, persisted IDs, or round-trip behavior changes.
 4. Keep docs, tests, and release-surface notes aligned.
 

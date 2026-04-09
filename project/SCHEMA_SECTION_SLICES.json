@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "defaults": {
+    "schema_file": "schemas/patch.schema.json",
+    "ts_contract_files": [
+      "src/patch/types.ts",
+      "src/patch/document.ts"
+    ],
+    "test_files": [
+      "tests/unit/patch-schema.spec.ts"
+    ]
+  },
+  "sections": [
+    {
+      "id": "document-root",
+      "paths": [
+        "version",
+        "name",
+        "nodes",
+        "connections",
+        "interface"
+      ]
+    },
+    {
+      "id": "node-type-enum",
+      "paths": [
+        "$defs.nodeType.enum"
+      ],
+      "escalate_if": [
+        "runtime parity in din-core",
+        "persisted node ids"
+      ]
+    },
+    {
+      "id": "patch-node-data",
+      "paths": [
+        "$defs.patchNodeData"
+      ]
+    },
+    {
+      "id": "patch-interface",
+      "paths": [
+        "$defs.patchInterface",
+        "$defs.patchInput",
+        "$defs.patchEvent"
+      ]
+    },
+    {
+      "id": "midi-bindings",
+      "paths": [
+        "$defs.patchMidiInput",
+        "$defs.patchMidiOutput",
+        "$defs.patchMidiSyncOutput"
+      ]
+    },
+    {
+      "id": "connections",
+      "paths": [
+        "$defs.patchConnection"
+      ]
+    }
+  ],
+  "notes": [
+    "If a section changes src/patch/types.ts or src/patch/document.ts, update schemas/patch.schema.json in the same diff.",
+    "Escalate to din-core when changing node-type-enum, serialization, persisted ids, or round-trip behavior."
+  ]
+}

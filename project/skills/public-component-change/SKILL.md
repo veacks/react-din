@@ -11,8 +11,8 @@
 
 ## STEPS
 
-1. Read `project/SUMMARY.md`, `../docs/summaries/react-din-api.md`, and `project/REPO_MANIFEST.json`.
-2. Update `src/**` and any public export touched by the request.
+1. Read `project/ROUTE_CARD.json` and the matching group in `project/PUBLIC_EXPORT_SLICES.json`.
+2. Update the exact source module and any public barrel touched by the request.
 3. Update docs, tests, and coverage rows together.
 4. Escalate only if schema, serialization, persisted IDs, or round-trip compatibility changes.
 

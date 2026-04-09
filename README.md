@@ -6,9 +6,9 @@ Public React audio library and published patch schema for DIN.
 
 ## ENTRY FILES
 
-- `project/SUMMARY.md`
-- `schemas/patch.schema.json`
-- `src/index.ts`
+- `project/ROUTE_CARD.json`
+- `project/SCHEMA_SECTION_SLICES.json`
+- `project/PUBLIC_EXPORT_SLICES.json`
 - `project/COVERAGE_MANIFEST.json`
 
 ## DO NOT TOUCH

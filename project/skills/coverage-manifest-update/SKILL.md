@@ -11,7 +11,7 @@
 
 ## STEPS
 
-1. Read the target summary files plus `project/COVERAGE_MANIFEST.json`.
+1. Read `project/ROUTE_CARD.json`, the matching export slice, and `project/COVERAGE_MANIFEST.json`.
 2. Update the affected manifest row with source, docs, tests, and scenarios.
 3. Remove orphan references or add missing coverage rows.
 4. Keep the manifest aligned with exported surface only.

@@ -7,11 +7,13 @@ import {
     importPatch,
     MidiProvider,
     Patch,
+    patchToGraphDocument,
     PatchOutput,
     PatchRenderer,
     type PatchDocument,
     type PatchNode,
 } from '@open-din/react';
+import { getTransportConnections } from '../../src/patch/document';
 
 afterEach(() => {
     cleanup();
@@ -675,5 +677,53 @@ describe('patch import/export runtime', () => {
                 output: { id: 'out', label: 'Audio Out', type: 'audio' },
             },
         });
+    });
+
+    it('round-trips dynamic graph handles through patch migration', () => {
+        const patch = graphDocumentToPatch({
+            name: 'Parity Graph',
+            nodes: [
+                {
+                    id: 'input-1',
+                    position: { x: 0, y: 0 },
+                    data: {
+                        type: 'input',
+                        label: 'Input',
+                        params: [{ id: 'gain', name: 'Gain', type: 'float', defaultValue: 0.5, value: 0.5, min: 0, max: 1 }],
+                    },
+                },
+                {
+                    id: 'switch-1',
+                    position: { x: 100, y: 0 },
+                    data: { type: 'switch', label: 'Switch', inputs: 4 },
+                },
+                {
+                    id: 'matrix-1',
+                    position: { x: 200, y: 0 },
+                    data: { type: 'matrixMixer', label: 'Matrix', inputs: 2, outputs: 2 },
+                },
+                {
+                    id: 'transport-1',
+                    position: { x: 300, y: 0 },
+                    data: { type: 'transport', label: 'Transport', bpm: 120, playing: false, beatsPerBar: 4, beatUnit: 4, stepsPerBeat: 4, barsPerPhrase: 4, swing: 0 },
+                },
+                {
+                    id: 'player-1',
+                    position: { x: 400, y: 0 },
+                    data: { type: 'midiPlayer', label: 'MIDI Player', midiFileName: 'clip.mid', loaded: false, loop: false },
+                },
+            ],
+            edges: [
+                { source: 'input-1', sourceHandle: 'param:gain', target: 'switch-1', targetHandle: 'in_3' },
+                { source: 'transport-1', sourceHandle: 'out', target: 'player-1', targetHandle: 'transport' },
+            ],
+        });
+
+        const migrated = patchToGraphDocument(patch, { graphId: 'graph-1', createdAt: 1, updatedAt: 1, order: 0 });
+        expect(migrated.edges.find((edge) => edge.target === 'switch-1')?.targetHandle).toBe('in_3');
+        expect(migrated.nodes.find((node) => node.id === 'matrix-1')?.data).toMatchObject({ inputs: 2, outputs: 2 });
+
+        const nodeById = new Map(patch.nodes.map((node) => [node.id, node] as const));
+        expect(getTransportConnections(patch.connections, nodeById)).toEqual(new Set(['player-1']));
     });
 });
