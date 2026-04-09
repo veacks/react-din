@@ -11,6 +11,8 @@ Render a versioned `PatchDocument` as a live `@open-din/react` graph, or derive 
 - Flat props generated from patch `interface.events[]`: change-driven trigger tokens keyed by the exported safe camelCase names.
 - `midi.inputs`: explicit note/CC bindings keyed by `interface.midiInputs[]`.
 - `midi.outputs`: explicit output and sync bindings keyed by `interface.midiOutputs[]`.
+- Patch nodes in the serialized contract can carry `patchAsset`, `patchInline`, `patchName`, `inputs`, `outputs`, and cached implicit audio metadata on `data`.
+- `Patch` and `PatchOutput` are the public runtime companions for nested patch source resolution and output naming.
 
 ## Defaults
 - `includeProvider`: `false`
@@ -22,7 +24,9 @@ Render a versioned `PatchDocument` as a live `@open-din/react` graph, or derive 
 - Use `importPatch(patch, options?)` when you want a reusable typed component instead of passing `patch` on every render.
 - The public patch JSON contract is described by [`schemas/patch.schema.json`](../../../schemas/patch.schema.json) and published with the package at `@open-din/react/patch/schema.json`.
 - Patch public props come from the patch interface entries stored in `interface.inputs[]` and `interface.events[]`.
+- Patch node boundary metadata uses `SlotType` and `PatchSlot` values; `patchInline` takes precedence over `patchAsset`, and implicit audio `in` / `out` handles are not duplicated in the cached slot arrays.
 - Patch MIDI bindings stay explicit in host code so the app keeps ownership of permissions, selected ports, and `MidiProvider`.
+- Nested patch nodes resolve their source with `Patch` semantics: inline data wins over assets, repeated loads are cached, and recursive references throw explicitly.
 - When a patch contains a transport node or a bound MIDI sync output, `includeProvider` wraps the content in `TransportProvider`; `midi-master` sync forces transport `mode="manual"`.
 - Export/import round-trips preserve graph positions, public interface metadata, and unresolved external `assetPath` references for sampler and convolver nodes.
 
@@ -31,6 +35,8 @@ Render a versioned `PatchDocument` as a live `@open-din/react` graph, or derive 
 - Missing `MidiProvider` means MIDI output bindings cannot send messages.
 - Missing assets or a wrong `assetRoot` keep sampler/convolver nodes unresolved and silent.
 - Omitting an explicit MIDI binding leaves the corresponding patch endpoint inactive by design.
+- Patch nodes are validated as contract data in this package, and nested patch execution now resolves through the public `Patch` runtime surface.
+- `PatchInput` runtime behavior remains deferred to later feature work.
 
 ## Example
 ```tsx
@@ -69,4 +75,5 @@ function App() {
 
 ## Test Coverage
 - Automated: `tests/library/patch.spec.tsx`
+- Contract validation: `tests/unit/patch-schema.spec.ts`
 - Scenarios: `F01-S05`, `F04-S03`

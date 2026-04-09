@@ -31,6 +31,7 @@ import {
     migratePatchDocument,
     resolvePatchAssetPath,
 } from './document';
+import { ResolvedPatchSource } from './runtime';
 import type {
     ImportPatchOptions,
     PatchConnection,
@@ -40,6 +41,7 @@ import type {
     PatchNode,
     PatchRendererProps,
     PatchProps,
+    PatchRuntimeProps,
 } from './types';
 
 type AnyNodeData = Record<string, unknown> & { type: string; label?: string };
@@ -73,6 +75,7 @@ const AUDIO_NODE_COMPONENTS: Record<string, ComponentType<any>> = {
     noise: Noise,
     waveShaper: WaveShaper,
     sampler: Sampler,
+    patch: NestedPatchRuntime,
 };
 
 const DATA_NODE_TYPES = new Set(['math', 'compare', 'mix', 'clamp', 'switch']);
@@ -697,6 +700,7 @@ const RuntimeRenderer: React.FC<{
                 paramsByHandle,
                 lfoValues,
                 midiInputBindings,
+                midi,
                 getDataValue,
             });
 
@@ -796,6 +800,7 @@ const RuntimeRenderer: React.FC<{
         getTrackInfo,
         graph,
         lfoValues,
+        midi,
         midiInputBindings,
         paramsByHandle,
     ]);
@@ -892,6 +897,7 @@ function buildRuntimeProps(
         paramsByHandle: Map<string, number>;
         lfoValues: LfoValues;
         midiInputBindings: Map<string, MidiNoteValue | MidiCCValue>;
+        midi?: PatchMidiBindings<PatchDocument>;
         getDataValue: (nodeId: string, visiting?: Set<string>) => number;
     }
 ): Record<string, unknown> {
@@ -1149,6 +1155,13 @@ function buildRuntimeProps(
             }
             break;
         }
+        case 'patch':
+            props.patchInline = data.patchInline;
+            props.patchAsset = data.patchAsset;
+            props.patchName = data.patchName;
+            props.assetRoot = context.assetRoot;
+            props.midi = context.midi;
+            break;
         case 'matrixMixer':
             props.inputs = asNumber(data.inputs, 2);
             props.outputs = asNumber(data.outputs, 2);
@@ -1189,6 +1202,41 @@ interface PatchFeedbackDelayProps {
     feedback?: number;
     maxDelayTime?: number;
     bypass?: boolean;
+}
+
+interface PatchRuntimeNodeProps extends PatchRuntimeProps {
+    children?: ReactNode;
+}
+
+function NestedPatchRuntime({
+    children,
+    includeProvider = false,
+    assetRoot,
+    midi,
+    patchInline,
+    patchAsset,
+    patchName,
+}: PatchRuntimeNodeProps) {
+    return (
+        <ResolvedPatchSource
+            patchInline={patchInline}
+            patchAsset={patchAsset}
+            patchName={patchName}
+            assetRoot={assetRoot}
+        >
+            {(patch) => (
+                <>
+                    {children}
+                    {React.createElement(PatchRenderer as unknown as ComponentType<Record<string, unknown>>, {
+                        patch,
+                        includeProvider,
+                        assetRoot,
+                        midi,
+                    })}
+                </>
+            )}
+        </ResolvedPatchSource>
+    );
 }
 
 function PatchFeedbackDelay({

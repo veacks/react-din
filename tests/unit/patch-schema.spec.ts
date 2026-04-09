@@ -21,10 +21,17 @@ describe('patch schema contract', () => {
                 'midiCCOutput',
                 'midiSync',
                 'midiPlayer',
+                'patch',
                 'sampler',
                 'convolver',
                 'output',
             ])
+        );
+        expect(patchSchema.$defs.slotType.enum).toEqual(['audio', 'midi']);
+        expect(patchSchema.$defs.patchSlot.required).toEqual(expect.arrayContaining(['id', 'label', 'type']));
+        expect(patchSchema.$defs.patchAudioMetadata.required).toEqual(expect.arrayContaining(['input', 'output']));
+        expect(Object.keys(patchSchema.$defs.patchNodeData.properties)).toEqual(
+            expect.arrayContaining(['patchAsset', 'patchInline', 'patchName', 'inputs', 'outputs', 'audio'])
         );
     });
 
@@ -48,6 +55,54 @@ describe('patch schema contract', () => {
             events: [],
             midiInputs: [],
             midiOutputs: [],
+        });
+    });
+
+    it('canonicalizes patch node boundary metadata with implicit audio slots', () => {
+        const inlinePatch = graphDocumentToPatch({
+            name: 'Inline Child Patch',
+            nodes: [],
+            edges: [],
+        });
+
+        const patch = graphDocumentToPatch({
+            name: 'Patch Node Contract',
+            nodes: [
+                {
+                    id: 'patch-1',
+                    position: { x: 0, y: 0 },
+                    data: {
+                        type: 'patch',
+                        label: 'Nested Patch',
+                        patchAsset: '/patches/child.din',
+                        patchInline: inlinePatch,
+                        patchName: 'Child Patch',
+                        inputs: [{ id: 'keys', label: 'Keys', type: 'midi' }],
+                        outputs: [{ id: 'mix', label: 'Mix', type: 'audio' }],
+                        audio: {
+                            input: { id: 'in', label: 'Audio In', type: 'audio' },
+                            output: { id: 'out', label: 'Audio Out', type: 'audio' },
+                        },
+                    },
+                },
+            ],
+            edges: [],
+        });
+
+        expect(patch.nodes[0]).toMatchObject({
+            type: 'patch',
+            data: {
+                type: 'patch',
+                patchAsset: '/patches/child.din',
+                patchInline: inlinePatch,
+                patchName: 'Child Patch',
+                inputs: [{ id: 'keys', label: 'Keys', type: 'midi' }],
+                outputs: [{ id: 'mix', label: 'Mix', type: 'audio' }],
+                audio: {
+                    input: { id: 'in', label: 'Audio In', type: 'audio' },
+                    output: { id: 'out', label: 'Audio Out', type: 'audio' },
+                },
+            },
         });
     });
 });

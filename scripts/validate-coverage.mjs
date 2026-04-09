@@ -34,6 +34,8 @@ const expectedPublicSources = [
     'src/effects/Reverb.tsx',
     'src/effects/Chorus.tsx',
     'src/effects/Distortion.tsx',
+    'src/patch/Patch.tsx',
+    'src/patch/PatchOutput.tsx',
     'src/patch/PatchRenderer.tsx',
     'src/midi/MidiProvider.tsx',
     'src/midi/MidiNoteInput.tsx',

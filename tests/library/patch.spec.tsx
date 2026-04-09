@@ -6,6 +6,8 @@ import {
     graphDocumentToPatch,
     importPatch,
     MidiProvider,
+    Patch,
+    PatchOutput,
     PatchRenderer,
     type PatchDocument,
     type PatchNode,
@@ -406,6 +408,136 @@ describe('patch import/export runtime', () => {
         });
     });
 
+    it('renders nested patch nodes from inline sources before falling back to patchAsset', async () => {
+        const access = new MockMIDIAccess();
+        const output = new MockMIDIOutput('out-a', 'Nested CC');
+        access.setOutputs([output]);
+        installMidiAccess(access);
+        const runtime = createMidiRuntime();
+
+        const nestedPatch = graphDocumentToPatch({
+            name: 'Nested Patch',
+            nodes: [
+                {
+                    id: 'cc-out-1',
+                    position: { x: 0, y: 0 },
+                    data: {
+                        type: 'midiCCOutput',
+                        label: 'CC Out',
+                        outputId: 'out-a',
+                        channel: 1,
+                        cc: 74,
+                        value: 64,
+                        valueFormat: 'raw',
+                    },
+                },
+            ],
+            edges: [],
+        });
+
+        const outerPatch = graphDocumentToPatch({
+            name: 'Outer Patch',
+            nodes: [
+                {
+                    id: 'patch-1',
+                    position: { x: 0, y: 0 },
+                    data: {
+                        type: 'patch',
+                        label: 'Nested Patch',
+                        patchAsset: '/patches/ignored.patch.json',
+                        patchInline: nestedPatch,
+                        patchName: 'Nested Patch',
+                    },
+                },
+            ],
+            edges: [],
+        });
+
+        const fetchMock = vi.fn();
+        vi.stubGlobal('fetch', fetchMock);
+
+        render(
+            <MidiProvider runtime={runtime} requestOnMount>
+                <PatchRenderer patch={outerPatch} midi={{ outputs: { ccOut: {} } }} />
+            </MidiProvider>
+        );
+
+        await waitFor(() => {
+            expect(output.sent.some((bytes) => bytes[0] === 0xB0 && bytes[1] === 74 && bytes[2] === 64)).toBe(true);
+        });
+
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('caches repeated asset-backed Patch loads by resolved asset path', async () => {
+        const assetPatch = graphDocumentToPatch({
+            name: 'Asset Patch',
+            nodes: [],
+            edges: [],
+        });
+
+        const fetchMock = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            text: async () => JSON.stringify(assetPatch),
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        render(
+            <>
+                <Patch patchAsset="/patches/shared.patch.json" />
+                <Patch patchAsset="/patches/shared.patch.json" />
+            </>
+        );
+
+        await waitFor(() => {
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    it('renders PatchOutput as a transparent wrapper', () => {
+        const { getByText } = render(
+            <PatchOutput>
+                <span>slot</span>
+            </PatchOutput>
+        );
+
+        expect(getByText('slot')).toBeTruthy();
+    });
+
+    it('rejects recursive inline patch references', () => {
+        const recursivePatch: PatchDocument = {
+            version: 1,
+            name: 'Recursive Patch',
+            nodes: [],
+            connections: [],
+            interface: {
+                inputs: [],
+                events: [],
+                midiInputs: [],
+                midiOutputs: [],
+            },
+        };
+
+        (recursivePatch as PatchDocument & { nodes: PatchNode[] }).nodes = [
+            {
+                id: 'patch-1',
+                position: { x: 0, y: 0 },
+                data: {
+                    type: 'patch',
+                    label: 'Recursive',
+                    patchInline: recursivePatch,
+                    patchName: 'Recursive Patch',
+                },
+            } as PatchNode,
+        ];
+
+        expect(() => {
+            render(<Patch patchInline={recursivePatch} />);
+        }).toThrow(/Recursive patch reference/i);
+    });
+
     it('rejects invalid patches', () => {
         const validPatch = graphDocumentToPatch({
             name: 'Valid',
@@ -456,5 +588,92 @@ describe('patch import/export runtime', () => {
         expect(() => importPatch(unsupportedVersion)).toThrow(/Unsupported patch version/);
         expect(() => importPatch(unknownNodeType)).toThrow(/unsupported node type|unsupported source handle|unsupported target handle|missing a valid data\.type|mismatched type metadata/i);
         expect(() => importPatch(invalidHandle)).toThrow(/unsupported target handle/);
+    });
+
+    it('accepts patch nodes with implicit audio and named slot handles', () => {
+        const inlinePatch = graphDocumentToPatch({
+            name: 'Inline Child',
+            nodes: [],
+            edges: [],
+        });
+
+        const patch = graphDocumentToPatch({
+            name: 'Nested Patch Contract',
+            nodes: [
+                {
+                    id: 'event-1',
+                    position: { x: 0, y: 0 },
+                    data: {
+                        type: 'eventTrigger',
+                        label: 'Bang',
+                        token: 0,
+                        mode: 'change',
+                        cooldownMs: 0,
+                        velocity: 0.75,
+                        duration: 0.05,
+                        note: 67,
+                        trackId: 'bang',
+                    },
+                },
+                {
+                    id: 'patch-1',
+                    position: { x: 180, y: 0 },
+                    data: {
+                        type: 'patch',
+                        label: 'Nested Patch',
+                        patchAsset: '/patches/child.patch.json',
+                        patchInline: inlinePatch,
+                        patchName: 'Child Patch',
+                        inputs: [{ id: 'keys', label: 'Keys', type: 'midi' }],
+                        outputs: [{ id: 'mix', label: 'Mix', type: 'audio' }],
+                        audio: {
+                            input: { id: 'in', label: 'Audio In', type: 'audio' },
+                            output: { id: 'out', label: 'Audio Out', type: 'audio' },
+                        },
+                    },
+                },
+                {
+                    id: 'output-1',
+                    position: { x: 360, y: 0 },
+                    data: {
+                        type: 'output',
+                        label: 'Output',
+                        playing: false,
+                        masterGain: 0.5,
+                    },
+                },
+            ],
+            edges: [
+                {
+                    id: 'bang-in',
+                    source: 'event-1',
+                    sourceHandle: 'trigger',
+                    target: 'patch-1',
+                    targetHandle: 'in:keys',
+                },
+                {
+                    id: 'patch-out',
+                    source: 'patch-1',
+                    sourceHandle: 'out',
+                    target: 'output-1',
+                    targetHandle: 'in',
+                },
+            ],
+        });
+
+        const Patch = importPatch(patch);
+
+        expect(Patch).toBeTypeOf('function');
+        expect(patch.nodes.find((node) => node.id === 'patch-1')?.data).toMatchObject({
+            type: 'patch',
+            patchAsset: '/patches/child.patch.json',
+            patchName: 'Child Patch',
+            inputs: [{ id: 'keys', label: 'Keys', type: 'midi' }],
+            outputs: [{ id: 'mix', label: 'Mix', type: 'audio' }],
+            audio: {
+                input: { id: 'in', label: 'Audio In', type: 'audio' },
+                output: { id: 'out', label: 'Audio Out', type: 'audio' },
+            },
+        });
     });
 });

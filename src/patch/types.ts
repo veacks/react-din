@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type {
     MidiCCOutputProps,
     MidiCCValue,
@@ -8,20 +9,58 @@ import type {
     MidiValueFormat,
 } from '../midi/types';
 
+export type SlotType = 'audio' | 'midi';
+
 export interface PatchPosition {
     x: number;
     y: number;
+}
+
+export interface PatchSlot {
+    id: string;
+    label: string;
+    type: SlotType;
+    [key: string]: unknown;
+}
+
+export interface PatchAudioMetadata {
+    input: PatchSlot;
+    output: PatchSlot;
+    [key: string]: unknown;
+}
+
+export interface PatchRuntimeProps {
+    patchInline?: PatchDocument | null;
+    patchAsset?: string | null;
+    patchName?: string;
+    includeProvider?: boolean;
+    assetRoot?: string;
+    midi?: PatchMidiBindings<PatchDocument>;
+    children?: ReactNode;
+}
+
+export interface PatchOutputProps {
+    name?: string;
+    children?: ReactNode;
+}
+
+export interface PatchNodeData<TType extends string = string> {
+    type: TType;
+    label?: string;
+    patchAsset?: string | null;
+    patchInline?: PatchDocument | null;
+    patchName?: string;
+    inputs?: readonly PatchSlot[];
+    outputs?: readonly PatchSlot[];
+    audio?: PatchAudioMetadata | null;
+    [key: string]: unknown;
 }
 
 export interface PatchNode<TType extends string = string> {
     id: string;
     type: TType;
     position?: PatchPosition;
-    data: {
-        type: TType;
-        label?: string;
-        [key: string]: unknown;
-    };
+    data: PatchNodeData<TType>;
 }
 
 export interface PatchConnection {

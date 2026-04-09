@@ -493,6 +493,34 @@
       ]
     },
     {
+      "id": "component:Patch",
+      "kind": "public-component",
+      "name": "Patch",
+      "source": "src/patch/Patch.tsx",
+      "docs": "docs/components/patch/Patch.md",
+      "tests": [
+        "tests/library/patch.spec.tsx"
+      ],
+      "scenarios": [
+        "F01-S05",
+        "F04-S03"
+      ]
+    },
+    {
+      "id": "component:PatchOutput",
+      "kind": "public-component",
+      "name": "PatchOutput",
+      "source": "src/patch/PatchOutput.tsx",
+      "docs": "docs/components/patch/PatchOutput.md",
+      "tests": [
+        "tests/library/patch.spec.tsx"
+      ],
+      "scenarios": [
+        "F01-S05",
+        "F04-S03"
+      ]
+    },
+    {
       "id": "component:PatchRenderer",
       "kind": "public-component",
       "name": "PatchRenderer",

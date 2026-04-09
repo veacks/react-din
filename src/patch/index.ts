@@ -6,10 +6,13 @@ export {
     migratePatchDocument,
 } from './document';
 
+export { Patch } from './Patch';
+export { PatchOutput } from './PatchOutput';
 export { importPatch, PatchRenderer } from './PatchRenderer';
 
 export type {
     ImportPatchOptions,
+    PatchAudioMetadata,
     PatchConnection,
     PatchDocument,
     PatchEvent,
@@ -26,7 +29,12 @@ export type {
     PatchMidiOutputBindings,
     PatchMidiSyncOutput,
     PatchNode,
+    PatchNodeData,
     PatchPosition,
+    PatchOutputProps,
     PatchProps,
+    PatchRuntimeProps,
+    PatchSlot,
+    SlotType,
     PatchRendererProps,
 } from './types';

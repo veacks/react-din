@@ -281,12 +281,15 @@ export {
     graphDocumentToPatch,
     patchToGraphDocument,
     migratePatchDocument,
+    Patch,
+    PatchOutput,
     importPatch,
     PatchRenderer,
 } from './patch';
 
 export type {
     ImportPatchOptions,
+    PatchAudioMetadata,
     PatchConnection,
     PatchDocument,
     PatchEvent,
@@ -303,9 +306,14 @@ export type {
     PatchMidiOutputBindings,
     PatchMidiSyncOutput,
     PatchNode,
+    PatchNodeData,
     PatchPosition,
+    PatchOutputProps,
     PatchProps,
+    PatchRuntimeProps,
+    PatchSlot,
     PatchRendererProps,
+    SlotType,
 } from './patch';
 
 // -----------------------------------------------------------------------------

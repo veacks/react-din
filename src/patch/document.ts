@@ -1,6 +1,7 @@
 import type { MidiTransportSyncMode, MidiValueFormat } from '../midi/types';
 import { ensureUniqueName, toSafeIdentifier } from './naming';
 import type {
+    PatchAudioMetadata,
     PatchConnection,
     PatchDocument,
     PatchEvent,
@@ -15,6 +16,8 @@ import type {
     PatchMidiSyncOutput,
     PatchNode,
     PatchPosition,
+    PatchSlot,
+    SlotType,
 } from './types';
 
 export const PATCH_DOCUMENT_VERSION = 1 as const;
@@ -113,6 +116,7 @@ const PATCH_NODE_TYPES = new Set([
     'midiCCOutput',
     'midiSync',
     'midiPlayer',
+    'patch',
 ]);
 
 const MODULATION_TARGET_HANDLES = new Set([
@@ -234,8 +238,78 @@ function resolveMidiPlayerAssetPath(data: Record<string, unknown>): string {
     return ensurePathPrefix('', '/midi', fileName || 'clip.mid');
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizeSlotType(value: unknown, fallback: SlotType = 'audio'): SlotType {
+    if (value === 'audio' || value === 'midi') return value;
+    return fallback;
+}
+
+function normalizePatchSlot(slot: unknown, fallbackId: string, fallbackLabel: string): PatchSlot {
+    const data = isRecord(slot) ? deepClone(slot) : {};
+
+    return {
+        id: asString(data.id).trim() || fallbackId,
+        label: asString(data.label).trim() || fallbackLabel,
+        type: normalizeSlotType(data.type),
+    } satisfies PatchSlot;
+}
+
+function normalizePatchSlotList(value: unknown, direction: 'input' | 'output'): PatchSlot[] {
+    if (!Array.isArray(value)) return [];
+
+    const implicitId = direction === 'input' ? 'in' : 'out';
+    const fallbackPrefix = direction === 'input' ? 'input' : 'output';
+    const fallbackLabelPrefix = direction === 'input' ? 'Input' : 'Output';
+
+    return value.flatMap((slot, index) => {
+        const normalized = normalizePatchSlot(slot, `${fallbackPrefix}-${index + 1}`, `${fallbackLabelPrefix} ${index + 1}`);
+        if (normalized.id === implicitId && normalized.type === 'audio') return [];
+        return [normalized];
+    });
+}
+
+function normalizePatchAudioSlot(slot: unknown, direction: 'input' | 'output'): PatchSlot {
+    const data = isRecord(slot) ? deepClone(slot) : {};
+
+    return {
+        id: direction === 'input' ? 'in' : 'out',
+        label: asString(data.label).trim() || (direction === 'input' ? 'Audio In' : 'Audio Out'),
+        type: 'audio',
+    } satisfies PatchSlot;
+}
+
+function normalizePatchAudioMetadata(value: unknown): PatchAudioMetadata {
+    const data = isRecord(value) ? deepClone(value) : {};
+
+    return {
+        input: normalizePatchAudioSlot(data.input, 'input'),
+        output: normalizePatchAudioSlot(data.output, 'output'),
+    };
+}
+
+function resolvePatchName(data: Record<string, unknown>): string {
+    const explicit = asString(data.patchName).trim();
+    if (explicit) return explicit;
+
+    const inlinePatch = isRecord(data.patchInline) ? data.patchInline : null;
+    const inlineName = inlinePatch ? asString(inlinePatch.name).trim() : '';
+    if (inlineName) return inlineName;
+
+    const assetName = fileNameFromPath(asString(data.patchAsset));
+    if (assetName) {
+        const stripped = assetName.replace(/\.patch\.json$/i, '').replace(/\.din$/i, '').trim();
+        return stripped || assetName;
+    }
+
+    return 'Patch';
+}
+
 function sanitizeNodeData(data: Record<string, unknown>): Record<string, unknown> {
     const next = deepClone(data);
+    const inlinePatch = isRecord(data.patchInline) ? data.patchInline : null;
 
     if (next.type === 'sampler') {
         next.assetPath = resolveSamplerAssetPath(next);
@@ -256,6 +330,32 @@ function sanitizeNodeData(data: Record<string, unknown>): Record<string, unknown
         delete next.loaded;
     }
 
+    if (next.type === 'patch') {
+        const patchAsset = asString(next.patchAsset).trim();
+        if (patchAsset) {
+            next.patchAsset = patchAsset;
+        } else {
+            delete next.patchAsset;
+        }
+
+        if (inlinePatch) {
+            next.patchInline = inlinePatch;
+        } else {
+            delete next.patchInline;
+        }
+
+        next.patchName = resolvePatchName(next);
+        next.inputs = normalizePatchSlotList(next.inputs, 'input');
+        next.outputs = normalizePatchSlotList(next.outputs, 'output');
+        next.audio = normalizePatchAudioMetadata(next.audio);
+
+        // Strip Studio-only tracking fields that must not leak into exported documents.
+        delete next.patchSourceId;
+        delete next.patchSourceKind;
+        delete next.sourceUpdatedAt;
+        delete next.sourceError;
+    }
+
     if (next.type === 'output' || next.type === 'transport') {
         next.playing = false;
     }
@@ -265,6 +365,7 @@ function sanitizeNodeData(data: Record<string, unknown>): Record<string, unknown
 
 function hydrateNodeDataForGraph(data: Record<string, unknown>): Record<string, unknown> {
     const next = deepClone(data);
+    const inlinePatch = isRecord(data.patchInline) ? data.patchInline : null;
 
     if (next.type === 'sampler') {
         const assetPath = resolveSamplerAssetPath(next);
@@ -291,6 +392,14 @@ function hydrateNodeDataForGraph(data: Record<string, unknown>): Record<string, 
         next.loaded = false;
     }
 
+    if (next.type === 'patch') {
+        if (inlinePatch) {
+            next.patchInline = inlinePatch;
+        } else {
+            delete next.patchInline;
+        }
+    }
+
     if (next.type === 'output' || next.type === 'transport') {
         next.playing = false;
     }
@@ -300,6 +409,23 @@ function hydrateNodeDataForGraph(data: Record<string, unknown>): Record<string, 
 
 function getInputParamHandleId(paramId: string): string {
     return `${PATCH_INPUT_HANDLE_PREFIX}${paramId}`;
+}
+
+function getPatchSlotHandleIds(node: PatchNode, direction: 'input' | 'output'): Set<string> {
+    const data = node.data as Record<string, unknown>;
+    const handlePrefix = direction === 'input' ? 'in:' : 'out:';
+    const implicitHandle = direction === 'input' ? 'in' : 'out';
+    const slots = Array.isArray(direction === 'input' ? data.inputs : data.outputs)
+        ? ((direction === 'input' ? data.inputs : data.outputs) as Array<Record<string, unknown>>)
+        : [];
+    const handleIds = new Set<string>([implicitHandle]);
+
+    slots.forEach((slot, index) => {
+        const slotId = asString(slot.id).trim() || `${direction}-${index + 1}`;
+        handleIds.add(`${handlePrefix}${slotId}`);
+    });
+
+    return handleIds;
 }
 
 function isInputLikeNodeType(type: string): boolean {
@@ -338,6 +464,7 @@ function getSourceHandleIds(node: PatchNode): Set<string> {
     if (type === 'adsr') handleIds.add('envelope');
     if (type === 'midiNote') ['trigger', 'frequency', 'note', 'gate', 'velocity'].forEach((id) => handleIds.add(id));
     if (type === 'midiCC') ['normalized', 'raw'].forEach((id) => handleIds.add(id));
+    if (type === 'patch') getPatchSlotHandleIds(node, 'output').forEach((id) => handleIds.add(id));
     if (isInputLikeNodeType(type)) {
         const params = Array.isArray((node.data as Record<string, unknown>).params)
             ? ((node.data as Record<string, unknown>).params as Array<Record<string, unknown>>)
@@ -378,6 +505,7 @@ function getTargetHandleIds(node: PatchNode): Set<string> {
     if (type === 'sampler') ['trigger', 'playbackRate', 'detune'].forEach((id) => handleIds.add(id));
     if (type === 'midiNoteOutput') ['trigger', 'gate', 'note', 'frequency', 'velocity'].forEach((id) => handleIds.add(id));
     if (type === 'midiCCOutput') handleIds.add('value');
+    if (type === 'patch') getPatchSlotHandleIds(node, 'input').forEach((id) => handleIds.add(id));
 
     MODULATION_TARGET_HANDLES.forEach((id) => handleIds.add(id));
     if (type === 'switch') {
@@ -603,12 +731,31 @@ export function isAudioConnectionLike(
     nodeById: Map<string, PatchNode>
 ): boolean {
     const sourceNode = nodeById.get(connection.source);
-    if (!sourceNode || !isAudioNodeType(sourceNode.data.type)) return false;
     const sourceHandle = connection.sourceHandle ?? '';
-    const isAudioOutHandle = sourceHandle === 'out' || /^out\d+$/.test(sourceHandle);
-    return isAudioOutHandle
-        && Boolean(connection.target)
+    if (!sourceNode) return false;
+
+    const isAudioTargetHandle = Boolean(connection.target)
         && ((connection.targetHandle ?? '') === 'in' || (connection.targetHandle ?? '').startsWith('in'));
+
+    if (isAudioNodeType(sourceNode.data.type)) {
+        const isAudioOutHandle = sourceHandle === 'out' || /^out\d+$/.test(sourceHandle);
+        return isAudioOutHandle && isAudioTargetHandle;
+    }
+
+    if (sourceNode.data.type !== 'patch' || !(sourceHandle === 'out' || sourceHandle.startsWith('out:'))) {
+        return false;
+    }
+
+    if (sourceHandle === 'out') {
+        return isAudioTargetHandle;
+    }
+
+    const outputId = sourceHandle.slice('out:'.length);
+    const outputs = Array.isArray((sourceNode.data as Record<string, unknown>).outputs)
+        ? ((sourceNode.data as Record<string, unknown>).outputs as Array<Record<string, unknown>>)
+        : [];
+    const outputSlot = outputs.find((slot) => asString(slot.id).trim() === outputId);
+    return normalizeSlotType(outputSlot?.type, 'midi') === 'audio' && isAudioTargetHandle;
 }
 
 export function getTransportConnections(
