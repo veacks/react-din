@@ -5,6 +5,7 @@
 // Types
 export type {
     EnvelopeConfig,
+    EnvelopeProps,
     OscillatorConfig,
     OscillatorWaveType,
     FilterConfig,
@@ -34,6 +35,9 @@ export { useEnvelope } from './useEnvelope';
 export type { UseEnvelopeResult } from './useEnvelope';
 
 // Components
+export { Envelope } from './Envelope';
+export { Voice } from './Voice';
+export type { VoiceProps, VoiceRenderProps } from './Voice';
 export { Synth } from './Synth';
 export { MonoSynth } from './MonoSynth';
 export { FMSynth } from './FMSynth';
