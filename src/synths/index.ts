@@ -15,7 +15,6 @@ export type {
     FMSynthProps,
     AMSynthProps,
     NoiseSynthProps,
-    EnvelopeProps,
 } from './types';
 
 export type {
@@ -35,12 +34,9 @@ export { useEnvelope } from './useEnvelope';
 export type { UseEnvelopeResult } from './useEnvelope';
 
 // Components
-export { Envelope } from './Envelope';
 export { Synth } from './Synth';
 export { MonoSynth } from './MonoSynth';
 export { FMSynth } from './FMSynth';
 export { AMSynth } from './AMSynth';
 export { NoiseSynth } from './NoiseSynth';
 export { DrumSynth } from './DrumSynth';
-export { Voice, type VoiceProps, type VoiceRenderProps } from './Voice';
-export { PolyVoice, type PolyVoiceProps } from './PolyVoice';

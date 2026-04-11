@@ -1,48 +1,29 @@
 import { useEffect, type FC } from 'react';
-import type { StereoPannerProps } from './types';
-import { useAudioNode, useAudioParam } from './useAudioNode';
 import { AudioOutProvider } from '../core/AudioOutContext';
+import type { StereoPannerProps } from './types';
+import { useWasmNode } from './useAudioNode';
 
-/**
- * StereoPanner node component for simple left/right panning.
- *
- * @example
- * ```tsx
- * // Pan to the left
- * <StereoPanner pan={-0.7}>
- *   <Sampler src="/guitar.wav" />
- * </StereoPanner>
- *
- * // Center (default)
- * <StereoPanner pan={0}>
- *   <Sampler src="/vocals.wav" />
- * </StereoPanner>
- * ```
- */
 export const StereoPanner: FC<StereoPannerProps> = ({
     children,
     nodeRef: externalRef,
     bypass = false,
     pan = 0,
-    id,
 }) => {
-    const { nodeRef, context } = useAudioNode<StereoPannerNode>({
-        createNode: (ctx) => ctx.createStereoPanner(),
+    const { nodeId } = useWasmNode('stereoPanner', {
+        pan,
         bypass,
     });
 
-    // Sync external ref
     useEffect(() => {
-        if (externalRef) {
-            (externalRef as React.MutableRefObject<StereoPannerNode | null>).current = nodeRef.current;
-        }
-    }, [externalRef, nodeRef.current]);
-
-    // Apply pan parameter
-    useAudioParam(nodeRef.current?.pan, pan);
+        if (!externalRef) return;
+        (externalRef as React.MutableRefObject<StereoPannerNode | null>).current = {} as StereoPannerNode;
+        return () => {
+            (externalRef as React.MutableRefObject<StereoPannerNode | null>).current = null;
+        };
+    }, [externalRef]);
 
     return (
-        <AudioOutProvider node={bypass ? null : nodeRef.current}>
+        <AudioOutProvider node={null} nodeId={nodeId}>
             {children}
         </AudioOutProvider>
     );

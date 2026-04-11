@@ -3,6 +3,7 @@
 // =============================================================================
 
 import type { NoteName, NoteInput, ParsedNote } from './types';
+import { withWasm } from '../runtime/wasm/withWasm';
 
 // =============================================================================
 // Constants
@@ -119,6 +120,14 @@ function frenchToEnglish(note: string): string {
  * ```
  */
 export function parseNote(input: NoteInput): ParsedNote {
+    const wasmParsed = withWasm(
+        (wasm) => wasm.parse_note_value(String(input)) as ParsedNote | null,
+        () => null
+    );
+    if (wasmParsed) {
+        return wasmParsed;
+    }
+
     // Handle MIDI number
     if (typeof input === 'number') {
         const midi = Math.round(input);
@@ -188,11 +197,18 @@ export function parseNote(input: NoteInput): ParsedNote {
  * ```
  */
 export function noteToMidi(note: string, octave?: number): number {
-    if (octave !== undefined) {
-        // Combine note name with octave
-        return parseNote(`${note}${octave}`).midi;
-    }
-    return parseNote(note).midi;
+    return withWasm(
+        (wasm) => {
+            const normalized = octave !== undefined ? `${note}${octave}` : note;
+            return wasm.note_to_midi_value(normalized);
+        },
+        () => {
+            if (octave !== undefined) {
+                return parseNote(`${note}${octave}`).midi;
+            }
+            return parseNote(note).midi;
+        }
+    );
 }
 
 /**
@@ -211,6 +227,14 @@ export function noteToMidi(note: string, octave?: number): number {
  * ```
  */
 export function midiToNote(midi: number, preferFlats = false): string {
+    const wasmValue = withWasm(
+        (wasm) => wasm.midi_to_note_value(Math.round(midi), preferFlats),
+        () => null as string | null
+    );
+    if (wasmValue) {
+        return wasmValue;
+    }
+
     const midiRounded = Math.round(midi);
     const octave = Math.floor(midiRounded / 12) - 1;
     const semitone = midiRounded % 12;
@@ -233,7 +257,10 @@ export function midiToNote(midi: number, preferFlats = false): string {
  * ```
  */
 export function midiToFreq(midi: number): number {
-    return 440 * Math.pow(2, (midi - 69) / 12);
+    return withWasm(
+        (wasm) => wasm.midi_to_freq_value(midi),
+        () => 440 * Math.pow(2, (midi - 69) / 12)
+    );
 }
 
 /**
@@ -252,10 +279,18 @@ export function midiToFreq(midi: number): number {
  * ```
  */
 export function noteToFreq(note: NoteInput): number {
-    if (typeof note === 'number') {
-        return midiToFreq(note);
-    }
-    return parseNote(note).frequency;
+    return withWasm(
+        (wasm) => {
+            const value = wasm.note_to_freq_value(String(note));
+            return value ?? (typeof note === 'number' ? midiToFreq(note) : parseNote(note).frequency);
+        },
+        () => {
+            if (typeof note === 'number') {
+                return midiToFreq(note);
+            }
+            return parseNote(note).frequency;
+        }
+    );
 }
 
 /**
@@ -271,14 +306,19 @@ export function noteToFreq(note: NoteInput): number {
  * ```
  */
 export function noteToFrench(note: string): string {
-    const match = note.match(/^([A-G])(#|b)?$/i);
-    if (!match) return note;
+    return withWasm(
+        (wasm) => wasm.note_to_french_value(note) ?? note,
+        () => {
+            const match = note.match(/^([A-G])(#|b)?$/i);
+            if (!match) return note;
 
-    const base = match[1].toUpperCase();
-    const accidental = match[2] || '';
-    const french = ENGLISH_TO_FRENCH[base];
+            const base = match[1].toUpperCase();
+            const accidental = match[2] || '';
+            const french = ENGLISH_TO_FRENCH[base];
 
-    return french ? `${french}${accidental}` : note;
+            return french ? `${french}${accidental}` : note;
+        }
+    );
 }
 
 /**
@@ -294,5 +334,8 @@ export function noteToFrench(note: string): string {
  * ```
  */
 export function noteFromFrench(note: string): string {
-    return frenchToEnglish(note);
+    return withWasm(
+        (wasm) => wasm.note_from_french_value(note) ?? note,
+        () => frenchToEnglish(note)
+    );
 }

@@ -15,6 +15,9 @@ import type {
     AudioContextRef,
 } from './types';
 import { AudioOutProvider } from './AudioOutContext';
+import { PatchGraphProvider } from './PatchGraphContext';
+import { PatchRuntimeProvider } from './PatchRuntimeProvider';
+import { ensureWasmInitialized } from '../runtime/wasm/loadWasmOnce';
 import { setupUnlock, setupGestureUnlock } from './unlock';
 
 /**
@@ -161,6 +164,10 @@ export const AudioProvider: FC<AudioProviderProps> = ({
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
+        ensureWasmInitialized().catch((error) => {
+            console.error('[AudioProvider] WASM init failed:', error);
+        });
+
         unlockCleanupRef.current?.();
         unlockCleanupRef.current = null;
 
@@ -224,9 +231,20 @@ export const AudioProvider: FC<AudioProviderProps> = ({
 
     return (
         <AudioContext.Provider value={value}>
-            <AudioOutProvider node={masterBusRef.current}>
-                {children}
-            </AudioOutProvider>
+            <PatchGraphProvider>
+                <PatchRuntimeProvider
+                    masterBus={masterBusRef.current}
+                    sampleRate={context?.sampleRate ?? 44100}
+                >
+                    <AudioOutProvider
+                        node={masterBusRef.current}
+                        nodeId={null}
+                        inputHandle="input"
+                    >
+                        {children}
+                    </AudioOutProvider>
+                </PatchRuntimeProvider>
+            </PatchGraphProvider>
         </AudioContext.Provider>
     );
 };

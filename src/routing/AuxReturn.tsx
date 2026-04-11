@@ -1,8 +1,8 @@
-import { useEffect, useRef, type FC } from 'react';
-import { useAudio } from '../core/AudioProvider';
-import { useAudioOut } from '../core/AudioOutContext';
+import { useEffect, type FC } from 'react';
+import { usePatchGraph } from '../core/PatchGraphContext';
+import { useWasmNode } from '../nodes/useAudioNode';
 import type { AuxReturnProps } from './types';
-import { getOrCreateBusNode } from './busRegistry';
+import { releaseBusNode, retainBusNode } from './busNodes';
 
 export const AuxReturn: FC<AuxReturnProps> = ({
     busId = 'aux',
@@ -10,44 +10,30 @@ export const AuxReturn: FC<AuxReturnProps> = ({
     bypass = false,
     nodeRef: externalRef,
 }) => {
-    const { context } = useAudio();
-    const { outputNode } = useAudioOut();
-    const returnGainRef = useRef<GainNode | null>(null);
+    const graph = usePatchGraph();
+    const { nodeId } = useWasmNode('auxReturn', {
+        busId,
+        returnLevel: gain,
+        bypass,
+    });
 
     useEffect(() => {
-        if (!context || !outputNode) return;
-
-        const busNode = getOrCreateBusNode(context, busId);
-        const returnGain = context.createGain();
-        returnGain.gain.value = bypass ? 0 : Math.max(0, gain);
-
-        busNode.connect(returnGain);
-        returnGain.connect(outputNode);
-        returnGainRef.current = returnGain;
-
-        if (externalRef) {
-            (externalRef as React.MutableRefObject<GainNode | null>).current = returnGain;
-        }
-
+        const sharedBusNodeId = retainBusNode(graph, busId);
+        const connectionId = `${sharedBusNodeId}->${nodeId}:return`;
+        graph.addConnection(connectionId, sharedBusNodeId, 'output', nodeId, 'input');
         return () => {
-            try { busNode.disconnect(returnGain); } catch { /* noop */ }
-            try { returnGain.disconnect(); } catch { /* noop */ }
-            returnGainRef.current = null;
-            if (externalRef) {
-                (externalRef as React.MutableRefObject<GainNode | null>).current = null;
-            }
+            graph.removeConnection(connectionId);
+            releaseBusNode(graph, sharedBusNodeId);
         };
-    }, [context, outputNode, busId, externalRef]);
+    }, [busId, graph, nodeId]);
 
     useEffect(() => {
-        if (!returnGainRef.current || !context) return;
-        const next = bypass ? 0 : Math.max(0, gain);
-        if (typeof returnGainRef.current.gain.setTargetAtTime === 'function') {
-            returnGainRef.current.gain.setTargetAtTime(next, context.currentTime, 0.01);
-        } else {
-            returnGainRef.current.gain.value = next;
-        }
-    }, [context, gain, bypass]);
+        if (!externalRef) return;
+        (externalRef as React.MutableRefObject<GainNode | null>).current = null;
+        return () => {
+            (externalRef as React.MutableRefObject<GainNode | null>).current = null;
+        };
+    }, [externalRef]);
 
     return null;
 };

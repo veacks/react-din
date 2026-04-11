@@ -10,10 +10,8 @@ import {
 } from 'react';
 import type { TransportState, TransportConfig, TimePosition, TransportEvents } from './types';
 import { useAudio } from '../core/AudioProvider';
+import { getWasmModuleSync, isWasmReady } from '../runtime/wasm/loadWasmOnce';
 
-/**
- * Default transport configuration.
- */
 const DEFAULT_CONFIG: TransportConfig = {
     bpm: 120,
     beatsPerBar: 4,
@@ -25,9 +23,6 @@ const DEFAULT_CONFIG: TransportConfig = {
     mode: 'raf',
 };
 
-/**
- * Default time position.
- */
 const DEFAULT_POSITION: TimePosition = {
     step: 0,
     beat: 0,
@@ -37,37 +32,95 @@ const DEFAULT_POSITION: TimePosition = {
     totalTime: 0,
 };
 
-/**
- * Transport context for musical timing.
- */
 export const TransportContext = createContext<TransportState | null>(null);
 
-/**
- * Props for TransportProvider.
- */
 export interface TransportProviderProps extends Partial<TransportConfig>, TransportEvents {
     children: ReactNode;
 }
 
-/**
- * Transport provider component for musical timing and playback control.
- *
- * Manages tempo, time signature, and provides timing information
- * to all child components.
- *
- * @example
- * ```tsx
- * <AudioProvider>
- *   <TransportProvider bpm={128} beatsPerBar={4}>
- *     <Sequencer>
- *       <Track id="drums">
- *         <DrumMachine />
- *       </Track>
- *     </Sequencer>
- *   </TransportProvider>
- * </AudioProvider>
- * ```
- */
+type TransportRuntimeLike = {
+    play: () => void;
+    stop: () => void;
+    reset: () => void;
+    isPlaying: () => boolean;
+    advanceSeconds: (deltaSeconds: number) => unknown;
+    stepIndex: () => bigint;
+    secondsPerBeat: () => number;
+    secondsPerStep: () => number;
+    free?: () => void;
+    seekToStep?: (step: bigint) => void;
+};
+
+function clampTempo(bpm: number): number {
+    return Math.max(20, Math.min(300, bpm));
+}
+
+function normalizeConfig(config: TransportConfig): TransportConfig {
+    return {
+        ...config,
+        bpm: clampTempo(config.bpm),
+        beatsPerBar: Math.max(1, Math.floor(config.beatsPerBar)),
+        beatUnit: Math.max(1, Math.floor(config.beatUnit)),
+        barsPerPhrase: Math.max(1, Math.floor(config.barsPerPhrase)),
+        stepsPerBeat: Math.max(1, Math.floor(config.stepsPerBeat)),
+        swing: Math.max(0, Math.min(1, config.swing ?? 0)),
+        swingSubdivision: Math.max(1, Math.floor(config.swingSubdivision ?? 2)),
+        mode: config.mode === 'manual' ? 'manual' : 'raf',
+    };
+}
+
+function totalStepsToPosition(totalSteps: number, config: TransportConfig, secondsPerStep: number): TimePosition {
+    const stepsPerBar = config.stepsPerBeat * config.beatsPerBar;
+    const stepsPerPhrase = stepsPerBar * config.barsPerPhrase;
+    const phrase = Math.floor(totalSteps / stepsPerPhrase);
+    const stepsInPhrase = totalSteps % stepsPerPhrase;
+    const bar = Math.floor(stepsInPhrase / stepsPerBar);
+    const stepsInBar = stepsInPhrase % stepsPerBar;
+    const beat = Math.floor(stepsInBar / config.stepsPerBeat);
+    const step = stepsInBar % config.stepsPerBeat;
+    return {
+        step,
+        beat,
+        bar,
+        phrase,
+        totalSteps,
+        totalTime: totalSteps * secondsPerStep,
+    };
+}
+
+function positionToTotalSteps(position: Partial<TimePosition>, current: TimePosition, config: TransportConfig): number {
+    const phrase = position.phrase ?? current.phrase;
+    const bar = position.bar ?? current.bar;
+    const beat = position.beat ?? current.beat;
+    const step = position.step ?? current.step;
+    const stepsPerBar = config.stepsPerBeat * config.beatsPerBar;
+    const stepsPerPhrase = stepsPerBar * config.barsPerPhrase;
+    const total =
+        phrase * stepsPerPhrase +
+        bar * stepsPerBar +
+        beat * config.stepsPerBeat +
+        step;
+    return Math.max(0, Math.floor(total));
+}
+
+function toStepInBeat(tick: unknown, fallback: number): number {
+    if (!tick || typeof tick !== 'object') return fallback;
+    const value = (tick as Record<string, unknown>).stepInBeat ?? (tick as Record<string, unknown>).step_in_beat;
+    return typeof value === 'number' ? value : fallback;
+}
+
+function toBeatInBar(tick: unknown, fallback: number): number {
+    if (!tick || typeof tick !== 'object') return fallback;
+    const value = (tick as Record<string, unknown>).beatInBar ?? (tick as Record<string, unknown>).beat_in_bar;
+    return typeof value === 'number' ? value : fallback;
+}
+
+function toPhraseBar(tick: unknown, fallback: number): number {
+    if (!tick || typeof tick !== 'object') return fallback;
+    const value = (tick as Record<string, unknown>).phraseBar ?? (tick as Record<string, unknown>).phrase_bar;
+    return typeof value === 'number' ? value : fallback;
+}
+
 export const TransportProvider: FC<TransportProviderProps> = ({
     children,
     bpm = DEFAULT_CONFIG.bpm,
@@ -86,10 +139,10 @@ export const TransportProvider: FC<TransportProviderProps> = ({
     onStop,
     onPause,
 }) => {
-    const { context, isUnlocked } = useAudio();
+    useAudio();
     const [isPlaying, setIsPlaying] = useState(false);
     const [position, setPosition] = useState<TimePosition>(DEFAULT_POSITION);
-    const [config, setConfigState] = useState<TransportConfig>({
+    const [config, setConfigState] = useState<TransportConfig>(normalizeConfig({
         bpm,
         beatsPerBar,
         beatUnit,
@@ -98,256 +151,263 @@ export const TransportProvider: FC<TransportProviderProps> = ({
         swing,
         swingSubdivision,
         mode,
-    });
+    }));
 
-    const schedulerRef = useRef<number | null>(null);
-    const startTimeRef = useRef<number>(0);
-    const nextStepTimeRef = useRef<number>(0);
+    const runtimeRef = useRef<TransportRuntimeLike | null>(null);
+    const callbacksRef = useRef({ onStep, onBeat, onBar, onPhrase });
+    const manualNowRef = useRef<number | null>(null);
+    const fallbackCarryRef = useRef(0);
+    const positionRef = useRef<TimePosition>(DEFAULT_POSITION);
 
-    // Calculate durations
-    const beatDuration = 60 / config.bpm;
-    const stepDuration = beatDuration / config.stepsPerBeat;
-    const barDuration = beatDuration * config.beatsPerBar;
-    const phraseDuration = barDuration * config.barsPerPhrase;
+    useEffect(() => {
+        callbacksRef.current = { onStep, onBeat, onBar, onPhrase };
+    }, [onStep, onBeat, onBar, onPhrase]);
 
-    // Play control
+    useEffect(() => {
+        positionRef.current = position;
+    }, [position]);
+
+    const createRuntime = useCallback((nextConfig: TransportConfig): TransportRuntimeLike | null => {
+        if (!isWasmReady()) return null;
+        const wasm = getWasmModuleSync();
+        if (!wasm?.TransportRuntime?.fromConfig) return null;
+        return wasm.TransportRuntime.fromConfig(
+            nextConfig.bpm,
+            nextConfig.beatsPerBar,
+            nextConfig.beatUnit,
+            nextConfig.barsPerPhrase,
+            nextConfig.stepsPerBeat,
+            nextConfig.swing ?? 0,
+            'tick'
+        ) as TransportRuntimeLike;
+    }, []);
+
+    const syncPositionFromRuntime = useCallback((runtime: TransportRuntimeLike) => {
+        const stepIndex = Number(runtime.stepIndex());
+        const next = totalStepsToPosition(stepIndex, config, runtime.secondsPerStep());
+        setPosition(next);
+        return next;
+    }, [config]);
+
+    const seekRuntime = useCallback((runtime: TransportRuntimeLike, totalSteps: number) => {
+        const nextStep = BigInt(Math.max(0, totalSteps));
+        if (typeof runtime.seekToStep === 'function') {
+            runtime.seekToStep(nextStep);
+            return;
+        }
+        runtime.reset();
+        const seconds = Number(nextStep) * runtime.secondsPerStep();
+        if (seconds > 0) {
+            runtime.advanceSeconds(seconds);
+        }
+    }, []);
+
+    const replaceRuntime = useCallback((nextConfig: TransportConfig) => {
+        const wasPlaying = runtimeRef.current?.isPlaying() ?? false;
+        const currentStep = runtimeRef.current ? Number(runtimeRef.current.stepIndex()) : positionRef.current.totalSteps;
+        const previous = runtimeRef.current;
+        const nextRuntime = createRuntime(nextConfig);
+        runtimeRef.current = nextRuntime;
+        previous?.free?.();
+        if (!nextRuntime) {
+            return;
+        }
+        seekRuntime(nextRuntime, currentStep);
+        if (wasPlaying) {
+            nextRuntime.play();
+            setIsPlaying(true);
+        } else {
+            setIsPlaying(false);
+        }
+        syncPositionFromRuntime(nextRuntime);
+    }, [createRuntime, seekRuntime, syncPositionFromRuntime]);
+
+    useEffect(() => {
+        replaceRuntime(config);
+        return () => {
+            runtimeRef.current?.free?.();
+            runtimeRef.current = null;
+        };
+    }, [config, replaceRuntime]);
+
     const play = useCallback(() => {
-        if (!context || !isUnlocked) return;
+        if (runtimeRef.current) {
+            runtimeRef.current.play();
+        }
         setIsPlaying(true);
-        startTimeRef.current = context.currentTime;
-        nextStepTimeRef.current = context.currentTime;
+        manualNowRef.current = null;
+        fallbackCarryRef.current = 0;
         onPlay?.();
-    }, [context, isUnlocked, onPlay]);
+    }, [onPlay]);
 
-    // Stop control
     const stop = useCallback(() => {
+        runtimeRef.current?.stop();
+        runtimeRef.current?.reset();
         setIsPlaying(false);
         setPosition(DEFAULT_POSITION);
-        if (schedulerRef.current) {
-            cancelAnimationFrame(schedulerRef.current);
-            schedulerRef.current = null;
-        }
+        manualNowRef.current = null;
+        fallbackCarryRef.current = 0;
         onStop?.();
     }, [onStop]);
 
-    // Pause control
     const pause = useCallback(() => {
+        runtimeRef.current?.stop();
         setIsPlaying(false);
-        if (schedulerRef.current) {
-            cancelAnimationFrame(schedulerRef.current);
-            schedulerRef.current = null;
-        }
+        manualNowRef.current = null;
         onPause?.();
     }, [onPause]);
 
-    // Seek to position
     const seek = useCallback((targetPosition: Partial<TimePosition>) => {
-        const stepsPerBar = config.stepsPerBeat * config.beatsPerBar;
-        const stepsPerPhrase = stepsPerBar * config.barsPerPhrase;
-
-        const newPhrase = targetPosition.phrase ?? position.phrase;
-        const newBar = targetPosition.bar ?? position.bar;
-        const newBeat = targetPosition.beat ?? position.beat;
-        const newStep = targetPosition.step ?? position.step;
-
-        const totalSteps =
-            newPhrase * stepsPerPhrase +
-            newBar * stepsPerBar +
-            newBeat * config.stepsPerBeat +
-            newStep;
-
-        setPosition({
-            step: newStep,
-            beat: newBeat,
-            bar: newBar,
-            phrase: newPhrase,
-            totalSteps,
-            totalTime: totalSteps * stepDuration,
-        });
-    }, [position, config, stepDuration]);
-
-    // Set tempo
-    const setTempo = useCallback((newBpm: number) => {
-        const nextBpm = Math.max(20, Math.min(300, newBpm));
-        setConfigState((prev) => (prev.bpm === nextBpm ? prev : { ...prev, bpm: nextBpm }));
-    }, []);
-
-    // Set config
-    const setConfig = useCallback((updates: Partial<TransportConfig>) => {
-        setConfigState((prev) => {
-            const next = { ...prev, ...updates };
-            const changed = Object.keys(updates).some((key) => {
-                const typedKey = key as keyof TransportConfig;
-                return !Object.is(prev[typedKey], next[typedKey]);
-            });
-            return changed ? next : prev;
-        });
-    }, []);
-
-    // Toggle play/stop
-    const toggle = useCallback(() => {
-        if (isPlaying) {
-            stop();
-        } else {
-            play();
+        const targetSteps = positionToTotalSteps(targetPosition, position, config);
+        if (runtimeRef.current) {
+            seekRuntime(runtimeRef.current, targetSteps);
         }
+        const secondsPerStep = runtimeRef.current
+            ? runtimeRef.current.secondsPerStep()
+            : (60 / config.bpm) / config.stepsPerBeat;
+        const next = totalStepsToPosition(targetSteps, config, secondsPerStep);
+        setPosition(next);
+    }, [config, position, seekRuntime]);
+
+    const setTempo = useCallback((newBpm: number) => {
+        setConfigState((prev) => normalizeConfig({ ...prev, bpm: newBpm }));
+    }, []);
+
+    const setConfig = useCallback((updates: Partial<TransportConfig>) => {
+        setConfigState((prev) => normalizeConfig({ ...prev, ...updates }));
+    }, []);
+
+    const toggle = useCallback(() => {
+        if (isPlaying) stop();
+        else play();
     }, [isPlaying, play, stop]);
 
-    // Reset position without stopping
     const reset = useCallback(() => {
+        runtimeRef.current?.reset();
         setPosition(DEFAULT_POSITION);
-        if (context) {
-            nextStepTimeRef.current = context.currentTime;
-        }
-    }, [context]);
-
-    // Manual update for 'manual' mode
-    const update = useCallback((now?: number) => {
-        if (config.mode !== 'manual' || !context || !isPlaying) return;
-
-        const currentTime = now ?? context.currentTime;
-        const stepsPerBar = config.stepsPerBeat * config.beatsPerBar;
-        const stepsPerPhrase = stepsPerBar * config.barsPerPhrase;
-        const lookAhead = 0.1;
-
-        while (nextStepTimeRef.current < currentTime + lookAhead) {
-            const stepTime = nextStepTimeRef.current;
-            const totalSteps = position.totalSteps;
-
-            const currentPhrase = Math.floor(totalSteps / stepsPerPhrase);
-            const stepsInPhrase = totalSteps % stepsPerPhrase;
-            const currentBar = Math.floor(stepsInPhrase / stepsPerBar);
-            const stepsInBar = stepsInPhrase % stepsPerBar;
-            const currentBeat = Math.floor(stepsInBar / config.stepsPerBeat);
-            const currentStep = stepsInBar % config.stepsPerBeat;
-
-            onStep?.(currentStep, stepTime);
-            if (currentStep === 0) {
-                onBeat?.(currentBeat, stepTime);
-                if (currentBeat === 0) {
-                    onBar?.(currentBar, stepTime);
-                    if (currentBar === 0) {
-                        onPhrase?.(currentPhrase, stepTime);
-                    }
-                }
-            }
-
-            setPosition({
-                step: currentStep,
-                beat: currentBeat,
-                bar: currentBar,
-                phrase: currentPhrase,
-                totalSteps: totalSteps + 1,
-                totalTime: (totalSteps + 1) * stepDuration,
-            });
-
-            let swingOffset = 0;
-            if (config.swing && config.swingSubdivision) {
-                const isSwungStep = (totalSteps + 1) % config.swingSubdivision === 1;
-                if (isSwungStep) {
-                    swingOffset = stepDuration * (config.swing ?? 0) * 0.5;
-                }
-            }
-
-            nextStepTimeRef.current += stepDuration + swingOffset;
-        }
-    }, [config, context, isPlaying, position.totalSteps, stepDuration, onStep, onBeat, onBar, onPhrase]);
-
-    // Individual setters
-    const setBpm = useCallback((newBpm: number) => {
-        const nextBpm = Math.max(20, Math.min(300, newBpm));
-        setConfigState((prev) => (prev.bpm === nextBpm ? prev : { ...prev, bpm: nextBpm }));
+        manualNowRef.current = null;
+        fallbackCarryRef.current = 0;
     }, []);
 
-    const setTimeSignature = useCallback((beatsPerBar: number, beatUnit = 4) => {
-        setConfigState((prev) => (
-            prev.beatsPerBar === beatsPerBar && prev.beatUnit === beatUnit
-                ? prev
-                : { ...prev, beatsPerBar, beatUnit }
-        ));
-    }, []);
-
-    const setStepsPerBeat = useCallback((steps: number) => {
-        setConfigState((prev) => (prev.stepsPerBeat === steps ? prev : { ...prev, stepsPerBeat: steps }));
-    }, []);
-
-    const setPhraseBars = useCallback((bars: number) => {
-        setConfigState((prev) => (prev.barsPerPhrase === bars ? prev : { ...prev, barsPerPhrase: bars }));
-    }, []);
-
-    // Scheduler loop (only for 'raf' mode)
-    useEffect(() => {
-        if (!isPlaying || !context || config.mode === 'manual') return;
-
-        const stepsPerBar = config.stepsPerBeat * config.beatsPerBar;
-        const stepsPerPhrase = stepsPerBar * config.barsPerPhrase;
-
-        const schedule = () => {
-            const lookAhead = 0.1; // Look-ahead time in seconds
-            const currentTime = context.currentTime;
-
-            while (nextStepTimeRef.current < currentTime + lookAhead) {
-                const stepTime = nextStepTimeRef.current;
-                const totalSteps = position.totalSteps;
-
-                // Calculate position from total steps
-                const currentPhrase = Math.floor(totalSteps / stepsPerPhrase);
-                const stepsInPhrase = totalSteps % stepsPerPhrase;
-                const currentBar = Math.floor(stepsInPhrase / stepsPerBar);
-                const stepsInBar = stepsInPhrase % stepsPerBar;
-                const currentBeat = Math.floor(stepsInBar / config.stepsPerBeat);
-                const currentStep = stepsInBar % config.stepsPerBeat;
-
-                // Fire callbacks
-                onStep?.(currentStep, stepTime);
-
-                if (currentStep === 0) {
-                    onBeat?.(currentBeat, stepTime);
-
-                    if (currentBeat === 0) {
-                        onBar?.(currentBar, stepTime);
-
-                        if (currentBar === 0) {
-                            onPhrase?.(currentPhrase, stepTime);
+    const processDelta = useCallback((deltaSeconds: number, wallClockSeconds: number) => {
+        if (deltaSeconds <= 0) return;
+        if (!runtimeRef.current) {
+            const stepDuration = (60 / config.bpm) / config.stepsPerBeat;
+            if (stepDuration <= 0) return;
+            fallbackCarryRef.current += deltaSeconds;
+            let nextTotal = positionRef.current.totalSteps;
+            while (fallbackCarryRef.current >= stepDuration) {
+                fallbackCarryRef.current -= stepDuration;
+                nextTotal += 1;
+                const next = totalStepsToPosition(nextTotal, config, stepDuration);
+                setPosition(next);
+                callbacksRef.current.onStep?.(next.step, wallClockSeconds);
+                if (next.step === 0) {
+                    callbacksRef.current.onBeat?.(next.beat, wallClockSeconds);
+                    if (next.beat === 0) {
+                        callbacksRef.current.onBar?.(next.bar, wallClockSeconds);
+                        if (next.bar === 0) {
+                            callbacksRef.current.onPhrase?.(next.phrase, wallClockSeconds);
                         }
                     }
                 }
-
-                // Update position
-                setPosition({
-                    step: currentStep,
-                    beat: currentBeat,
-                    bar: currentBar,
-                    phrase: currentPhrase,
-                    totalSteps: totalSteps + 1,
-                    totalTime: (totalSteps + 1) * stepDuration,
-                });
-
-                // Calculate next step time with swing
-                let swingOffset = 0;
-                if (config.swing && config.swingSubdivision) {
-                    const isSwungStep = (totalSteps + 1) % config.swingSubdivision === 1;
-                    if (isSwungStep) {
-                        swingOffset = stepDuration * (config.swing ?? 0) * 0.5;
+            }
+            return;
+        }
+        const ticks = runtimeRef.current.advanceSeconds(deltaSeconds);
+        const tickList = Array.isArray(ticks) ? ticks : [];
+        if (tickList.length === 0) {
+            syncPositionFromRuntime(runtimeRef.current);
+            return;
+        }
+        for (const tick of tickList) {
+            const totalSteps = Number(runtimeRef.current.stepIndex());
+            const fallback = totalStepsToPosition(totalSteps, config, runtimeRef.current.secondsPerStep());
+            const next: TimePosition = {
+                ...fallback,
+                step: toStepInBeat(tick, fallback.step),
+                beat: toBeatInBar(tick, fallback.beat),
+                bar: fallback.bar,
+                phrase: toPhraseBar(tick, fallback.bar),
+            };
+            setPosition(next);
+            callbacksRef.current.onStep?.(next.step, wallClockSeconds);
+            if (next.step === 0) {
+                callbacksRef.current.onBeat?.(next.beat, wallClockSeconds);
+                if (next.beat === 0) {
+                    callbacksRef.current.onBar?.(next.bar, wallClockSeconds);
+                    if (next.phrase === 0) {
+                        callbacksRef.current.onPhrase?.(fallback.phrase, wallClockSeconds);
                     }
                 }
-
-                nextStepTimeRef.current += stepDuration + swingOffset;
             }
+        }
+    }, [config, syncPositionFromRuntime]);
 
-            schedulerRef.current = requestAnimationFrame(schedule);
+    const update = useCallback((now?: number) => {
+        if (config.mode !== 'manual' || !isPlaying) return;
+        const currentNow = now ?? performance.now() / 1000;
+        if (manualNowRef.current === null) {
+            manualNowRef.current = currentNow;
+            const initialDelta = runtimeRef.current
+                ? runtimeRef.current.secondsPerStep()
+                : (60 / config.bpm) / config.stepsPerBeat;
+            processDelta(initialDelta, currentNow);
+            return;
+        }
+        const delta = Math.max(0, currentNow - manualNowRef.current);
+        manualNowRef.current = currentNow;
+        processDelta(delta, currentNow);
+    }, [config.mode, isPlaying, processDelta]);
+
+    const setBpm = useCallback((newBpm: number) => {
+        setConfigState((prev) => normalizeConfig({ ...prev, bpm: newBpm }));
+    }, []);
+
+    const setTimeSignature = useCallback((nextBeatsPerBar: number, nextBeatUnit = 4) => {
+        setConfigState((prev) => normalizeConfig({
+            ...prev,
+            beatsPerBar: nextBeatsPerBar,
+            beatUnit: nextBeatUnit,
+        }));
+    }, []);
+
+    const setStepsPerBeat = useCallback((steps: number) => {
+        setConfigState((prev) => normalizeConfig({ ...prev, stepsPerBeat: steps }));
+    }, []);
+
+    const setPhraseBars = useCallback((bars: number) => {
+        setConfigState((prev) => normalizeConfig({ ...prev, barsPerPhrase: bars }));
+    }, []);
+
+    useEffect(() => {
+        if (config.mode === 'manual') return;
+        let disposed = false;
+        let rafId = 0;
+        let lastNow = performance.now() / 1000;
+        const tick = () => {
+            if (disposed) return;
+            const now = performance.now() / 1000;
+            const delta = Math.max(0, now - lastNow);
+            lastNow = now;
+            if (isPlaying && (!runtimeRef.current || runtimeRef.current.isPlaying())) {
+                processDelta(delta, now);
+            }
+            rafId = requestAnimationFrame(tick);
         };
-
-        schedulerRef.current = requestAnimationFrame(schedule);
-
+        rafId = requestAnimationFrame(tick);
         return () => {
-            if (schedulerRef.current) {
-                cancelAnimationFrame(schedulerRef.current);
-            }
+            disposed = true;
+            cancelAnimationFrame(rafId);
         };
-    }, [isPlaying, context, config, position.totalSteps, stepDuration, onStep, onBeat, onBar, onPhrase]);
+    }, [config.mode, isPlaying, processDelta]);
 
-    // Build state value
+    const runtime = runtimeRef.current;
+    const beatDuration = runtime ? runtime.secondsPerBeat() : 60 / config.bpm;
+    const stepDuration = runtime ? runtime.secondsPerStep() : beatDuration / config.stepsPerBeat;
+    const barDuration = beatDuration * config.beatsPerBar;
+    const phraseDuration = barDuration * config.barsPerPhrase;
+
     const value: TransportState = {
         ...position,
         isPlaying,

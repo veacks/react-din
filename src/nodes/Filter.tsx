@@ -1,28 +1,9 @@
 import { useEffect, type FC } from 'react';
-import type { FilterProps } from './types';
-import { useAudioNode, useAudioParam } from './useAudioNode';
 import { AudioOutProvider } from '../core/AudioOutContext';
+import { getNumericValue } from '../core/ModulatableValue';
+import type { FilterProps } from './types';
+import { useWasmNode } from './useAudioNode';
 
-/**
- * BiquadFilter node component for frequency-based audio filtering.
- *
- * Supports all standard filter types: lowpass, highpass, bandpass,
- * lowshelf, highshelf, peaking, notch, and allpass.
- *
- * @example
- * ```tsx
- * // Low-pass filter at 1000Hz
- * <Filter type="lowpass" frequency={1000} Q={1}>
- *   <Noise type="white" />
- * </Filter>
- *
- * // With LFO modulation
- * const lfo = useLFO({ rate: 2, depth: 500 });
- * <Filter type="lowpass" frequency={lfo} frequencyBase={1000}>
- *   <Osc type="sawtooth" frequency={110} />
- * </Filter>
- * ```
- */
 export const Filter: FC<FilterProps> = ({
     children,
     nodeRef: externalRef,
@@ -36,35 +17,26 @@ export const Filter: FC<FilterProps> = ({
     gainBase,
     detune = 0,
     detuneBase,
-    id,
 }) => {
-    const { nodeRef, context } = useAudioNode<BiquadFilterNode>({
-        createNode: (ctx) => ctx.createBiquadFilter(),
+    const { nodeId } = useWasmNode('filter', {
+        type,
+        frequency: getNumericValue(frequency, frequencyBase ?? 350),
+        Q: getNumericValue(Q, QBase ?? 1),
+        gain: getNumericValue(gain, gainBase ?? 0),
+        detune: getNumericValue(detune, detuneBase ?? 0),
         bypass,
     });
 
-    // Sync external ref
     useEffect(() => {
-        if (externalRef) {
-            (externalRef as React.MutableRefObject<BiquadFilterNode | null>).current = nodeRef.current;
-        }
-    }, [externalRef, nodeRef.current]);
-
-    // Apply filter type
-    useEffect(() => {
-        if (nodeRef.current) {
-            nodeRef.current.type = type;
-        }
-    }, [type]);
-
-    // Apply parameters (with LFO support)
-    useAudioParam(nodeRef.current?.frequency, frequency, frequencyBase ?? 350);
-    useAudioParam(nodeRef.current?.Q, Q, QBase ?? 1);
-    useAudioParam(nodeRef.current?.gain, gain, gainBase ?? 0);
-    useAudioParam(nodeRef.current?.detune, detune, detuneBase ?? 0);
+        if (!externalRef) return;
+        (externalRef as React.MutableRefObject<BiquadFilterNode | null>).current = {} as BiquadFilterNode;
+        return () => {
+            (externalRef as React.MutableRefObject<BiquadFilterNode | null>).current = null;
+        };
+    }, [externalRef]);
 
     return (
-        <AudioOutProvider node={bypass ? null : nodeRef.current}>
+        <AudioOutProvider node={null} nodeId={nodeId}>
             {children}
         </AudioOutProvider>
     );

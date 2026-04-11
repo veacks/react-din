@@ -28,6 +28,7 @@ export type {
     PatchMidiOutput,
     PatchMidiOutputBindings,
     PatchMidiSyncOutput,
+    MidiTransportState,
     PatchNode,
     PatchNodeData,
     PatchPosition,

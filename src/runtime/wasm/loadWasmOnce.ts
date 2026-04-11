@@ -1,4 +1,5 @@
 let initPromise: Promise<void> | null = null;
+let wasmModule: (typeof import('din-wasm')) | null = null;
 
 /**
  * Loads and initializes the `din-wasm` module once per JS realm.
@@ -9,7 +10,16 @@ export function ensureWasmInitialized(): Promise<void> {
         initPromise = (async () => {
             const wasm = await import('din-wasm');
             await wasm.default();
+            wasmModule = wasm;
         })();
     }
     return initPromise;
+}
+
+export function getWasmModuleSync(): (typeof import('din-wasm')) | null {
+    return wasmModule;
+}
+
+export function isWasmReady(): boolean {
+    return wasmModule !== null;
 }

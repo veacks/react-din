@@ -1,52 +1,31 @@
 import { useEffect, type FC } from 'react';
-import type { DelayProps } from './types';
-import { useAudioNode, useAudioParam } from './useAudioNode';
 import { AudioOutProvider } from '../core/AudioOutContext';
+import type { DelayProps } from './types';
+import { useWasmNode } from './useAudioNode';
 
-/**
- * Delay node component for audio delay effects.
- *
- * @example
- * ```tsx
- * // Simple delay
- * <Delay delayTime={0.5}>
- *   <Sampler src="/voice.wav" />
- * </Delay>
- *
- * // Feedback delay (using Gain for feedback loop)
- * <Gain gain={0.6}>
- *   <Delay delayTime={0.375} maxDelayTime={2}>
- *     <Sampler src="/guitar.wav" />
- *   </Delay>
- * </Gain>
- * ```
- */
 export const Delay: FC<DelayProps> = ({
     children,
     nodeRef: externalRef,
     bypass = false,
     delayTime = 0,
     maxDelayTime = 1,
-    id,
 }) => {
-    const { nodeRef, context } = useAudioNode<DelayNode>({
-        createNode: (ctx) => ctx.createDelay(maxDelayTime),
+    const { nodeId } = useWasmNode('delay', {
+        delayTime,
+        maxDelayTime,
         bypass,
-        deps: [maxDelayTime],
     });
 
-    // Sync external ref
     useEffect(() => {
-        if (externalRef) {
-            (externalRef as React.MutableRefObject<DelayNode | null>).current = nodeRef.current;
-        }
-    }, [externalRef, nodeRef.current]);
-
-    // Apply delay time
-    useAudioParam(nodeRef.current?.delayTime, delayTime);
+        if (!externalRef) return;
+        (externalRef as React.MutableRefObject<DelayNode | null>).current = {} as DelayNode;
+        return () => {
+            (externalRef as React.MutableRefObject<DelayNode | null>).current = null;
+        };
+    }, [externalRef]);
 
     return (
-        <AudioOutProvider node={bypass ? null : nodeRef.current}>
+        <AudioOutProvider node={null} nodeId={nodeId}>
             {children}
         </AudioOutProvider>
     );

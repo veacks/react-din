@@ -1,12 +1,9 @@
-import { useEffect, useRef, useState, type FC } from 'react';
-import type { ReactNode } from 'react';
-import { useAudio } from '../core/AudioProvider';
-import { useAudioOut, AudioOutProvider } from '../core/AudioOutContext';
+import { useEffect, type FC, type ReactNode } from 'react';
+import { AudioOutProvider } from '../core/AudioOutContext';
+import { usePatchRuntime } from '../core/PatchRuntimeProvider';
 import { useTrigger } from '../sequencer/useTrigger';
+import { useWasmNode } from '../nodes/useAudioNode';
 
-/**
- * Props for TriggeredSampler.
- */
 export interface TriggeredSamplerProps {
     children?: ReactNode;
     src?: string | AudioBuffer;
@@ -19,12 +16,6 @@ export interface TriggeredSamplerProps {
     duration?: number;
 }
 
-/**
- * Trigger-aware sampler source.
- *
- * Uses `useTrigger()` from the nearest trigger context and plays
- * one-shot samples on each emitted trigger.
- */
 export const TriggeredSampler: FC<TriggeredSamplerProps> = ({
     children,
     src,
@@ -36,124 +27,34 @@ export const TriggeredSampler: FC<TriggeredSamplerProps> = ({
     offset = 0,
     duration,
 }) => {
-    const { context, isUnlocked } = useAudio();
-    const { outputNode } = useAudioOut();
+    const { runtimeRef } = usePatchRuntime();
     const trigger = useTrigger();
-    const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
-    const sourceRef = useRef<AudioBufferSourceNode | null>(null);
-    const activeRef = useRef(false);
+    const patchAsset = typeof src === 'string' ? src : undefined;
+    const { nodeId } = useWasmNode('sampler', {
+        patchAsset,
+        loop,
+        playbackRate,
+        detune,
+        offset,
+        duration,
+        autoStart,
+        active,
+        triggered: true,
+    });
 
     useEffect(() => {
-        if (!context || !src) return;
-
-        let cancelled = false;
-
-        if (typeof src === 'string') {
-            fetch(src)
-                .then((response) => {
-                    if (!response.ok) {
-                        throw new Error(`Failed to load sampler source: ${src}`);
-                    }
-                    return response.arrayBuffer();
-                })
-                .then((arrayBuffer) => context.decodeAudioData(arrayBuffer))
-                .then((decodedBuffer) => {
-                    if (!cancelled) {
-                        setBuffer(decodedBuffer);
-                    }
-                })
-                .catch(() => {
-                    if (!cancelled) {
-                        setBuffer(null);
-                    }
-                });
-        } else {
-            setBuffer(src);
-        }
-
-        return () => {
-            cancelled = true;
-        };
-    }, [context, src]);
-
-    const stop = () => {
-        const source = sourceRef.current;
-        if (!source) return;
-        try {
-            source.stop();
-        } catch {
-            // Ignore stop races during retriggering.
-        }
-        sourceRef.current = null;
-    };
-
-    const play = (playDuration?: number) => {
-        if (!context || !outputNode || !buffer || !isUnlocked) return;
-
-        stop();
-
-        const source = context.createBufferSource();
-        source.buffer = buffer;
-        source.loop = loop;
-        source.playbackRate.value = playbackRate;
-        source.detune.value = detune;
-        source.connect(outputNode);
-        source.onended = () => {
-            if (sourceRef.current === source) {
-                sourceRef.current = null;
-            }
-        };
-
-        sourceRef.current = source;
-
-        if (loop || !playDuration) {
-            source.start(context.currentTime, offset);
-        } else {
-            source.start(context.currentTime, offset, playDuration);
-        }
-
-        if (loop && playDuration) {
-            window.setTimeout(() => {
-                if (sourceRef.current === source) {
-                    stop();
-                }
-            }, playDuration * 1000);
-        }
-    };
-
-    useEffect(() => {
-        if (autoStart && active === undefined && buffer && isUnlocked) {
-            play(duration);
-        }
-        // Intentionally scoped to source/loading changes.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [autoStart, active, buffer, isUnlocked, src]);
-
-    useEffect(() => {
-        if (!trigger || active !== undefined) return;
-        play(trigger.duration);
-        // Intentionally scoped to trigger edges.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [trigger, active]);
-
-    useEffect(() => {
-        if (active === undefined) return;
-
-        if (active && !activeRef.current) {
-            play(duration);
-        } else if (!active && activeRef.current && loop) {
-            stop();
-        }
-
-        activeRef.current = active;
-        // Intentionally scoped to active edge changes.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [active, duration, loop]);
-
-    useEffect(() => () => stop(), []);
+        if (!trigger) return;
+        const note = Number.isFinite(trigger.note) ? trigger.note : 60;
+        const velocity = Math.max(0, Math.min(127, Math.round(trigger.velocity * 127)));
+        runtimeRef.current?.pushMidi(0x90, note, velocity, 0);
+        const timeout = window.setTimeout(() => {
+            runtimeRef.current?.pushMidi(0x80, note, 0, 0);
+        }, Math.max(0, trigger.duration * 1000));
+        return () => window.clearTimeout(timeout);
+    }, [runtimeRef, trigger]);
 
     return (
-        <AudioOutProvider node={outputNode}>
+        <AudioOutProvider node={null} nodeId={nodeId}>
             {children}
         </AudioOutProvider>
     );

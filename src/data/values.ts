@@ -1,3 +1,5 @@
+import { withWasm } from '../runtime/wasm/withWasm';
+
 export type MathOperation =
     | 'add'
     | 'subtract'
@@ -42,6 +44,20 @@ export type MathOperation =
 export type CompareOperation = 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'neq';
 
 export type ClampMode = 'minmax' | 'range';
+
+const COMPARE_OP_MAP: Record<CompareOperation, string> = {
+    gt: 'greater_than',
+    gte: 'greater_than_or_equal',
+    lt: 'less_than',
+    lte: 'less_than_or_equal',
+    eq: 'equal',
+    neq: 'not_equal',
+};
+
+const CLAMP_MODE_MAP: Record<ClampMode, string> = {
+    minmax: 'clamp',
+    range: 'wrap',
+};
 
 const safeNumber = (value: number | undefined): number => (
     typeof value === 'number' && Number.isFinite(value) ? value : 0
@@ -97,6 +113,12 @@ const smoothMinValue = (a: number, b: number, k: number) => {
  * @returns Numeric result, or 0 for unknown operations or invalid divide-by-zero cases.
  */
 export function math(operation: MathOperation, a = 0, b = 0, c = 0): number {
+    const wasmValue = withWasm(
+        (wasm) => wasm.audio_math(operation, a, b, c),
+        () => null as number | null
+    );
+    if (wasmValue !== null) return wasmValue;
+
     const av = safeNumber(a);
     const bv = safeNumber(b);
     const cv = safeNumber(c);
@@ -199,6 +221,12 @@ export function math(operation: MathOperation, a = 0, b = 0, c = 0): number {
  * @returns 1 if the comparison is true, else 0.
  */
 export function compare(operation: CompareOperation, a = 0, b = 0): number {
+    const wasmValue = withWasm(
+        (wasm) => (wasm.audio_compare(COMPARE_OP_MAP[operation], a, b) ? 1 : 0),
+        () => null as number | null
+    );
+    if (wasmValue !== null) return wasmValue;
+
     const av = safeNumber(a);
     const bv = safeNumber(b);
 
@@ -230,6 +258,12 @@ export function compare(operation: CompareOperation, a = 0, b = 0): number {
  * @returns Blended value `a * (1 - t*) + b * t*` where `t*` is optionally clamped.
  */
 export function mix(a = 0, b = 0, t = 0, clamp = false): number {
+    const wasmValue = withWasm(
+        (wasm) => wasm.audio_mix(a, b, t, clamp),
+        () => null as number | null
+    );
+    if (wasmValue !== null) return wasmValue;
+
     const av = safeNumber(a);
     const bv = safeNumber(b);
     const tv = safeNumber(t);
@@ -247,6 +281,12 @@ export function mix(a = 0, b = 0, t = 0, clamp = false): number {
  * @returns Value constrained to the range per `mode`.
  */
 export function clamp(value = 0, min = 0, max = 1, mode: ClampMode = 'minmax'): number {
+    const wasmValue = withWasm(
+        (wasm) => wasm.audio_clamp(value, min, max, CLAMP_MODE_MAP[mode]),
+        () => null as number | null
+    );
+    if (wasmValue !== null) return wasmValue;
+
     const v = safeNumber(value);
     const minValue = safeNumber(min);
     const maxValue = safeNumber(max);
@@ -262,6 +302,12 @@ export function clamp(value = 0, min = 0, max = 1, mode: ClampMode = 'minmax'): 
  * @returns Selected array element or `fallback`.
  */
 export function switchValue(index: number, values: number[], fallback = 0): number {
+    const wasmValue = withWasm(
+        (wasm) => wasm.audio_switch(index, values),
+        () => null as number | null
+    );
+    if (wasmValue !== null) return wasmValue;
+
     if (!Array.isArray(values) || values.length === 0) return fallback;
     const indexValue = Number.isFinite(index) ? Math.floor(index) : 0;
     const safeIndex = Math.min(Math.max(indexValue, 0), values.length - 1);

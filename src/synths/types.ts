@@ -168,7 +168,7 @@ export interface BaseSynthProps {
     /**
      * Node reference for external access.
      */
-    nodeRef?: React.RefObject<GainNode>;
+    nodeRef?: React.RefObject<GainNode | null>;
 }
 
 /**
@@ -311,7 +311,7 @@ export interface EnvelopeProps extends EnvelopeConfig {
     /**
      * Node reference for external access.
      */
-    nodeRef?: React.RefObject<GainNode>;
+    nodeRef?: React.RefObject<GainNode | null>;
 }
 
 // =============================================================================

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAudio } from '../core/AudioProvider';
 import { useAudioOut } from '../core/AudioOutContext';
+import { usePatchGraph } from '../core/PatchGraphContext';
+import { usePatchRuntime } from '../core/PatchRuntimeProvider';
 
 /**
  * Options for the useAudioNode hook.
@@ -41,6 +43,17 @@ export interface UseAudioNodeResult<T extends AudioNode> {
      * Whether the audio system is unlocked.
      */
     isUnlocked: boolean;
+}
+
+export interface UseWasmNodeResult {
+    nodeId: string;
+    updateParam: (key: string, value: number) => void;
+}
+
+let wasmNodeCounter = 0;
+function createWasmNodeId(): string {
+    wasmNodeCounter += 1;
+    return `wasm-node-${wasmNodeCounter.toString(36)}`;
 }
 
 /**
@@ -146,6 +159,61 @@ export function useAudioNode<T extends AudioNode>({
         nodeRef,
         context,
         isUnlocked,
+    };
+}
+
+/**
+ * Registers a virtual node in the patch graph and returns a node id + param updater.
+ */
+export function useWasmNode(
+    type: string,
+    data: Record<string, unknown>
+): UseWasmNodeResult {
+    const graph = usePatchGraph();
+    const { runtimeRef } = usePatchRuntime();
+    const { nodeId: parentNodeId, inputHandle: parentInputHandle } = useAudioOut();
+    const nodeIdRef = useRef<string | null>(null);
+    if (!nodeIdRef.current) {
+        nodeIdRef.current = createWasmNodeId();
+    }
+    const nodeId = nodeIdRef.current;
+    const connectionIdRef = useRef<string | null>(null);
+    const dataRef = useRef(data);
+
+    useEffect(() => {
+        graph.addNode(nodeId, type, data);
+        if (parentNodeId) {
+            const connectionId = `${nodeId}->${parentNodeId}:${parentInputHandle}`;
+            connectionIdRef.current = connectionId;
+            graph.addConnection(
+                connectionId,
+                nodeId,
+                'output',
+                parentNodeId,
+                parentInputHandle
+            );
+        }
+
+        return () => {
+            if (connectionIdRef.current) {
+                graph.removeConnection(connectionIdRef.current);
+                connectionIdRef.current = null;
+            }
+            graph.removeNode(nodeId);
+        };
+    }, [graph, nodeId, parentInputHandle, parentNodeId, type]);
+
+    useEffect(() => {
+        if (Object.is(dataRef.current, data)) return;
+        dataRef.current = data;
+        graph.updateNodeData(nodeId, data);
+    }, [data, graph, nodeId]);
+
+    return {
+        nodeId,
+        updateParam: (key: string, value: number) => {
+            runtimeRef.current?.setInput(`${nodeId}:${key}`, value);
+        },
     };
 }
 

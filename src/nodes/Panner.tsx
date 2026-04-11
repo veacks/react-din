@@ -1,24 +1,8 @@
 import { useEffect, type FC } from 'react';
-import type { PannerProps } from './types';
-import { useAudioNode, useAudioParam } from './useAudioNode';
 import { AudioOutProvider } from '../core/AudioOutContext';
+import type { PannerProps } from './types';
+import { useWasmNode } from './useAudioNode';
 
-/**
- * Panner node component for 3D spatial audio positioning.
- *
- * @example
- * ```tsx
- * // Position audio in 3D space
- * <Panner positionX={2} positionY={0} positionZ={-3}>
- *   <Sampler src="/footsteps.wav" />
- * </Panner>
- *
- * // HRTF panning for headphones
- * <Panner panningModel="HRTF" positionX={-1}>
- *   <Sampler src="/voice.wav" />
- * </Panner>
- * ```
- */
 export const Panner: FC<PannerProps> = ({
     children,
     nodeRef: externalRef,
@@ -37,33 +21,14 @@ export const Panner: FC<PannerProps> = ({
     coneInnerAngle = 360,
     coneOuterAngle = 360,
     coneOuterGain = 0,
-    id,
 }) => {
-    const { nodeRef, context } = useAudioNode<PannerNode>({
-        createNode: (ctx) => ctx.createPanner(),
-        bypass,
-    });
-
-    // Sync external ref
-    useEffect(() => {
-        if (externalRef) {
-            (externalRef as React.MutableRefObject<PannerNode | null>).current = nodeRef.current;
-        }
-    }, [externalRef, nodeRef.current]);
-
-    // Apply panning model and distance model
-    useEffect(() => {
-        if (nodeRef.current) {
-            nodeRef.current.panningModel = panningModel;
-            nodeRef.current.distanceModel = distanceModel;
-            nodeRef.current.refDistance = refDistance;
-            nodeRef.current.maxDistance = maxDistance;
-            nodeRef.current.rolloffFactor = rolloffFactor;
-            nodeRef.current.coneInnerAngle = coneInnerAngle;
-            nodeRef.current.coneOuterAngle = coneOuterAngle;
-            nodeRef.current.coneOuterGain = coneOuterGain;
-        }
-    }, [
+    const { nodeId } = useWasmNode('panner', {
+        positionX,
+        positionY,
+        positionZ,
+        orientationX,
+        orientationY,
+        orientationZ,
         panningModel,
         distanceModel,
         refDistance,
@@ -72,18 +37,19 @@ export const Panner: FC<PannerProps> = ({
         coneInnerAngle,
         coneOuterAngle,
         coneOuterGain,
-    ]);
+        bypass,
+    });
 
-    // Apply position and orientation as AudioParams
-    useAudioParam(nodeRef.current?.positionX, positionX);
-    useAudioParam(nodeRef.current?.positionY, positionY);
-    useAudioParam(nodeRef.current?.positionZ, positionZ);
-    useAudioParam(nodeRef.current?.orientationX, orientationX);
-    useAudioParam(nodeRef.current?.orientationY, orientationY);
-    useAudioParam(nodeRef.current?.orientationZ, orientationZ);
+    useEffect(() => {
+        if (!externalRef) return;
+        (externalRef as React.MutableRefObject<PannerNode | null>).current = {} as PannerNode;
+        return () => {
+            (externalRef as React.MutableRefObject<PannerNode | null>).current = null;
+        };
+    }, [externalRef]);
 
     return (
-        <AudioOutProvider node={bypass ? null : nodeRef.current}>
+        <AudioOutProvider node={null} nodeId={nodeId}>
             {children}
         </AudioOutProvider>
     );

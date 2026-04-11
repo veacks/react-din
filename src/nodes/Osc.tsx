@@ -1,24 +1,9 @@
-import { useEffect, useRef, type FC } from 'react';
-import type { OscProps } from './types';
-import { useAudioNode, useAudioParam } from './useAudioNode';
+import { useEffect, type FC } from 'react';
 import { AudioOutProvider } from '../core/AudioOutContext';
+import { getNumericValue } from '../core/ModulatableValue';
+import type { OscProps } from './types';
+import { useWasmNode } from './useAudioNode';
 
-/**
- * Oscillator node component for generating periodic waveforms.
- *
- * Supports standard waveforms (sine, square, sawtooth, triangle)
- * and custom periodic waves.
- *
- * @example
- * ```tsx
- * // Simple sine wave
- * <Osc type="sine" frequency={440} autoStart />
- *
- * // With LFO modulation (vibrato effect)
- * const lfo = useLFO({ rate: 6, depth: 20 });
- * <Osc type="sine" frequency={lfo} frequencyBase={440} autoStart />
- * ```
- */
 export const Osc: FC<OscProps> = ({
     children,
     nodeRef: externalRef,
@@ -29,61 +14,26 @@ export const Osc: FC<OscProps> = ({
     detune = 0,
     detuneBase,
     autoStart = false,
-    periodicWave,
-    id,
 }) => {
-    const startedNodeRef = useRef<OscillatorNode | null>(null);
-
-    const { nodeRef, context } = useAudioNode<OscillatorNode>({
-        createNode: (ctx) => ctx.createOscillator(),
+    const { nodeId } = useWasmNode('osc', {
+        type,
+        frequency: getNumericValue(frequency, frequencyBase ?? 440),
+        detune: getNumericValue(detune, detuneBase ?? 0),
+        autoStart,
         bypass,
-        // Create a new oscillator when type changes (oscillators are single-use)
-        deps: [type],
     });
 
-    // Sync external ref
     useEffect(() => {
-        if (externalRef) {
-            (externalRef as React.MutableRefObject<OscillatorNode | null>).current = nodeRef.current;
-        }
-    }, [externalRef, nodeRef.current]);
-
-    // Apply oscillator type
-    useEffect(() => {
-        if (nodeRef.current && !periodicWave) {
-            nodeRef.current.type = type;
-        }
-    }, [type, periodicWave]);
-
-    // Apply periodic wave
-    useEffect(() => {
-        if (nodeRef.current && periodicWave) {
-            nodeRef.current.setPeriodicWave(periodicWave);
-        }
-    }, [periodicWave]);
-
-    // Apply parameters (with LFO support)
-    useAudioParam(nodeRef.current?.frequency, frequency, frequencyBase ?? 440);
-    useAudioParam(nodeRef.current?.detune, detune, detuneBase ?? 0);
-
-    // Auto-start
-    useEffect(() => {
-        const node = nodeRef.current;
-        if (!node || !autoStart) return;
-        if (startedNodeRef.current === node) return;
-
-        try {
-            node.start();
-        } catch {
-            // Already started
-        }
-        startedNodeRef.current = node;
-    }, [autoStart, nodeRef.current]);
+        if (!externalRef) return;
+        (externalRef as React.MutableRefObject<OscillatorNode | null>).current = {} as OscillatorNode;
+        return () => {
+            (externalRef as React.MutableRefObject<OscillatorNode | null>).current = null;
+        };
+    }, [externalRef]);
 
     return (
-        <AudioOutProvider node={bypass ? null : nodeRef.current}>
+        <AudioOutProvider node={null} nodeId={nodeId}>
             {children}
         </AudioOutProvider>
     );
 };
-

@@ -1,6 +1,12 @@
 import { useAudio } from '../../core';
-import type { PatchDocument, PatchMidiBindings } from '../../patch/types';
+import type { MidiTransportState, PatchDocument, PatchMidiBindings } from '../../patch/types';
 import type { MidiNoteValue } from '../../midi/types';
+import {
+    resolveConvolverAssetPath,
+    resolveMidiPlayerAssetPath,
+    resolveSamplerAssetPath,
+} from '../../patch/document/assets';
+import { resolvePatchAssetPath } from '../../patch/document';
 import { useEffect, useRef, type FC } from 'react';
 import { ensureWasmInitialized } from './loadWasmOnce';
 
@@ -73,6 +79,51 @@ export interface PatchWasmBridgeProps<TPatch extends PatchDocument> {
     assetRoot?: string;
     propValues: Record<string, unknown>;
     midi?: PatchMidiBindings<TPatch>;
+    onTransportState?: (state: MidiTransportState) => void;
+}
+
+async function loadPatchAssets(
+    runtime: import('din-wasm').AudioRuntime,
+    patch: PatchDocument,
+    assetRoot?: string
+): Promise<void> {
+    const tasks: Array<{ path: string; resolvedPath: string }> = [];
+
+    for (const node of patch.nodes) {
+        const nodeType = node.data?.type;
+        if (nodeType === 'sampler' || nodeType === 'triggeredSampler') {
+            const samplerPath = resolveSamplerAssetPath(node.data);
+            tasks.push({
+                path: samplerPath,
+                resolvedPath: resolvePatchAssetPath(samplerPath, assetRoot) ?? samplerPath,
+            });
+        } else if (nodeType === 'convolver') {
+            const convolverPath = resolveConvolverAssetPath(node.data);
+            tasks.push({
+                path: convolverPath,
+                resolvedPath: resolvePatchAssetPath(convolverPath, assetRoot) ?? convolverPath,
+            });
+        } else if (nodeType === 'midiPlayer') {
+            const midiPath = resolveMidiPlayerAssetPath(node.data);
+            tasks.push({
+                path: midiPath,
+                resolvedPath: resolvePatchAssetPath(midiPath, assetRoot) ?? midiPath,
+            });
+        }
+    }
+
+    await Promise.all(tasks.map(async ({ path, resolvedPath }) => {
+        try {
+            const response = await fetch(resolvedPath);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const bytes = new Uint8Array(await response.arrayBuffer());
+            runtime.loadAsset(path, bytes);
+        } catch (error) {
+            console.warn(`[PatchWasmBridge] Failed to load asset ${resolvedPath}:`, error);
+        }
+    }));
 }
 
 /**
@@ -81,8 +132,10 @@ export interface PatchWasmBridgeProps<TPatch extends PatchDocument> {
  */
 export const PatchWasmBridge: FC<PatchWasmBridgeProps<PatchDocument>> = ({
     patch,
+    assetRoot,
     propValues,
     midi,
+    onTransportState,
 }) => {
     const { context, masterBus, sampleRate } = useAudio();
 
@@ -92,6 +145,7 @@ export const PatchWasmBridge: FC<PatchWasmBridgeProps<PatchDocument>> = ({
     midiRef.current = midi;
 
     const lastGateRef = useRef<Map<string, boolean>>(new Map());
+    const lastTickCountRef = useRef<number | null>(null);
 
     useEffect(() => {
         if (!context || !masterBus) return undefined;
@@ -121,6 +175,12 @@ export const PatchWasmBridge: FC<PatchWasmBridgeProps<PatchDocument>> = ({
                     return;
                 }
 
+                await loadPatchAssets(audioRuntime, patch, assetRoot);
+                if (cancelled) {
+                    audioRuntime.free();
+                    return;
+                }
+
                 runtime = audioRuntime;
                 const scratch = new Float32Array(audioRuntime.interleavedOutputLen());
 
@@ -131,6 +191,13 @@ export const PatchWasmBridge: FC<PatchWasmBridgeProps<PatchDocument>> = ({
                     applyInterfaceEvents(audioRuntime, patch, propValuesRef.current);
                     applyMidiNoteEdges(audioRuntime, patch, midiRef.current, lastGateByNodeId);
                     audioRuntime.renderBlockInto(scratch);
+                    if (onTransportState) {
+                        const state = audioRuntime.transportState() as MidiTransportState;
+                        if (state.tick_count !== lastTickCountRef.current) {
+                            lastTickCountRef.current = state.tick_count;
+                            onTransportState(state);
+                        }
+                    }
                     const outL = event.outputBuffer.getChannelData(0);
                     const outR = event.outputBuffer.getChannelData(1);
                     for (let i = 0; i < WASM_BLOCK_FRAMES; i++) {
@@ -162,7 +229,7 @@ export const PatchWasmBridge: FC<PatchWasmBridgeProps<PatchDocument>> = ({
                 runtime = null;
             }
         };
-    }, [context, masterBus, patch, sampleRate]);
+    }, [assetRoot, context, masterBus, onTransportState, patch, sampleRate]);
 
     return null;
 };

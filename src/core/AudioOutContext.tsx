@@ -6,6 +6,8 @@ import type { AudioOutContextValue } from './types';
  */
 const defaultValue: AudioOutContextValue = {
     outputNode: null,
+    nodeId: null,
+    inputHandle: 'input',
     setOutputNode: () => {
         console.warn('AudioOutContext: setOutputNode called without provider');
     },
@@ -25,7 +27,9 @@ const AudioOutContext = createContext<AudioOutContextValue>(defaultValue);
  */
 interface AudioOutProviderProps {
     children: ReactNode;
-    node: AudioNode | null;
+    node?: AudioNode | null;
+    nodeId?: string | null;
+    inputHandle?: string;
 }
 
 /**
@@ -37,9 +41,16 @@ interface AudioOutProviderProps {
  *
  * @internal
  */
-export const AudioOutProvider: FC<AudioOutProviderProps> = ({ children, node }) => {
+export const AudioOutProvider: FC<AudioOutProviderProps> = ({
+    children,
+    node = null,
+    nodeId = null,
+    inputHandle = 'input',
+}) => {
     const value: AudioOutContextValue = {
         outputNode: node,
+        nodeId,
+        inputHandle,
         setOutputNode: () => {
             // This is typically a no-op as nodes set themselves as output
             // when they mount. Kept for potential future use.

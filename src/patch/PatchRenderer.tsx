@@ -78,6 +78,7 @@ export function PatchRenderer<const TPatch extends PatchDocument>({
     includeProvider = true,
     assetRoot,
     midi,
+    onTransportState,
     ...rest
 }: PatchRendererProps<TPatch>) {
     const migratedPatch = useMemo(() => {
@@ -101,6 +102,7 @@ export function PatchRenderer<const TPatch extends PatchDocument>({
             assetRoot={assetRoot}
             propValues={rest as Record<string, unknown>}
             midi={midi as PatchMidiBindings<PatchDocument> | undefined}
+            onTransportState={onTransportState}
         />
     );
 

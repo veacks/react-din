@@ -153,6 +153,16 @@ export interface AudioOutContextValue {
     outputNode: AudioNode | null;
 
     /**
+     * Patch-graph node id routed as parent for WASM graph connections.
+     */
+    nodeId: string | null;
+
+    /**
+     * Input handle used when wiring a child node to the parent patch node.
+     */
+    inputHandle: string;
+
+    /**
      * Register a new output node for children to connect to.
      * @param node - The AudioNode to set as the output
      */

@@ -195,6 +195,12 @@ export interface PatchMidiBindings<TPatch extends PatchDocument> {
     outputs?: PatchMidiOutputBindings<TPatch>;
 }
 
+export interface MidiTransportState {
+    running: boolean;
+    tick_count: number;
+    bpm_estimate: number | null;
+}
+
 export type PatchProps<TPatch extends PatchDocument> =
     PatchInputProps<TPatch>
     & PatchEventProps<TPatch>
@@ -206,4 +212,5 @@ export type PatchRendererProps<TPatch extends PatchDocument> = PatchProps<TPatch
     patch: TPatch;
     includeProvider?: boolean;
     assetRoot?: string;
+    onTransportState?: (state: MidiTransportState) => void;
 };

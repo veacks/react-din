@@ -3,6 +3,7 @@ import { hydrateNodeDataForGraph, normalizePatchNode } from './document/assets';
 import { getTransportConnections, isAudioConnectionLike, validateConnection, validateNode } from './document/handles';
 import { buildPatchInterface } from './document/interface';
 import { normalizePatchConnection } from './document/normalize';
+import { withWasm } from '../runtime/wasm/withWasm';
 import {
     PATCH_DOCUMENT_VERSION,
     PATCH_INPUT_HANDLE_PREFIX,
@@ -23,6 +24,16 @@ export {
 export { isAudioConnectionLike, getTransportConnections };
 
 export function resolvePatchAssetPath(assetPath: string | undefined, assetRoot?: string): string | undefined {
+    return withWasm(
+        (wasm) => {
+            if (!assetPath || !assetRoot) return assetPath;
+            return wasm.resolve_patch_asset_path(assetPath, assetRoot) ?? undefined;
+        },
+        () => resolvePatchAssetPathLocal(assetPath, assetRoot)
+    );
+}
+
+function resolvePatchAssetPathLocal(assetPath: string | undefined, assetRoot?: string): string | undefined {
     if (!assetPath) return undefined;
     if (!assetRoot) return assetPath;
     if (/^(?:[a-z]+:)?\/\//i.test(assetPath) || assetPath.startsWith('blob:') || assetPath.startsWith('data:')) {
@@ -35,6 +46,13 @@ export function resolvePatchAssetPath(assetPath: string | undefined, assetRoot?:
 }
 
 export function graphDocumentToPatch(graph: GraphDocumentLike): PatchDocument {
+    return withWasm(
+        (wasm) => JSON.parse(wasm.graph_document_to_patch(JSON.stringify(graph))) as PatchDocument,
+        () => graphDocumentToPatchLocal(graph)
+    );
+}
+
+function graphDocumentToPatchLocal(graph: GraphDocumentLike): PatchDocument {
     const rawConnections = graph.connections ?? graph.edges ?? [];
     const nodes = graph.nodes.map((node) => normalizePatchNode(node) as PatchNode);
     const connections = rawConnections.map(normalizePatchConnection);
@@ -53,6 +71,13 @@ export function graphDocumentToPatch(graph: GraphDocumentLike): PatchDocument {
 }
 
 export function migratePatchDocument(patch: PatchDocument): PatchDocument {
+    return withWasm(
+        (wasm) => JSON.parse(wasm.migrate_patch(JSON.stringify(patch))) as PatchDocument,
+        () => migratePatchDocumentLocal(patch)
+    );
+}
+
+function migratePatchDocumentLocal(patch: PatchDocument): PatchDocument {
     if (!patch || typeof patch !== 'object') {
         throw new Error('Patch document must be an object.');
     }
@@ -100,7 +125,20 @@ function buildGraphEdgeStyle(
     };
 }
 
-export function patchToGraphDocument(patch: PatchDocument, options: PatchToGraphOptions = {}) {
+export function patchToGraphDocument(
+    patch: PatchDocument,
+    options: PatchToGraphOptions = {}
+): GraphDocumentLike {
+    return withWasm(
+        (wasm) => JSON.parse(wasm.patch_to_graph_document(JSON.stringify(patch))) as GraphDocumentLike,
+        () => patchToGraphDocumentLocal(patch, options)
+    );
+}
+
+function patchToGraphDocumentLocal(
+    patch: PatchDocument,
+    options: PatchToGraphOptions = {}
+): GraphDocumentLike {
     const migrated = migratePatchDocument(patch);
     const now = Date.now();
     const graphId = options.graphId ?? createGraphId();
@@ -114,7 +152,10 @@ export function patchToGraphDocument(patch: PatchDocument, options: PatchToGraph
         type: `${node.type}Node`,
         position: node.position ? { ...node.position } : { x: 0, y: 0 },
         dragHandle: '.node-header',
-        data: hydrateNodeDataForGraph(node.data),
+        data: {
+            ...hydrateNodeDataForGraph(node.data),
+            type: node.type,
+        },
     }));
 
     const edges = migrated.connections.map((connection) => ({
