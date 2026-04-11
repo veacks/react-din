@@ -27,5 +27,5 @@ export { useAudio } from './useAudio';
 
 // Internal (for advanced use cases)
 export { AudioOutProvider, useAudioOut } from './AudioOutContext';
-export { PatchGraphProvider, usePatchGraph } from './PatchGraphContext';
-export { PatchRuntimeProvider, usePatchRuntime } from './PatchRuntimeProvider';
+export { PATCH_MASTER_OUTPUT_NODE_ID, PatchGraphProvider, usePatchGraph } from './PatchGraphContext';
+export { PatchRuntimeProvider, usePatchRuntime, type PatchRuntimeHandle } from './PatchRuntimeProvider';

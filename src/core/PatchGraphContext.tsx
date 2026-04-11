@@ -7,6 +7,9 @@ import {
     type ReactNode,
 } from 'react';
 
+/** Stable id for the WASM engine [`NodeKind::Output`] sink; required or `Engine` renders silence. */
+export const PATCH_MASTER_OUTPUT_NODE_ID = '__din_master_output__';
+
 export interface PatchGraphEntry {
     type: string;
     data: Record<string, unknown>;
@@ -41,18 +44,31 @@ export interface PatchGraphContextValue {
 
 const PatchGraphContext = createContext<PatchGraphContextValue | null>(null);
 
+function createInitialNodes(): Map<string, PatchGraphEntry> {
+    const nodes = new Map<string, PatchGraphEntry>();
+    nodes.set(PATCH_MASTER_OUTPUT_NODE_ID, {
+        type: 'output',
+        data: { type: 'output', label: 'Main output' },
+    });
+    return nodes;
+}
+
 export const PatchGraphProvider: FC<{ children: ReactNode }> = ({ children }) => {
-    const nodesRef = useRef(new Map<string, PatchGraphEntry>());
+    const nodesRef = useRef(createInitialNodes());
     const connectionsRef = useRef(new Map<string, PatchGraphConnection>());
     const subscribersRef = useRef(new Set<() => void>());
     const topologyVersionRef = useRef(0);
     const dataVersionRef = useRef(0);
 
-    const notifyTopology = () => {
-        topologyVersionRef.current += 1;
+    const notifySubscribers = () => {
         for (const callback of subscribersRef.current) {
             callback();
         }
+    };
+
+    const notifyTopology = () => {
+        topologyVersionRef.current += 1;
+        notifySubscribers();
     };
 
     const value = useMemo<PatchGraphContextValue>(() => ({
@@ -61,6 +77,7 @@ export const PatchGraphProvider: FC<{ children: ReactNode }> = ({ children }) =>
             notifyTopology();
         },
         removeNode(id) {
+            if (id === PATCH_MASTER_OUTPUT_NODE_ID) return;
             if (!nodesRef.current.delete(id)) return;
             for (const [connectionId, connection] of connectionsRef.current.entries()) {
                 if (connection.source === id || connection.target === id) {
@@ -74,6 +91,7 @@ export const PatchGraphProvider: FC<{ children: ReactNode }> = ({ children }) =>
             if (!existing) return;
             nodesRef.current.set(id, { ...existing, data });
             dataVersionRef.current += 1;
+            notifySubscribers();
         },
         addConnection(id, source, sourceHandle, target, targetHandle) {
             connectionsRef.current.set(id, {

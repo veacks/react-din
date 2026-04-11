@@ -1,14 +1,13 @@
 import { useState } from 'react';
+import { AudioProvider, useAudio } from '@open-din/react';
 import {
-    AudioProvider,
-    useAudio,
     Gain,
     Filter,
     Osc,
     Delay,
     StereoPanner,
     Compressor,
-} from '@open-din/react';
+} from '@open-din/react/nodes';
 
 /**
  * Nodes Demo - Audio Processing Nodes

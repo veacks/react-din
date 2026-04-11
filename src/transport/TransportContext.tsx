@@ -1,6 +1,5 @@
 import {
     createContext,
-    useContext,
     useState,
     useCallback,
     useRef,
@@ -10,7 +9,11 @@ import {
 } from 'react';
 import type { TransportState, TransportConfig, TimePosition, TransportEvents } from './types';
 import { useAudio } from '../core/AudioProvider';
-import { getWasmModuleSync, isWasmReady } from '../runtime/wasm/loadWasmOnce';
+import {
+    bumpWasmDebugCounter,
+    getWasmModuleSync,
+    isWasmReady,
+} from '../runtime/wasm/loadWasmOnce';
 
 const DEFAULT_CONFIG: TransportConfig = {
     bpm: 120,
@@ -171,7 +174,7 @@ export const TransportProvider: FC<TransportProviderProps> = ({
         if (!isWasmReady()) return null;
         const wasm = getWasmModuleSync();
         if (!wasm?.TransportRuntime?.fromConfig) return null;
-        return wasm.TransportRuntime.fromConfig(
+        const runtime = wasm.TransportRuntime.fromConfig(
             nextConfig.bpm,
             nextConfig.beatsPerBar,
             nextConfig.beatUnit,
@@ -180,6 +183,8 @@ export const TransportProvider: FC<TransportProviderProps> = ({
             nextConfig.swing ?? 0,
             'tick'
         ) as TransportRuntimeLike;
+        bumpWasmDebugCounter('transportRuntimeCreated');
+        return runtime;
     }, []);
 
     const syncPositionFromRuntime = useCallback((runtime: TransportRuntimeLike) => {
@@ -314,6 +319,7 @@ export const TransportProvider: FC<TransportProviderProps> = ({
             }
             return;
         }
+        bumpWasmDebugCounter('transportAdvanceCalls');
         const ticks = runtimeRef.current.advanceSeconds(deltaSeconds);
         const tickList = Array.isArray(ticks) ? ticks : [];
         if (tickList.length === 0) {

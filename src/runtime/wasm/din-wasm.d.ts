@@ -63,7 +63,7 @@ declare module 'din-wasm' {
         max: number,
         mode: string
     ): number;
-    export function audio_switch(index: number, values: number[]): number;
+    export function audio_switch(index: number, values: Float32Array): number;
 
     export function migrate_patch(json: string): string;
     export function graph_document_to_patch(json: string): string;

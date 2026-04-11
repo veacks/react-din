@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState, type FC, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type FC, type ReactNode } from 'react';
 import { migratePatchDocument, resolvePatchAssetPath } from './document';
 import type { PatchDocument, PatchRuntimeProps } from './types';
 

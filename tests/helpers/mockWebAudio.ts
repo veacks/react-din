@@ -41,6 +41,8 @@ export class MockAudioParam {
 }
 
 export class MockAudioNode {
+    /** Set by `MockAudioContext` factory methods (WebAudio `AudioNode.context`). */
+    context: MockAudioContext | null = null;
     connections: unknown[] = [];
 
     connect(target: unknown) {
@@ -205,11 +207,37 @@ class MockScriptProcessorNode extends MockAudioNode {
     }
 }
 
+class MockMessagePort {
+    onmessage: ((event: MessageEvent) => void) | null = null;
+
+    postMessage(_data: unknown) {}
+
+    close() {}
+}
+
+export class MockAudioWorkletNode extends MockAudioNode {
+    processorName: string;
+    readonly port = new MockMessagePort();
+
+    constructor(
+        ctx: MockAudioContext,
+        name: string,
+        _options?: { processorOptions?: unknown; outputChannelCount?: number[] }
+    ) {
+        super();
+        this.context = ctx;
+        this.processorName = name;
+    }
+}
+
 export class MockAudioContext extends MockEventTarget {
     state: AudioContextState = 'suspended';
     sampleRate = 44100;
     currentTime = 0;
     destination = new MockAudioNode();
+    audioWorklet = {
+        addModule: async (_url: string | URL) => {},
+    };
 
     resume = async () => {
         this.state = 'running';
@@ -222,7 +250,9 @@ export class MockAudioContext extends MockEventTarget {
     };
 
     createGain() {
-        return new MockGainNode();
+        const g = new MockGainNode();
+        g.context = this;
+        return g;
     }
 
     createBiquadFilter() {
@@ -298,11 +328,19 @@ export const installMockWebAudio = () => {
             configurable: true,
             value: MockAudioContext,
         });
+        Object.defineProperty(window, 'AudioWorkletNode', {
+            configurable: true,
+            value: MockAudioWorkletNode,
+        });
     }
 
     Object.defineProperty(globalThis, 'AudioContext', {
         configurable: true,
         value: MockAudioContext,
+    });
+    Object.defineProperty(globalThis, 'AudioWorkletNode', {
+        configurable: true,
+        value: MockAudioWorkletNode,
     });
     Object.defineProperty(globalThis, 'AudioBuffer', {
         configurable: true,

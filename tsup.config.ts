@@ -1,6 +1,6 @@
 import { defineConfig } from 'tsup';
 
-export default defineConfig({
+const main = defineConfig({
     entry: {
         index: 'src/index.ts',
         'core/index': 'src/core/index.ts',
@@ -17,6 +17,7 @@ export default defineConfig({
         'notes/index': 'src/notes/index.ts',
         'synths/index': 'src/synths/index.ts',
         'utils/index': 'src/utils/index.ts',
+        'runtime/wasm/loadDinAudioWorklet': 'src/runtime/wasm/loadDinAudioWorklet.ts',
     },
     format: ['esm', 'cjs'],
     dts: true,
@@ -29,3 +30,24 @@ export default defineConfig({
         options.jsx = 'automatic';
     },
 });
+
+/** Bundles `din-wasm` for the AudioWorklet global (separate from the main thread). */
+const worklet = defineConfig({
+    entry: {
+        'runtime/wasm/dinAudioRuntime.worklet': 'src/runtime/wasm/dinAudioRuntime.worklet.ts',
+    },
+    format: ['esm'],
+    platform: 'browser',
+    outDir: 'dist',
+    dts: false,
+    splitting: false,
+    sourcemap: true,
+    clean: false,
+    treeshake: true,
+    noExternal: ['din-wasm'],
+    esbuildOptions(options) {
+        options.jsx = 'automatic';
+    },
+});
+
+export default [main, worklet];

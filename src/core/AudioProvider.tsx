@@ -6,7 +6,6 @@ import {
     useCallback,
     useRef,
     type FC,
-    type ReactNode,
 } from 'react';
 import type {
     AudioProviderProps,
@@ -15,7 +14,7 @@ import type {
     AudioContextRef,
 } from './types';
 import { AudioOutProvider } from './AudioOutContext';
-import { PatchGraphProvider } from './PatchGraphContext';
+import { PATCH_MASTER_OUTPUT_NODE_ID, PatchGraphProvider } from './PatchGraphContext';
 import { PatchRuntimeProvider } from './PatchRuntimeProvider';
 import { ensureWasmInitialized } from '../runtime/wasm/loadWasmOnce';
 import { setupUnlock, setupGestureUnlock } from './unlock';
@@ -238,7 +237,7 @@ export const AudioProvider: FC<AudioProviderProps> = ({
                 >
                     <AudioOutProvider
                         node={masterBusRef.current}
-                        nodeId={null}
+                        nodeId={PATCH_MASTER_OUTPUT_NODE_ID}
                         inputHandle="input"
                     >
                         {children}

@@ -9,7 +9,7 @@ export const StereoPanner: FC<StereoPannerProps> = ({
     bypass = false,
     pan = 0,
 }) => {
-    const { nodeId } = useWasmNode('stereoPanner', {
+    const { nodeId } = useWasmNode('panner', {
         pan,
         bypass,
     });

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { AudioProvider, useAudio, Gain, Filter, Osc } from '@open-din/react';
+import { AudioProvider, useAudio } from '@open-din/react';
+import { Gain, Filter, Osc } from '@open-din/react/nodes';
 
 /**
  * Core Demo - Basic AudioProvider and Oscillator

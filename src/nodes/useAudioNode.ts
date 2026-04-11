@@ -56,6 +56,15 @@ function createWasmNodeId(): string {
     return `wasm-node-${wasmNodeCounter.toString(36)}`;
 }
 
+/** Patch graph uses `out` / `in`; the audio tree context still speaks Web Audio `output` / `input`. */
+function toPatchSourceHandle(handle: string): string {
+    return handle === 'output' ? 'out' : handle;
+}
+
+function toPatchTargetHandle(handle: string): string {
+    return handle === 'input' ? 'in' : handle;
+}
+
 /**
  * Base hook for creating and managing audio nodes.
  *
@@ -183,15 +192,11 @@ export function useWasmNode(
     useEffect(() => {
         graph.addNode(nodeId, type, data);
         if (parentNodeId) {
-            const connectionId = `${nodeId}->${parentNodeId}:${parentInputHandle}`;
+            const sourceHandle = toPatchSourceHandle('output');
+            const targetHandle = toPatchTargetHandle(parentInputHandle);
+            const connectionId = `${nodeId}->${parentNodeId}:${targetHandle}`;
             connectionIdRef.current = connectionId;
-            graph.addConnection(
-                connectionId,
-                nodeId,
-                'output',
-                parentNodeId,
-                parentInputHandle
-            );
+            graph.addConnection(connectionId, nodeId, sourceHandle, parentNodeId, targetHandle);
         }
 
         return () => {

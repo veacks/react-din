@@ -65,7 +65,7 @@ export function useLFO(options: UseLFOOptions = {}): LFOOutput | null {
         rate = 1,
         depth = 100,
         waveform = 'sine',
-        phase = 0,
+        phase: _phase = 0,
         autoStart = true,
     } = options;
 

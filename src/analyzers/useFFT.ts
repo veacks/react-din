@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAnalyzer } from './useAnalyzer';
 import type { FFTData, UseAnalyzerOptions } from './types';
 
@@ -8,7 +8,7 @@ import type { FFTData, UseAnalyzerOptions } from './types';
 function getFrequencyRangeLevel(
     frequencyData: Uint8Array,
     sampleRate: number,
-    fftSize: number,
+    _fftSize: number,
     minHz: number,
     maxHz: number
 ): number {

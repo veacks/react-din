@@ -6,11 +6,14 @@ import {
     useRef,
     useEffect,
     type FC,
-    type ReactNode,
 } from 'react';
 import type { SequencerProps, SequencerContextValue } from './types';
 import { useAudio } from '../core/AudioProvider';
-import { getWasmModuleSync, isWasmReady } from '../runtime/wasm/loadWasmOnce';
+import {
+    bumpWasmDebugCounter,
+    getWasmModuleSync,
+    isWasmReady,
+} from '../runtime/wasm/loadWasmOnce';
 
 const defaultValue: SequencerContextValue = {
     currentStep: 0,
@@ -38,7 +41,7 @@ function createRuntime(bpm: number, steps: number): TransportRuntimeLike | null 
     if (!isWasmReady()) return null;
     const wasm = getWasmModuleSync();
     if (!wasm?.TransportRuntime?.fromConfig) return null;
-    return wasm.TransportRuntime.fromConfig(
+    const runtime = wasm.TransportRuntime.fromConfig(
         bpm,
         4,
         4,
@@ -47,6 +50,8 @@ function createRuntime(bpm: number, steps: number): TransportRuntimeLike | null 
         0,
         'tick'
     ) as TransportRuntimeLike;
+    bumpWasmDebugCounter('sequencerRuntimeCreated');
+    return runtime;
 }
 
 function seekRuntime(runtime: TransportRuntimeLike, step: number): void {
@@ -71,7 +76,7 @@ export const Sequencer: FC<SequencerProps> = ({
     onStep,
     onComplete,
     onStart,
-    onStop,
+    onStop: _onStop,
 }) => {
     useAudio();
     const [isPlaying, setIsPlaying] = useState(autoStart);
@@ -102,17 +107,6 @@ export const Sequencer: FC<SequencerProps> = ({
         fallbackStepRef.current = 0;
         onStart?.();
     }, [onStart]);
-
-    const stop = useCallback(() => {
-        runtimeRef.current?.stop();
-        runtimeRef.current?.reset();
-        setIsPlaying(false);
-        setCurrentStep(0);
-        lastNowRef.current = null;
-        fallbackCarryRef.current = 0;
-        fallbackStepRef.current = 0;
-        onStop?.();
-    }, [onStop]);
 
     useEffect(() => {
         const previous = runtimeRef.current;
@@ -172,6 +166,7 @@ export const Sequencer: FC<SequencerProps> = ({
                     }
                 }
             } else if (runtime && isPlaying && runtime.isPlaying()) {
+                bumpWasmDebugCounter('sequencerAdvanceCalls');
                 const ticks = runtime.advanceSeconds(delta);
                 const tickList = Array.isArray(ticks) ? ticks : [];
                 for (let i = 0; i < tickList.length; i += 1) {

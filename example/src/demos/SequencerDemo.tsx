@@ -4,14 +4,11 @@ import {
     useAudio,
     Sequencer,
     Track,
-    Gain,
-    Filter,
-    NoiseBurst,
-    Synth,
-    MonoSynth,
-    DrumSynth,
     noteToFreq,
 } from '@open-din/react';
+import { Gain, Filter } from '@open-din/react/nodes';
+import { NoiseBurst } from '@open-din/react/sources';
+import { Synth, MonoSynth, DrumSynth } from '@open-din/react/synths';
 
 /**
  * Sequencer Demo - Acid House Banger

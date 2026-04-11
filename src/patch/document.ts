@@ -6,7 +6,6 @@ import { normalizePatchConnection } from './document/normalize';
 import { withWasm } from '../runtime/wasm/withWasm';
 import {
     PATCH_DOCUMENT_VERSION,
-    PATCH_INPUT_HANDLE_PREFIX,
     type GraphDocumentLike,
     type PatchToGraphOptions,
     createGraphId,

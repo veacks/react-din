@@ -1,12 +1,6 @@
 import { useState, useCallback, useEffect, useRef, type FC } from 'react';
-import {
-    AudioProvider,
-    Osc,
-    Gain,
-    ADSR,
-    noteToFreq,
-    parseNote,
-} from '@open-din/react';
+import { AudioProvider, noteToFreq, parseNote } from '@open-din/react';
+import { Osc, Gain, ADSR } from '@open-din/react/nodes';
 
 /**
  * Notes Demo - Interactive Piano Keyboard

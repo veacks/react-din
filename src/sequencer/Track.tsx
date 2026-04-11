@@ -4,7 +4,7 @@ import {
     useMemo,
     type FC,
 } from 'react';
-import type { TrackProps, TriggerEvent, Pattern } from './types';
+import type { TrackProps, TriggerEvent } from './types';
 import { useSequencer } from './Sequencer';
 import { TriggerProvider } from './TriggerContext';
 import { useAudio } from '../core/AudioProvider';
@@ -46,7 +46,7 @@ export const Track: FC<TrackProps> = ({
     pattern = [],
     offset = 0,
     mute = false,
-    solo = false,
+    solo: _solo = false,
     probability = 1,
     note = 60,
     data,

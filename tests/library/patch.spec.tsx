@@ -446,7 +446,8 @@ describe('patch import/export runtime', () => {
             expect(document.body).toBeTruthy();
         });
 
-        expect(fetchMock).not.toHaveBeenCalled();
+        const fetchedUrls = fetchMock.mock.calls.map((call) => String(call[0]));
+        expect(fetchedUrls.some((url) => url.includes('ignored.patch.json'))).toBe(false);
     });
 
     it('caches repeated asset-backed Patch loads by resolved asset path', async () => {

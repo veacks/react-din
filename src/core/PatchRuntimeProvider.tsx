@@ -7,18 +7,30 @@ import {
     type MutableRefObject,
     type ReactNode,
 } from 'react';
-import { ensureWasmInitialized, getWasmModuleSync } from '../runtime/wasm/loadWasmOnce';
+import { graphDocumentToPatch, type GraphDocumentLike } from '../patch/document';
+import { bumpWasmDebugCounter } from '../runtime/wasm/loadWasmOnce';
+import {
+    DIN_AUDIO_RUNTIME_PROCESSOR_NAME,
+    ensureDinAudioWorkletLoaded,
+} from '../runtime/wasm/loadDinAudioWorklet';
 import { usePatchGraph } from './PatchGraphContext';
 
 interface PatchRuntimeProviderProps {
     masterBus: GainNode | null;
     sampleRate: number;
+    /** Must match the AudioWorklet render quantum (128). */
     blockSize?: number;
     children: ReactNode;
 }
 
+/** Subset of `din-wasm` `AudioRuntime` used from React; implemented via `AudioWorkletNode` message port. */
+export type PatchRuntimeHandle = {
+    setInput: (key: string, value: number) => void;
+    pushMidi: (status: number, data1: number, data2: number, frameOffset: number) => void;
+};
+
 interface PatchRuntimeContextValue {
-    runtimeRef: MutableRefObject<import('din-wasm').AudioRuntime | null>;
+    runtimeRef: MutableRefObject<PatchRuntimeHandle | null>;
 }
 
 const PatchRuntimeContext = createContext<PatchRuntimeContextValue | null>(null);
@@ -32,13 +44,16 @@ function buildGraphDocument(graph: ReturnType<typeof usePatchGraph>) {
             type: node.type,
         },
     }));
-    const edges = Array.from(graph.getConnections().values()).map((connection) => ({
-        id: connection.id,
-        source: connection.source,
-        sourceHandle: connection.sourceHandle,
-        target: connection.target,
-        targetHandle: connection.targetHandle,
-    }));
+    const nodeIds = new Set(nodes.map((n) => n.id));
+    const edges = Array.from(graph.getConnections().values())
+        .filter((c) => nodeIds.has(c.source) && nodeIds.has(c.target))
+        .map((connection) => ({
+            id: connection.id,
+            source: connection.source,
+            sourceHandle: connection.sourceHandle,
+            target: connection.target,
+            targetHandle: connection.targetHandle,
+        }));
     return {
         name: 'Wasm Graph',
         nodes,
@@ -49,12 +64,12 @@ function buildGraphDocument(graph: ReturnType<typeof usePatchGraph>) {
 export const PatchRuntimeProvider: FC<PatchRuntimeProviderProps> = ({
     masterBus,
     sampleRate,
-    blockSize = 256,
+    blockSize = 128,
     children,
 }) => {
     const graph = usePatchGraph();
-    const runtimeRef = useRef<import('din-wasm').AudioRuntime | null>(null);
-    const processorRef = useRef<ScriptProcessorNode | null>(null);
+    const runtimeRef = useRef<PatchRuntimeHandle | null>(null);
+    const workletRef = useRef<AudioWorkletNode | null>(null);
 
     useEffect(() => {
         if (!masterBus) return undefined;
@@ -62,64 +77,94 @@ export const PatchRuntimeProvider: FC<PatchRuntimeProviderProps> = ({
         let cancelled = false;
 
         const destroyRuntime = () => {
-            if (processorRef.current) {
+            const node = workletRef.current;
+            if (node) {
+                node.port.onmessage = null;
                 try {
-                    processorRef.current.disconnect();
+                    node.disconnect();
                 } catch {
                     /* ignore */
                 }
-                processorRef.current = null;
+                workletRef.current = null;
             }
-            if (runtimeRef.current) {
-                runtimeRef.current.free();
-                runtimeRef.current = null;
-            }
+            runtimeRef.current = null;
         };
 
         const rebuildRuntime = async () => {
             if (cancelled) return;
-            const wasm = getWasmModuleSync();
-            if (!wasm) return;
             if (graph.getNodes().size === 0) {
                 destroyRuntime();
                 return;
             }
 
-            const graphDoc = buildGraphDocument(graph);
-            const patchJson = wasm.graph_document_to_patch(JSON.stringify(graphDoc));
-            const runtime = new wasm.AudioRuntime(patchJson, sampleRate, 2, blockSize);
-            const scratch = new Float32Array(runtime.interleavedOutputLen());
-            const processor = context.createScriptProcessor(blockSize, 0, 2);
-            processor.onaudioprocess = (event) => {
-                runtime.renderBlockInto(scratch);
-                const outL = event.outputBuffer.getChannelData(0);
-                const outR = event.outputBuffer.getChannelData(1);
-                for (let i = 0; i < blockSize; i++) {
-                    outL[i] = scratch[i * 2];
-                    outR[i] = scratch[i * 2 + 1];
-                }
-            };
-
-            destroyRuntime();
-            if (cancelled) {
-                runtime.free();
-                processor.disconnect();
+            let patchJson: string;
+            try {
+                const graphDoc = buildGraphDocument(graph) as GraphDocumentLike;
+                patchJson = JSON.stringify(graphDocumentToPatch(graphDoc));
+            } catch (error) {
+                console.error('[PatchRuntimeProvider] graph → patch failed:', error);
+                destroyRuntime();
                 return;
             }
 
-            processor.connect(masterBus);
-            runtimeRef.current = runtime;
-            processorRef.current = processor;
+            try {
+                await ensureDinAudioWorkletLoaded(context);
+            } catch (error) {
+                console.error('[PatchRuntimeProvider] AudioWorklet module failed:', error);
+                return;
+            }
+
+            if (cancelled) return;
+
+            destroyRuntime();
+            if (cancelled) return;
+
+            const node = new AudioWorkletNode(context, DIN_AUDIO_RUNTIME_PROCESSOR_NAME, {
+                numberOfInputs: 0,
+                numberOfOutputs: 1,
+                outputChannelCount: [2],
+                processorOptions: {
+                    kind: 'graph-runtime',
+                    patchJson,
+                    sampleRate,
+                    channels: 2,
+                    blockSize,
+                },
+            });
+            workletRef.current = node;
+
+            node.port.onmessage = (event: MessageEvent) => {
+                const data = event.data;
+                if (!data || typeof data !== 'object') return;
+                if (data.type === 'bump' && data.key === 'patchRuntimeCreated') {
+                    bumpWasmDebugCounter('patchRuntimeCreated');
+                }
+                if (data.type === 'error' && typeof data.message === 'string') {
+                    console.error('[PatchRuntimeProvider] worklet:', data.message);
+                }
+            };
+
+            const facade: PatchRuntimeHandle = {
+                setInput(key: string, value: number) {
+                    node.port.postMessage({ type: 'setInput', key, value });
+                },
+                pushMidi(status: number, data1: number, data2: number, frameOffset: number) {
+                    node.port.postMessage({ type: 'pushMidi', status, d1: data1, d2: data2, frameOffset });
+                },
+            };
+
+            runtimeRef.current = facade;
+            node.connect(masterBus);
         };
 
-        void ensureWasmInitialized()
-            .then(rebuildRuntime)
-            .catch((error) => {
-                console.error('[PatchRuntimeProvider] WASM init failed:', error);
-            });
+        void rebuildRuntime().catch((error) => {
+            console.error('[PatchRuntimeProvider] rebuild failed:', error);
+        });
 
         const unsubscribe = graph.subscribe(() => {
-            void rebuildRuntime();
+            void rebuildRuntime().catch((error) => {
+                console.error('[PatchRuntimeProvider] rebuild failed:', error);
+            });
         });
 
         return () => {
@@ -136,6 +181,7 @@ export const PatchRuntimeProvider: FC<PatchRuntimeProviderProps> = ({
     );
 };
 
+/** Returns the patch graph WASM runtime handle (`setInput` / `pushMidi` via AudioWorklet). */
 export function usePatchRuntime(): PatchRuntimeContextValue {
     const context = useContext(PatchRuntimeContext);
     if (!context) {

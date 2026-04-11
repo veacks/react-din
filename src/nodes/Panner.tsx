@@ -22,7 +22,7 @@ export const Panner: FC<PannerProps> = ({
     coneOuterAngle = 360,
     coneOuterGain = 0,
 }) => {
-    const { nodeId } = useWasmNode('panner', {
+    const { nodeId } = useWasmNode('panner3d', {
         positionX,
         positionY,
         positionZ,

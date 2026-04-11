@@ -303,7 +303,7 @@ export function clamp(value = 0, min = 0, max = 1, mode: ClampMode = 'minmax'): 
  */
 export function switchValue(index: number, values: number[], fallback = 0): number {
     const wasmValue = withWasm(
-        (wasm) => wasm.audio_switch(index, values),
+        (wasm) => wasm.audio_switch(index, Float32Array.from(values)),
         () => null as number | null
     );
     if (wasmValue !== null) return wasmValue;

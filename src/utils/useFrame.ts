@@ -106,7 +106,7 @@ export function tickAudio(): void {
  * // Call tickAudio() from your external loop
  * ```
  */
-export function useFrame(callback: FrameCallback, priority = 0): void {
+export function useFrame(callback: FrameCallback, _priority = 0): void {
     const callbackRef = useRef(callback);
 
     // Update callback ref

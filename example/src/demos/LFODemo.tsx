@@ -1,13 +1,7 @@
 import React, { useState } from 'react';
-import {
-    AudioProvider,
-    Gain,
-    Filter,
-    Osc,
-    useLFO,
-    LFO,
-    type LFOWaveform,
-} from '@open-din/react';
+import { AudioProvider } from '@open-din/react';
+import { Gain, Filter, Osc } from '@open-din/react/nodes';
+import { useLFO, LFO, type LFOWaveform } from '@open-din/react/sources';
 
 /**
  * LFO Demo - Demonstrates using LFO for modulation

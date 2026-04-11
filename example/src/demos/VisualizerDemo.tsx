@@ -1,11 +1,12 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { AudioProvider, Osc, Filter, Gain, useAudio, useAnalyzer } from '@open-din/react';
+import { AudioProvider, useAudio } from '@open-din/react';
+import { Osc, Filter, Gain } from '@open-din/react/nodes';
+import { useAnalyzer } from '@open-din/react/analyzers';
 import { Suspense, useRef, useEffect, useState, useMemo } from 'react';
 import * as THREE from 'three';
 import { InstancedBufferAttribute } from 'three';
-import { MeshBasicNodeMaterial, WebGPURenderer, SpriteNodeMaterial } from 'three/webgpu';
+import { WebGPURenderer, SpriteNodeMaterial } from 'three/webgpu';
 import {
-    time,
     uv,
     vec3,
     vec4,
@@ -15,7 +16,6 @@ import {
     uniform,
     storage,
     instanceIndex,
-    vertexIndex,
     Fn
 } from 'three/tsl';
 import { PerspectiveCamera } from '@react-three/drei';
@@ -193,7 +193,7 @@ const DebugOverlay = ({ setAudioLevel }: { setAudioLevel: (v: number) => void })
 
 // --- Particle System ---
 const ParticleSystem = ({ isRendererReady }: { isRendererReady: boolean }) => {
-    const { gl, scene } = useThree();
+    const { scene } = useThree();
     const count = 20000;
     const { frequencyData } = useAnalyzer({ fftSize: 2048 }); // Higher FFT size for better resolution
 
@@ -324,7 +324,7 @@ const ParticleSystem = ({ isRendererReady }: { isRendererReady: boolean }) => {
         // 4. Geometry (Instanced Plane)
         const geo = new THREE.InstancedBufferGeometry();
         const base = new THREE.PlaneGeometry(1, 1);
-        geo.copy(base);
+        (geo as THREE.BufferGeometry).copy(base);
         geo.instanceCount = count;
 
         return { computeNode: compute, material: m, geometry: geo };
@@ -431,7 +431,7 @@ export const VisualizerDemo = () => {
                     style={{ filter: 'invert(1) drop-shadow(0 0 10px rgba(200,220,255,0.6)) brightness(1.2) contrast(1.2)' }}
                     gl={({ canvas }) => {
                         const renderer = new WebGPURenderer({
-                            canvas,
+                            canvas: canvas as HTMLCanvasElement,
                             antialias: false,
                             alpha: false,
                             trackTimestamp: false

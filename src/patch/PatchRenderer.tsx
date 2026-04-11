@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { AudioProvider } from '../core';
 import { TransportProvider } from '../transport';
 import { PatchWasmBridge } from '../runtime/wasm/PatchWasmBridge';

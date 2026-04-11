@@ -1,21 +1,62 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import path from 'path'
+import type { Plugin } from 'vite'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const exampleDir = path.dirname(fileURLToPath(import.meta.url))
+const reactDinRoot = path.resolve(exampleDir, '..')
+const dinAudioWorkletShimPath = path.resolve(exampleDir, 'shims/loadDinAudioWorklet.ts')
+
+/** Rollup regex alias + absolute `replacement` can resolve to `../` + abs path (ENOENT). Use resolveId. */
+function dinAudioWorkletShimPlugin(): Plugin {
+  return {
+    name: 'din-audio-worklet-shim',
+    enforce: 'pre',
+    resolveId(id) {
+      const withoutQuery = id.split('?')[0].replace(/\\/g, '/')
+      if (!withoutQuery.includes('/runtime/wasm/loadDinAudioWorklet')) return null
+      if (withoutQuery.includes('/shims/loadDinAudioWorklet')) return null
+      if (/\/runtime\/wasm\/loadDinAudioWorklet(\.|$)/.test(withoutQuery)) {
+        return dinAudioWorkletShimPath
+      }
+      return null
+    },
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [dinAudioWorkletShimPlugin(), react()],
   resolve: {
     dedupe: ['react', 'react-dom'],
-    alias: {
+    alias: [
       // Ensure we use the same React instance everywhere
-      'react': path.resolve(__dirname, '../node_modules/react'),
-      'react-dom': path.resolve(__dirname, '../node_modules/react-dom'),
-      // Use local source for @open-din/react during demo development
-      '@open-din/react': path.resolve(__dirname, '../src/index.ts'),
-      // Resolve like the library: same pkg path as react-din/package.json (monorepo)
-      'din-wasm': path.resolve(__dirname, '../../din-core/crates/din-wasm/pkg'),
-    },
+      { find: 'react', replacement: path.resolve(exampleDir, '../node_modules/react') },
+      { find: 'react-dom', replacement: path.resolve(exampleDir, '../node_modules/react-dom') },
+      // Subpaths must map to source (package.json "exports" point at dist/)
+      {
+        find: '@open-din/react/nodes',
+        replacement: path.resolve(reactDinRoot, 'src/nodes/index.ts'),
+      },
+      {
+        find: '@open-din/react/sources',
+        replacement: path.resolve(reactDinRoot, 'src/sources/index.ts'),
+      },
+      {
+        find: '@open-din/react/synths',
+        replacement: path.resolve(reactDinRoot, 'src/synths/index.ts'),
+      },
+      {
+        find: '@open-din/react/analyzers',
+        replacement: path.resolve(reactDinRoot, 'src/analyzers/index.ts'),
+      },
+      { find: '@open-din/react', replacement: path.resolve(reactDinRoot, 'src/index.ts') },
+      {
+        find: 'din-wasm',
+        replacement: path.resolve(exampleDir, '../../din-core/crates/din-wasm/pkg'),
+      },
+    ],
   },
   // Let WASM load via fetch(instantiateStreaming); avoid corrupting the bindgen wrapper in pre-bundle
   optimizeDeps: {
@@ -26,8 +67,8 @@ export default defineConfig({
   server: {
     fs: {
       allow: [
-        path.resolve(__dirname, '..'),
-        path.resolve(__dirname, '../../din-core'),
+        reactDinRoot,
+        path.resolve(exampleDir, '../../din-core'),
       ],
     },
   },

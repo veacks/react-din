@@ -4,10 +4,8 @@ import {
     useAudio,
     TransportProvider,
     useTransport,
-    Osc,
-    Gain,
-    Filter,
 } from '@open-din/react';
+import { Osc, Gain, Filter } from '@open-din/react/nodes';
 
 /**
  * Transport Demo - Musical Timing and Playback Control
