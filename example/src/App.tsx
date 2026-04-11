@@ -6,6 +6,7 @@ import { SequencerDemo } from './demos/SequencerDemo';
 import { VisualizerDemo } from './demos/VisualizerDemo';
 import { NotesDemo } from './demos/NotesDemo';
 import { LFODemo } from './demos/LFODemo';
+import { PatchWasmDemo } from './demos/PatchWasmDemo';
 import './App.css';
 
 function Home() {
@@ -42,6 +43,10 @@ function Home() {
           <h3>LFO</h3>
           <p>Low Frequency Oscillator modulation</p>
         </Link>
+        <Link href="/patch-wasm" className="demo-link">
+          <h3>Patch (WASM)</h3>
+          <p>PatchRenderer + din-wasm (voir le réseau)</p>
+        </Link>
       </nav>
     </div>
   );
@@ -68,6 +73,7 @@ function App() {
           <Route path="/notes" component={NotesDemo} />
           <Route path="/visualizer" component={VisualizerDemo} />
           <Route path="/lfo" component={LFODemo} />
+          <Route path="/patch-wasm" component={PatchWasmDemo} />
           <Route>
             <div className="not-found">
               <h2>404 - Not Found</h2>

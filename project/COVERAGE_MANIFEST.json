@@ -7,167 +7,8 @@
       "name": "AudioProvider",
       "source": "src/core/AudioProvider.tsx",
       "docs": "docs/components/core/AudioProvider.md",
-      "tests": [
-        "tests/library/core-components.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S01",
-        "F04-S01"
-      ]
-    },
-    {
-      "id": "component:Gain",
-      "kind": "public-component",
-      "name": "Gain",
-      "source": "src/nodes/Gain.tsx",
-      "docs": "docs/components/nodes/Gain.md",
-      "tests": [
-        "tests/library/audio-nodes.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S02",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:Filter",
-      "kind": "public-component",
-      "name": "Filter",
-      "source": "src/nodes/Filter.tsx",
-      "docs": "docs/components/nodes/Filter.md",
-      "tests": [
-        "tests/library/audio-nodes.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S02",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:Osc",
-      "kind": "public-component",
-      "name": "Osc",
-      "source": "src/nodes/Osc.tsx",
-      "docs": "docs/components/nodes/Osc.md",
-      "tests": [
-        "tests/library/audio-nodes.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S02",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:Delay",
-      "kind": "public-component",
-      "name": "Delay",
-      "source": "src/nodes/Delay.tsx",
-      "docs": "docs/components/nodes/Delay.md",
-      "tests": [
-        "tests/library/audio-nodes.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S02",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:Compressor",
-      "kind": "public-component",
-      "name": "Compressor",
-      "source": "src/nodes/Compressor.tsx",
-      "docs": "docs/components/nodes/Compressor.md",
-      "tests": [
-        "tests/library/audio-nodes.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S02",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:Convolver",
-      "kind": "public-component",
-      "name": "Convolver",
-      "source": "src/nodes/Convolver.tsx",
-      "docs": "docs/components/nodes/Convolver.md",
-      "tests": [
-        "tests/library/audio-nodes.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S02",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:Panner",
-      "kind": "public-component",
-      "name": "Panner",
-      "source": "src/nodes/Panner.tsx",
-      "docs": "docs/components/nodes/Panner.md",
-      "tests": [
-        "tests/library/audio-nodes.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S02",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:StereoPanner",
-      "kind": "public-component",
-      "name": "StereoPanner",
-      "source": "src/nodes/StereoPanner.tsx",
-      "docs": "docs/components/nodes/StereoPanner.md",
-      "tests": [
-        "tests/library/audio-nodes.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S02",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:WaveShaper",
-      "kind": "public-component",
-      "name": "WaveShaper",
-      "source": "src/nodes/WaveShaper.tsx",
-      "docs": "docs/components/nodes/WaveShaper.md",
-      "tests": [
-        "tests/library/audio-nodes.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S02",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:PresetWaveShaper",
-      "kind": "public-component",
-      "name": "PresetWaveShaper",
-      "source": "src/nodes/PresetWaveShaper.tsx",
-      "docs": "docs/components/nodes/PresetWaveShaper.md",
-      "tests": [
-        "tests/library/audio-nodes.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:ADSR",
-      "kind": "public-component",
-      "name": "ADSR",
-      "source": "src/nodes/ADSR.tsx",
-      "docs": "docs/components/nodes/ADSR.md",
-      "tests": [
-        "tests/library/audio-nodes.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S02",
-        "F04-S02"
-      ]
+      "tests": ["tests/library/core-components.spec.tsx"],
+      "scenarios": ["F01-S01", "F04-S01"]
     },
     {
       "id": "component:TransportProvider",
@@ -175,13 +16,8 @@
       "name": "TransportProvider",
       "source": "src/transport/TransportContext.tsx",
       "docs": "docs/components/transport/TransportProvider.md",
-      "tests": [
-        "tests/library/transport-sequencer.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
+      "tests": ["tests/library/transport-sequencer.spec.tsx"],
+      "scenarios": ["F01-S03", "F04-S02"]
     },
     {
       "id": "component:Sequencer",
@@ -189,13 +25,8 @@
       "name": "Sequencer",
       "source": "src/sequencer/Sequencer.tsx",
       "docs": "docs/components/sequencer/Sequencer.md",
-      "tests": [
-        "tests/library/transport-sequencer.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
+      "tests": ["tests/library/transport-sequencer.spec.tsx"],
+      "scenarios": ["F01-S03", "F04-S02"]
     },
     {
       "id": "component:Track",
@@ -203,13 +34,8 @@
       "name": "Track",
       "source": "src/sequencer/Track.tsx",
       "docs": "docs/components/sequencer/Track.md",
-      "tests": [
-        "tests/library/transport-sequencer.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
+      "tests": ["tests/library/transport-sequencer.spec.tsx"],
+      "scenarios": ["F01-S03", "F04-S02"]
     },
     {
       "id": "component:EventTrigger",
@@ -217,266 +43,8 @@
       "name": "EventTrigger",
       "source": "src/sequencer/EventTrigger.tsx",
       "docs": "docs/components/sequencer/EventTrigger.md",
-      "tests": [
-        "tests/library/transport-sequencer.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:Analyzer",
-      "kind": "public-component",
-      "name": "Analyzer",
-      "source": "src/analyzers/Analyzer.tsx",
-      "docs": "docs/components/analyzers/Analyzer.md",
-      "tests": [
-        "tests/library/analyzers.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:Sampler",
-      "kind": "public-component",
-      "name": "Sampler",
-      "source": "src/sources/Sampler.tsx",
-      "docs": "docs/components/sources/Sampler.md",
-      "tests": [
-        "tests/library/sources-effects.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:TriggeredSampler",
-      "kind": "public-component",
-      "name": "TriggeredSampler",
-      "source": "src/sources/TriggeredSampler.tsx",
-      "docs": "docs/components/sources/TriggeredSampler.md",
-      "tests": [
-        "tests/library/sources-effects.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:Noise",
-      "kind": "public-component",
-      "name": "Noise",
-      "source": "src/sources/Noise.tsx",
-      "docs": "docs/components/sources/Noise.md",
-      "tests": [
-        "tests/library/sources-effects.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:NoiseBurst",
-      "kind": "public-component",
-      "name": "NoiseBurst",
-      "source": "src/sources/NoiseBurst.tsx",
-      "docs": "docs/components/sources/NoiseBurst.md",
-      "tests": [
-        "tests/library/sources-effects.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:MediaStream",
-      "kind": "public-component",
-      "name": "MediaStream",
-      "source": "src/sources/MediaStream.tsx",
-      "docs": "docs/components/sources/MediaStream.md",
-      "tests": [
-        "tests/library/sources-effects.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:ConstantSource",
-      "kind": "public-component",
-      "name": "ConstantSource",
-      "source": "src/sources/ConstantSource.tsx",
-      "docs": "docs/components/sources/ConstantSource.md",
-      "tests": [
-        "tests/library/sources-effects.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:LFO",
-      "kind": "public-component",
-      "name": "LFO",
-      "source": "src/sources/LFO.tsx",
-      "docs": "docs/components/sources/LFO.md",
-      "tests": [
-        "tests/library/sources-effects.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:Reverb",
-      "kind": "public-component",
-      "name": "Reverb",
-      "source": "src/effects/Reverb.tsx",
-      "docs": "docs/components/effects/Reverb.md",
-      "tests": [
-        "tests/library/sources-effects.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:Chorus",
-      "kind": "public-component",
-      "name": "Chorus",
-      "source": "src/effects/Chorus.tsx",
-      "docs": "docs/components/effects/Chorus.md",
-      "tests": [
-        "tests/library/sources-effects.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:Distortion",
-      "kind": "public-component",
-      "name": "Distortion",
-      "source": "src/effects/Distortion.tsx",
-      "docs": "docs/components/effects/Distortion.md",
-      "tests": [
-        "tests/library/sources-effects.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:Phaser",
-      "kind": "public-component",
-      "name": "Phaser",
-      "source": "src/effects/Phaser.tsx",
-      "docs": "docs/components/effects/Phaser.md",
-      "tests": [
-        "tests/library/sources-effects.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:Flanger",
-      "kind": "public-component",
-      "name": "Flanger",
-      "source": "src/effects/Flanger.tsx",
-      "docs": "docs/components/effects/Flanger.md",
-      "tests": [
-        "tests/library/sources-effects.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:Tremolo",
-      "kind": "public-component",
-      "name": "Tremolo",
-      "source": "src/effects/Tremolo.tsx",
-      "docs": "docs/components/effects/Tremolo.md",
-      "tests": [
-        "tests/library/sources-effects.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:EQ3",
-      "kind": "public-component",
-      "name": "EQ3",
-      "source": "src/effects/EQ3.tsx",
-      "docs": "docs/components/effects/EQ3.md",
-      "tests": [
-        "tests/library/sources-effects.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:AuxSend",
-      "kind": "public-component",
-      "name": "AuxSend",
-      "source": "src/routing/AuxSend.tsx",
-      "docs": "docs/components/routing/AuxSend.md",
-      "tests": [
-        "tests/library/sources-effects.spec.tsx",
-        "tests/library/audio-nodes.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:AuxReturn",
-      "kind": "public-component",
-      "name": "AuxReturn",
-      "source": "src/routing/AuxReturn.tsx",
-      "docs": "docs/components/routing/AuxReturn.md",
-      "tests": [
-        "tests/library/sources-effects.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
-    },
-    {
-      "id": "component:MatrixMixer",
-      "kind": "public-component",
-      "name": "MatrixMixer",
-      "source": "src/routing/MatrixMixer.tsx",
-      "docs": "docs/components/routing/MatrixMixer.md",
-      "tests": [
-        "tests/library/sources-effects.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S03",
-        "F04-S02"
-      ]
+      "tests": ["tests/library/transport-sequencer.spec.tsx"],
+      "scenarios": ["F01-S03", "F04-S02"]
     },
     {
       "id": "component:MidiProvider",
@@ -484,13 +52,8 @@
       "name": "MidiProvider",
       "source": "src/midi/MidiProvider.tsx",
       "docs": "docs/components/midi/MidiProvider.md",
-      "tests": [
-        "tests/library/midi.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S04",
-        "F04-S02"
-      ]
+      "tests": ["tests/library/midi.spec.tsx"],
+      "scenarios": ["F01-S04", "F04-S02"]
     },
     {
       "id": "component:Patch",
@@ -498,13 +61,8 @@
       "name": "Patch",
       "source": "src/patch/Patch.tsx",
       "docs": "docs/components/patch/Patch.md",
-      "tests": [
-        "tests/library/patch.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S05",
-        "F04-S03"
-      ]
+      "tests": ["tests/library/patch.spec.tsx"],
+      "scenarios": ["F01-S05", "F04-S03"]
     },
     {
       "id": "component:PatchOutput",
@@ -512,13 +70,8 @@
       "name": "PatchOutput",
       "source": "src/patch/PatchOutput.tsx",
       "docs": "docs/components/patch/PatchOutput.md",
-      "tests": [
-        "tests/library/patch.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S05",
-        "F04-S03"
-      ]
+      "tests": ["tests/library/patch.spec.tsx"],
+      "scenarios": ["F01-S05", "F04-S03"]
     },
     {
       "id": "component:PatchRenderer",
@@ -526,13 +79,8 @@
       "name": "PatchRenderer",
       "source": "src/patch/PatchRenderer.tsx",
       "docs": "docs/components/patch/PatchRenderer.md",
-      "tests": [
-        "tests/library/patch.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S05",
-        "F04-S03"
-      ]
+      "tests": ["tests/library/patch.spec.tsx"],
+      "scenarios": ["F01-S05", "F04-S03"]
     },
     {
       "id": "component:MidiNoteInput",
@@ -540,13 +88,8 @@
       "name": "MidiNoteInput",
       "source": "src/midi/MidiNoteInput.tsx",
       "docs": "docs/components/midi/MidiNoteInput.md",
-      "tests": [
-        "tests/library/midi.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S04",
-        "F04-S02"
-      ]
+      "tests": ["tests/library/midi.spec.tsx"],
+      "scenarios": ["F01-S04", "F04-S02"]
     },
     {
       "id": "component:MidiCCInput",
@@ -554,13 +97,8 @@
       "name": "MidiCCInput",
       "source": "src/midi/MidiCCInput.tsx",
       "docs": "docs/components/midi/MidiCCInput.md",
-      "tests": [
-        "tests/library/midi.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S04",
-        "F04-S02"
-      ]
+      "tests": ["tests/library/midi.spec.tsx"],
+      "scenarios": ["F01-S04", "F04-S02"]
     },
     {
       "id": "component:MidiNoteOutput",
@@ -568,13 +106,8 @@
       "name": "MidiNoteOutput",
       "source": "src/midi/MidiNoteOutput.tsx",
       "docs": "docs/components/midi/MidiNoteOutput.md",
-      "tests": [
-        "tests/library/midi.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S04",
-        "F04-S02"
-      ]
+      "tests": ["tests/library/midi.spec.tsx"],
+      "scenarios": ["F01-S04", "F04-S02"]
     },
     {
       "id": "component:MidiCCOutput",
@@ -582,13 +115,8 @@
       "name": "MidiCCOutput",
       "source": "src/midi/MidiCCOutput.tsx",
       "docs": "docs/components/midi/MidiCCOutput.md",
-      "tests": [
-        "tests/library/midi.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S04",
-        "F04-S02"
-      ]
+      "tests": ["tests/library/midi.spec.tsx"],
+      "scenarios": ["F01-S04", "F04-S02"]
     },
     {
       "id": "component:MidiTransportSync",
@@ -596,14 +124,8 @@
       "name": "MidiTransportSync",
       "source": "src/midi/MidiTransportSync.tsx",
       "docs": "docs/components/midi/MidiTransportSync.md",
-      "tests": [
-        "tests/library/midi.spec.tsx",
-        "tests/library/transport-sequencer.spec.tsx"
-      ],
-      "scenarios": [
-        "F01-S04",
-        "F04-S02"
-      ]
+      "tests": ["tests/library/midi.spec.tsx", "tests/library/transport-sequencer.spec.tsx"],
+      "scenarios": ["F01-S04", "F04-S02"]
     }
   ]
 }

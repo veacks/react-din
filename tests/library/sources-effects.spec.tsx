@@ -1,25 +1,16 @@
 import { render } from '@testing-library/react';
 import React from 'react';
+import { AudioProvider, EventTrigger } from '@open-din/react';
+import { Chorus, Distortion, EQ3, Flanger, Phaser, Reverb, Tremolo } from '@open-din/react/effects';
+import { AuxReturn, AuxSend, MatrixMixer } from '@open-din/react/routing';
 import {
-    AudioProvider,
-    AuxReturn,
-    AuxSend,
-    Chorus,
     ConstantSource,
-    Distortion,
-    EQ3,
-    EventTrigger,
-    Flanger,
     LFO,
-    MatrixMixer,
     Noise,
     NoiseBurst,
-    Phaser,
-    Reverb,
     Sampler,
-    Tremolo,
     TriggeredSampler,
-} from '@open-din/react';
+} from '@open-din/react/sources';
 
 describe('sources and effects', () => {
     it('mounts representative source and effect chains without crashing', () => {

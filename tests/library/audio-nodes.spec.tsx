@@ -1,9 +1,9 @@
 import { render, waitFor } from '@testing-library/react';
 import React, { createRef } from 'react';
+import { AudioProvider } from '@open-din/react';
+import { AuxSend } from '@open-din/react/routing';
 import {
     ADSR,
-    AudioProvider,
-    AuxSend,
     Compressor,
     Delay,
     Filter,
@@ -13,8 +13,8 @@ import {
     PresetWaveShaper,
     StereoPanner,
     WaveShaper,
-    useLFO,
-} from '@open-din/react';
+} from '@open-din/react/nodes';
+import { useLFO } from '@open-din/react/sources';
 
 const FilterHarness = () => {
     const lfo = useLFO({ rate: 0.5, depth: 24, waveform: 'sine' });
